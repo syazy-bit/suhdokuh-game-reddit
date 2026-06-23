@@ -203,8 +203,21 @@ router.post<{ postId: string }, SubmitScoreResponse, SubmitScoreRequest>(
         : [];
 
       // ── 5. Deduplicate: keep only the user's personal best ───────────
-      // Remove any existing entries for this user, then insert the new one.
-      // This ensures each player occupies at most one slot on the board.
+      const existingEntry = entries.find((e) => e.username === username);
+
+      // If they already have a faster (or equal) time, keep it and ignore this slower submission.
+      if (existingEntry && existingEntry.time <= time) {
+        console.log(`[SCORE] ${username} submitted ${time}s for ${mode}, but their personal best (${existingEntry.time}s) is faster.`);
+        res.json({
+          type: "submit-score",
+          status: "success",
+          message: "Score submitted, but your personal best is still faster.",
+        });
+        return;
+      }
+
+      // Otherwise, they beat their old score (or it's their first time).
+      // Remove the old entry and insert the new one.
       entries = entries.filter((e) => e.username !== username);
       entries.push({
         username,
