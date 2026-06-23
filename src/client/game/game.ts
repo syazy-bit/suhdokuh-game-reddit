@@ -508,54 +508,51 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   /**
-   * Place a number in the selected cell
+   * Place a number in the selected cell.
+   *
+   * Conflicting placements are allowed — they are written to the grid and
+   * visually marked with the `conflict` CSS class by renderGrid(). The player
+   * must clear/correct conflicting cells before checkWin() can return true.
    */
   function placeNumber(num: number): void {
     if (state.gameWon || !state.selected) return;
 
     const { r, c } = state.selected;
 
-    // Check if cell is empty (can be edited)
+    // Locked cells (given clues) may never be overwritten.
     const puzzleCell = puzzle[r]?.[c];
     if (puzzleCell !== 0) return;
 
-    // Only place if valid
-    if (isValidMove(r, c, num)) {
-      const gridRow = state.grid[r];
-      if (gridRow) {
-        gridRow[c] = num;
-      }
-      // Start the timer on the first successful number placement.
-      // startTimer() is a no-op if the timer is already running.
-      startTimer();
+    // Write the number unconditionally — conflicts are shown visually, not blocked.
+    const gridRow = state.grid[r];
+    if (gridRow) {
+      gridRow[c] = num;
+    }
 
-      state.selected = null;
-      renderGrid();
+    // Start the timer on the first placement (valid or conflicting).
+    // startTimer() is a no-op if the timer is already running.
+    startTimer();
 
-      // Check for win condition
-      if (checkWin()) {
-        state.gameWon = true;
-        stopTimer();
-        message.classList.add("success");
-        message.textContent = "🎉 You solved the puzzle! Submitting score...";
+    state.selected = null;
+    renderGrid();
 
-        // Submit score and load next puzzle
-        submitScore().then(() => {
-          setTimeout(() => {
-            resetPuzzle();
-          }, 2000);
-        });
-      } else {
-        updateMessage("");
-      }
+    // Check for win condition.
+    // checkWin() compares state.grid against the solution array, so a board
+    // containing any conflicting or incorrect value will never return true.
+    if (checkWin()) {
+      state.gameWon = true;
+      stopTimer();
+      message.classList.add("success");
+      message.textContent = "🎉 You solved the puzzle! Submitting score...";
+
+      // Submit score and load next puzzle
+      submitScore().then(() => {
+        setTimeout(() => {
+          resetPuzzle();
+        }, 2000);
+      });
     } else {
-      // Show validation error
-      message.classList.add("error");
-      message.textContent = "❌ This number conflicts with another cell!";
-      setTimeout(() => {
-        message.classList.remove("error");
-        updateMessage("");
-      }, 2000);
+      updateMessage("");
     }
   }
 
