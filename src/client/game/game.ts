@@ -159,10 +159,7 @@ async function fetchPuzzleFromAPI(mode: GameMode): Promise<PuzzleData> {
     };
   } catch (error) {
     console.error("[CLIENT] Failed to fetch puzzle from backend:", error);
-    // Fallback should be handled by the backend, but just in case:
-    console.warn(
-      "[CLIENT] This should not happen - backend should handle fallback",
-    );
+    // Re-throw so resetPuzzle() can fall back to local puzzle library.
     throw error;
   }
 }
@@ -579,38 +576,76 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   /**
-   * Reset the puzzle and load a new one
+   * Reset the puzzle and load a new one.
+   *
+   * Two-layer fallback strategy:
+   *   1. Try the server-side /api/puzzle endpoint (which itself falls back
+   *      to server-side static puzzles if the generator fails).
+   *   2. If the entire API call fails (network error, server down, etc.),
+   *      silently use a random puzzle from the client-side library so the
+   *      user can always play without a page refresh.
    */
   async function resetPuzzle(): Promise<void> {
+    // Show loading state
+    message.classList.remove("success", "error");
+    message.classList.add("info");
+    message.textContent = "Loading puzzle...";
+
+    let currentPuzzle: PuzzleData;
+    let usingFallback = false;
+
     try {
-      // Show loading state
-      message.textContent = "Loading puzzle...";
-      message.classList.add("info");
-
-      // Get a new puzzle from API (or fallback)
-      const currentPuzzle = await fetchPuzzleFromAPI(state.mode);
-      puzzle = currentPuzzle.puzzle.map((r) => [...r]);
-      solution = currentPuzzle.solution.map((r) => [...r]);
-
-      // Reset game state
-      state.grid = puzzle.map((r) => [...r]);
-      state.selected = null;
-      state.gameWon = false;
-      state.startTime = null;
-      state.elapsedTime = 0;
-      stopTimer();
-      message.classList.remove("success", "error", "info");
-      updateMessage("");
-      if (timer) {
-        timer.textContent = "0:00";
+      currentPuzzle = await fetchPuzzleFromAPI(state.mode);
+    } catch (apiError) {
+      // API is unreachable or returned an error — use local fallback.
+      console.warn(
+        `[CLIENT] API unavailable for ${state.mode}, using local fallback:`,
+        apiError instanceof Error ? apiError.message : apiError,
+      );
+      try {
+        currentPuzzle = getRandomFallbackPuzzle(state.mode);
+        usingFallback = true;
+      } catch (fallbackError) {
+        // Both API and local library failed — this should never happen.
+        console.error("[CLIENT] Local fallback also failed:", fallbackError);
+        message.classList.remove("info");
+        message.classList.add("error");
+        message.textContent = "Failed to load puzzle. Please refresh the page.";
+        return;
       }
-      renderGrid();
-      renderNumbers();
-    } catch (error) {
-      console.error("Error loading puzzle:", error);
-      message.classList.add("error");
-      message.textContent = "Failed to load puzzle. Please try again.";
     }
+
+    // Apply the puzzle (from API or local fallback)
+    puzzle = currentPuzzle.puzzle.map((r) => [...r]);
+    solution = currentPuzzle.solution.map((r) => [...r]);
+
+    // Reset game state
+    state.grid = puzzle.map((r) => [...r]);
+    state.selected = null;
+    state.gameWon = false;
+    state.startTime = null;
+    state.elapsedTime = 0;
+    stopTimer();
+
+    message.classList.remove("success", "error", "info");
+    if (usingFallback) {
+      // Let the user know they are in offline mode — non-intrusive.
+      message.classList.add("info");
+      message.textContent = "Playing in offline mode.";
+      // Clear it after 3 s so it doesn't linger during gameplay.
+      setTimeout(() => {
+        message.classList.remove("info");
+        updateMessage("");
+      }, 3000);
+    } else {
+      updateMessage("");
+    }
+
+    if (timer) {
+      timer.textContent = "0:00";
+    }
+    renderGrid();
+    renderNumbers();
   }
 
   /**
