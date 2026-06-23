@@ -452,11 +452,10 @@ document.addEventListener("DOMContentLoaded", () => {
             cell.textContent = value.toString();
           }
 
-          // Add click handler for selection
+          // Add click handler for selection only — timer starts on first number placement, not selection.
           cell.addEventListener("click", () => {
             state.selected = { r, c };
             highlightSelected();
-            startTimer();
           });
 
           // Check for validation errors (conflict with other cells)
@@ -526,6 +525,10 @@ document.addEventListener("DOMContentLoaded", () => {
       if (gridRow) {
         gridRow[c] = num;
       }
+      // Start the timer on the first successful number placement.
+      // startTimer() is a no-op if the timer is already running.
+      startTimer();
+
       state.selected = null;
       renderGrid();
 
@@ -543,7 +546,6 @@ document.addEventListener("DOMContentLoaded", () => {
           }, 2000);
         });
       } else {
-        startTimer();
         updateMessage("");
       }
     } else {
@@ -672,7 +674,7 @@ document.addEventListener("DOMContentLoaded", () => {
       btn.textContent = n.toString();
       btn.addEventListener("click", () => {
         placeNumber(n);
-        startTimer();
+        // Timer is started inside placeNumber() on the first valid placement.
       });
       numbers.appendChild(btn);
     }
@@ -724,7 +726,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const num = parseInt(key, 10);
       if (num <= maxNumbers) {
         placeNumber(num);
-        startTimer();
+        // Timer is started inside placeNumber() on the first valid placement.
       }
     } else if (key === "Backspace" || key === "Delete") {
       clearCell();
