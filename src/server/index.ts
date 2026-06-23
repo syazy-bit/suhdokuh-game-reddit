@@ -532,7 +532,6 @@ router.post<{ postId: string }, PuzzleResponse, PuzzleRequest>(
     }
   },
 );
-
 router.post("/internal/on-app-install", async (_req, res): Promise<void> => {
   try {
     const post = await createPost();
