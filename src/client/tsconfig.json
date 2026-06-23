@@ -9,9 +9,6 @@
 
     "outDir": "../../dist/types/client",
 
-    // React
-    "jsx": "react-jsx",
-
     "tsBuildInfoFile": "../../dist/types/client/tsconfig.tsbuildinfo"
   },
   // https://github.com/Microsoft/TypeScript/issues/25636

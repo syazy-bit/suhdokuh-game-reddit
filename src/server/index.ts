@@ -1,8 +1,6 @@
 import express from "express";
 import {
   InitResponse,
-  IncrementResponse,
-  DecrementResponse,
   SubmitScoreRequest,
   SubmitScoreResponse,
   LeaderboardResponse,
@@ -69,47 +67,6 @@ router.get<
   }
 });
 
-router.post<
-  { postId: string },
-  IncrementResponse | { status: string; message: string },
-  unknown
->("/api/increment", async (_req, res): Promise<void> => {
-  const { postId } = context;
-  if (!postId) {
-    res.status(400).json({
-      status: "error",
-      message: "postId is required",
-    });
-    return;
-  }
-
-  res.json({
-    count: await redis.incrBy("count", 1),
-    postId,
-    type: "increment",
-  });
-});
-
-router.post<
-  { postId: string },
-  DecrementResponse | { status: string; message: string },
-  unknown
->("/api/decrement", async (_req, res): Promise<void> => {
-  const { postId } = context;
-  if (!postId) {
-    res.status(400).json({
-      status: "error",
-      message: "postId is required",
-    });
-    return;
-  }
-
-  res.json({
-    count: await redis.incrBy("count", -1),
-    postId,
-    type: "decrement",
-  });
-});
 
 // Minimum realistic human completion times (seconds) per mode.
 // These are generous lower bounds: a 4×4 expert needs ≥ 5 s,

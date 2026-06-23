@@ -5,17 +5,6 @@ export type InitResponse = {
   username: string;
 };
 
-export type IncrementResponse = {
-  type: "increment";
-  postId: string;
-  count: number;
-};
-
-export type DecrementResponse = {
-  type: "decrement";
-  postId: string;
-  count: number;
-};
 
 export type GameMode = "4x4" | "9x9";
 
@@ -44,10 +33,6 @@ export type LeaderboardResponse = {
   entries: LeaderboardEntry[];
 };
 
-export type LeaderboardRequest = {
-  mode: GameMode;
-  limit?: number; // default 10
-};
 
 export type PuzzleRequest = {
   mode: GameMode;
