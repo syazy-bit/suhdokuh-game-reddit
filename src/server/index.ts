@@ -408,6 +408,44 @@ router.post<{ postId: string }, PuzzleResponse, PuzzleRequest>(
       return;
     }
 
+    // ── Rate limiting (10 requests per user per 60 seconds) ───────────────
+    // Key is scoped to the authenticated user so users never share a bucket.
+    const RATE_LIMIT = 10;
+    const RATE_WINDOW = 60; // seconds
+
+    try {
+      const rlUsername = await reddit.getCurrentUsername();
+      if (rlUsername) {
+        const rlKey = `rl:puzzle:${rlUsername}`;
+        const count = await redis.incrBy(rlKey, 1);
+
+        // On the very first request in this window, set the TTL.
+        // Subsequent increments within the window do NOT reset the expiry.
+        if (count === 1) {
+          await redis.expire(rlKey, RATE_WINDOW);
+        }
+
+        if (count > RATE_LIMIT) {
+          console.log(
+            `[SERVER] Rate limit exceeded for ${rlUsername}: ${count} requests in window`
+          );
+          res.status(429).json({
+            type: "puzzle",
+            status: "error",
+            puzzle: [],
+            solution: [],
+            message: `Too many puzzle requests. Please wait a moment before requesting another puzzle.`,
+          });
+          return;
+        }
+      }
+    } catch (rlError) {
+      // Rate limiter failure is non-fatal — allow the request through rather
+      // than blocking gameplay due to a transient Redis error.
+      console.warn("[SERVER] Rate limit check failed (non-fatal):", rlError);
+    }
+    // ─────────────────────────────────────────────────────────────────────
+
     try {
       const { mode } = req.body;
       console.log(`[SERVER] Requested mode: ${mode}`);
