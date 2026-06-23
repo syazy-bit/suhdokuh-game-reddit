@@ -27,9 +27,10 @@ export type LeaderboardEntry = {
 };
 
 export type SubmitScoreRequest = {
-  username: string;
+  // username is intentionally omitted — the server resolves it from
+  // the authenticated Reddit session via reddit.getCurrentUsername().
   mode: GameMode;
-  time: number;
+  time: number; // completion time in seconds
 };
 
 export type SubmitScoreResponse = {

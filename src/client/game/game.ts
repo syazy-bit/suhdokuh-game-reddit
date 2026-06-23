@@ -357,7 +357,8 @@ document.addEventListener("DOMContentLoaded", () => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          username: state.username,
+          // username is NOT sent — the server resolves it from the
+          // authenticated Reddit session to prevent spoofing.
           mode: state.mode,
           time: state.elapsedTime,
         }),
@@ -365,6 +366,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
       if (response.ok) {
         await loadLeaderboard();
+      } else {
+        const data = await response.json().catch(() => null);
+        console.warn("Score submission rejected:", data?.message ?? response.status);
       }
     } catch (error) {
       console.error("Error submitting score:", error);

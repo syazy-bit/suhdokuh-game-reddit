@@ -111,6 +111,38 @@ router.post<
   });
 });
 
+// Minimum realistic human completion times (seconds) per mode.
+// These are generous lower bounds: a 4×4 expert needs ≥ 5 s,
+// a 9×9 expert needs ≥ 30 s (world record ~17 s with extensive practice).
+const MIN_TIME: Record<string, number> = { "4x4": 5, "9x9": 30 };
+// Upper bound: 24 h (86 400 s).  Anything beyond is likely a left-open tab.
+const MAX_TIME = 86_400;
+
+// Valid mode literals – used to prevent Redis key injection.
+const VALID_MODES = new Set<string>(["4x4", "9x9"]);
+
+/**
+ * Sanitise a raw leaderboard array read from Redis.
+ * Filters out any entries that are structurally invalid so a single
+ * corrupt record can never break the entire leaderboard.
+ */
+function sanitiseLeaderboard(raw: unknown): LeaderboardEntry[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter(
+    (e): e is LeaderboardEntry =>
+      e !== null &&
+      typeof e === "object" &&
+      typeof (e as LeaderboardEntry).username === "string" &&
+      (e as LeaderboardEntry).username.trim().length > 0 &&
+      typeof (e as LeaderboardEntry).mode === "string" &&
+      VALID_MODES.has((e as LeaderboardEntry).mode) &&
+      typeof (e as LeaderboardEntry).time === "number" &&
+      Number.isFinite((e as LeaderboardEntry).time) &&
+      (e as LeaderboardEntry).time > 0 &&
+      typeof (e as LeaderboardEntry).timestamp === "number",
+  );
+}
+
 router.post<{ postId: string }, SubmitScoreResponse, SubmitScoreRequest>(
   "/api/submit-score",
   async (req, res): Promise<void> => {
@@ -125,42 +157,71 @@ router.post<{ postId: string }, SubmitScoreResponse, SubmitScoreRequest>(
     }
 
     try {
-      const { username, mode, time } = req.body;
-
-      if (!username || !mode || typeof time !== "number") {
-        res.status(400).json({
+      // ── 1. Resolve authenticated username ────────────────────────────
+      // Never trust req.body.username – always derive from Reddit session.
+      const username = await reddit.getCurrentUsername();
+      if (!username) {
+        res.status(401).json({
           type: "submit-score",
           status: "error",
-          message: "Invalid request body",
+          message: "You must be logged in to submit a score",
         });
         return;
       }
 
-      // Create a unique key for each mode's leaderboard
-      const leaderboardKey = `leaderboard:${mode}`;
+      // ── 2. Validate mode ─────────────────────────────────────────────
+      const { mode, time } = req.body;
+      if (!mode || !VALID_MODES.has(mode)) {
+        res.status(400).json({
+          type: "submit-score",
+          status: "error",
+          message: "Invalid game mode",
+        });
+        return;
+      }
 
-      // Get current leaderboard
-      const leaderboardData = await redis.get(leaderboardKey);
-      let entries: LeaderboardEntry[] = leaderboardData
-        ? JSON.parse(leaderboardData)
+      // ── 3. Validate time ─────────────────────────────────────────────
+      if (
+        typeof time !== "number" ||
+        !Number.isFinite(time) ||
+        time < (MIN_TIME[mode] ?? 5) ||
+        time > MAX_TIME
+      ) {
+        res.status(400).json({
+          type: "submit-score",
+          status: "error",
+          message: `Invalid completion time for ${mode} (must be ${MIN_TIME[mode] ?? 5}–${MAX_TIME} seconds)`,
+        });
+        return;
+      }
+
+      // ── 4. Load and sanitise the existing leaderboard ────────────────
+      const leaderboardKey = `leaderboard:${mode}`;
+      const raw = await redis.get(leaderboardKey);
+      let entries: LeaderboardEntry[] = raw
+        ? sanitiseLeaderboard(JSON.parse(raw))
         : [];
 
-      // Add new entry
-      const newEntry: LeaderboardEntry = {
+      // ── 5. Deduplicate: keep only the user's personal best ───────────
+      // Remove any existing entries for this user, then insert the new one.
+      // This ensures each player occupies at most one slot on the board.
+      entries = entries.filter((e) => e.username !== username);
+      entries.push({
         username,
         mode,
         time,
         timestamp: Date.now(),
-      };
+      });
 
-      entries.push(newEntry);
-
-      // Sort by time (ascending - faster is better) and keep top 50
+      // ── 6. Sort ascending (fastest first) and cap at 50 entries ──────
       entries.sort((a, b) => a.time - b.time);
       entries = entries.slice(0, 50);
 
-      // Store updated leaderboard
       await redis.set(leaderboardKey, JSON.stringify(entries));
+
+      console.log(
+        `[SCORE] ${username} submitted ${time}s for ${mode}`,
+      );
 
       res.json({
         type: "submit-score",
@@ -169,7 +230,7 @@ router.post<{ postId: string }, SubmitScoreResponse, SubmitScoreRequest>(
       });
     } catch (error) {
       console.error(`Error submitting score: ${error}`);
-      res.status(400).json({
+      res.status(500).json({
         type: "submit-score",
         status: "error",
         message: "Failed to submit score",
@@ -196,9 +257,9 @@ router.get<
     const limit = Math.min(parseInt(req.query.limit as string) || 10, 50);
 
     const leaderboardKey = `leaderboard:${mode}`;
-    const leaderboardData = await redis.get(leaderboardKey);
-    let entries: LeaderboardEntry[] = leaderboardData
-      ? JSON.parse(leaderboardData)
+    const rawData = await redis.get(leaderboardKey);
+    const entries: LeaderboardEntry[] = rawData
+      ? sanitiseLeaderboard(JSON.parse(rawData))
       : [];
 
     // Return top entries
