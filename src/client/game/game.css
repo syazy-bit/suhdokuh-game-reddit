@@ -277,6 +277,48 @@ h2 {
   }
 }
 
+/* Action buttons container */
+.action-buttons {
+  display: flex;
+  gap: 12px;
+  width: 100%;
+  justify-content: center;
+}
+
+/* Undo button */
+.undo-btn {
+  padding: 12px 24px;
+  font-size: 1em;
+  font-weight: 600;
+  background-color: #fff;
+  color: var(--primary);
+  border: 2px solid var(--primary);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(217, 57, 0, 0.15);
+}
+
+.undo-btn:hover:not(:disabled) {
+  background-color: var(--primary);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(217, 57, 0, 0.3);
+  transform: translateY(-2px);
+}
+
+.undo-btn:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 1px 4px rgba(217, 57, 0, 0.3);
+}
+
+.undo-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  border-color: #ccc;
+  color: #999;
+  box-shadow: none;
+}
+
 /* Reset button */
 .reset-btn {
   padding: 12px 24px;
@@ -433,6 +475,11 @@ h2 {
     font-size: 1.1em;
   }
 
+  .action-buttons {
+    flex-direction: column;
+  }
+
+  .undo-btn,
   .reset-btn {
     width: 100%;
   }

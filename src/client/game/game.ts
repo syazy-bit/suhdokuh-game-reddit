@@ -21,6 +21,14 @@ interface PuzzleData {
   solution: number[][];
 }
 
+interface Move {
+  row: number;
+  col: number;
+  oldValue: number;
+  newValue: number;
+  selectionBeforeMove: { r: number; c: number } | null;
+}
+
 // Fallback puzzle libraries (for when API fails)
 const puzzleLibrary4x4: PuzzleData[] = [
   {
@@ -257,6 +265,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const leaderboardEl = document.getElementById(
     "leaderboard",
   ) as HTMLDivElement | null;
+  const undoBtn = document.getElementById(
+    "undo-btn",
+  ) as HTMLButtonElement | null;
 
   // Validate all required elements exist
   if (!gridEl || !numbersEl || !messageEl || !modeSelect || !leaderboardEl) {
@@ -303,6 +314,8 @@ document.addEventListener("DOMContentLoaded", () => {
   let puzzle: number[][] = [];
   let solution: number[][] = [];
   let timerInterval: number | null = null;
+  let winResetTimeout: number | null = null;
+  const moveHistory: Move[] = [];
 
   /**
    * Get grid size based on mode
@@ -602,9 +615,18 @@ document.addEventListener("DOMContentLoaded", () => {
     const puzzleCell = puzzle[r]?.[c];
     if (puzzleCell !== 0) return;
 
-    // Write the number unconditionally — conflicts are shown visually, not blocked.
+    // Record move before changing the grid
     const gridRow = state.grid[r];
     if (gridRow) {
+      const oldValue = gridRow[c] ?? 0;
+      if (oldValue === num) return;
+      moveHistory.push({
+        row: r,
+        col: c,
+        oldValue,
+        newValue: num,
+        selectionBeforeMove: state.selected ? { ...state.selected } : null,
+      });
       gridRow[c] = num;
     }
 
@@ -613,6 +635,7 @@ document.addEventListener("DOMContentLoaded", () => {
     startTimer();
 
     renderGrid();
+    updateUndoButton();
 
     // Check for win condition.
     // checkWin() compares state.grid against the solution array, so a board
@@ -625,9 +648,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // Submit score and load next puzzle
       submitScore().then(() => {
-        setTimeout(() => {
-          resetPuzzle();
-        }, 2000);
+        if (state.gameWon) {
+          winResetTimeout = window.setTimeout(() => {
+            resetPuzzle();
+          }, 2000);
+        }
       });
     } else {
       updateMessage("");
@@ -645,11 +670,53 @@ document.addEventListener("DOMContentLoaded", () => {
     if (puzzleCell === 0) {
       const gridRow = state.grid[r];
       if (gridRow) {
+        const oldValue = gridRow[c] ?? 0;
+        if (oldValue === 0) return;
+        moveHistory.push({
+          row: r,
+          col: c,
+          oldValue,
+          newValue: 0,
+          selectionBeforeMove: state.selected ? { ...state.selected } : null,
+        });
         gridRow[c] = 0;
       }
       renderGrid();
+      updateUndoButton();
       updateMessage("");
     }
+  }
+
+  function updateUndoButton(): void {
+    if (undoBtn) {
+      undoBtn.disabled = moveHistory.length === 0;
+    }
+  }
+
+  function undoMove(): void {
+    if (moveHistory.length === 0) return;
+
+    const move = moveHistory.pop()!;
+    const gridRow = state.grid[move.row];
+    if (gridRow) {
+      gridRow[move.col] = move.oldValue;
+    }
+
+    state.selected = move.selectionBeforeMove;
+
+    if (state.gameWon) {
+      state.gameWon = false;
+      message.classList.remove("success");
+      message.textContent = "";
+      if (winResetTimeout !== null) {
+        clearTimeout(winResetTimeout);
+        winResetTimeout = null;
+      }
+    }
+
+    renderGrid();
+    highlightSelected();
+    updateUndoButton();
   }
 
   /**
@@ -703,6 +770,11 @@ document.addEventListener("DOMContentLoaded", () => {
     state.startTime = null;
     state.elapsedTime = 0;
     stopTimer();
+    moveHistory.length = 0;
+    if (winResetTimeout !== null) {
+      clearTimeout(winResetTimeout);
+      winResetTimeout = null;
+    }
 
     message.classList.remove("success", "error", "info");
     if (usingFallback) {
@@ -723,6 +795,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     renderGrid();
     renderNumbers();
+    updateUndoButton();
   }
 
   /**
@@ -790,6 +863,10 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  if (undoBtn) {
+    undoBtn.addEventListener("click", undoMove);
+  }
+
   function handleArrowKey(key: string): void {
     const size = getGridSize();
 
@@ -812,10 +889,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Handle keyboard input
   document.addEventListener("keydown", (e) => {
-    if (state.gameWon) return;
-
     const key = e.key;
     const maxNumbers = state.mode === "4x4" ? 4 : 9;
+
+    // Ctrl+Z / Cmd+Z — allowed even when game is won
+    if ((e.ctrlKey || e.metaKey) && key.toLowerCase() === "z" && !e.shiftKey) {
+      e.preventDefault();
+      undoMove();
+      return;
+    }
+
+    if (state.gameWon) return;
 
     if (key === "ArrowUp" || key === "ArrowDown" || key === "ArrowLeft" || key === "ArrowRight") {
       e.preventDefault();
