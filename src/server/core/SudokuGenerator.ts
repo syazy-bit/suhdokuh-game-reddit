@@ -130,7 +130,7 @@ export class SudokuGenerator {
     const targets: Record<Difficulty, Record<GridSize, number>> = {
       easy:   { 4: 6, 9: 30 },
       medium: { 4: 8, 9: 45 },
-      hard:   { 4: 10, 9: 55 },
+      hard:   { 4: 10, 9: 50 },
     };
     const targetRemoval = targets[this.difficulty][this.size];
     
@@ -148,9 +148,10 @@ export class SudokuGenerator {
     const colRemoved = Array(this.size).fill(0);
     const boxRemoved = Array(this.size).fill(0);
 
-    const maxPerRow = Math.floor(this.size * 0.6);
-    const maxPerCol = Math.floor(this.size * 0.6);
-    const maxPerBox = Math.floor(this.size * 0.6);
+    const densityMultiplier = this.difficulty === "hard" ? 0.70 : 0.65;
+    const maxPerRow = Math.ceil(this.size * densityMultiplier);
+    const maxPerCol = Math.ceil(this.size * densityMultiplier);
+    const maxPerBox = Math.ceil(this.size * densityMultiplier);
 
     // Helper to compute box index
     const getBoxIndex = (r: number, c: number) =>
@@ -159,68 +160,72 @@ export class SudokuGenerator {
 
     let removed = 0;
     let consecutiveFailures = 0;
-    const maxConsecutiveFailures = 10; // Stop if we can't remove more cells
+    const maxConsecutiveFailures = 10;
+    let prevRemoved = -1;
 
-    for (let i = 0; i < positions.length && removed < targetRemoval; i++) {
-      const [row, col] = positions[i]!;
-      const symRow = this.size - 1 - row;
-      const symCol = this.size - 1 - col;
-      
-      // Skip if already removed
-      if (puzzle[row]![col] === 0) continue;
+    while (removed < targetRemoval && removed > prevRemoved && consecutiveFailures < maxConsecutiveFailures) {
+      prevRemoved = removed;
 
-      const box1 = getBoxIndex(row, col);
-      const box2 = getBoxIndex(symRow, symCol);
-
-      // Density guard: prevent ugly clustering
-      if (
-        rowRemoved[row]! >= maxPerRow ||
-        colRemoved[col]! >= maxPerCol ||
-        boxRemoved[box1]! >= maxPerBox ||
-        rowRemoved[symRow]! >= maxPerRow ||
-        colRemoved[symCol]! >= maxPerCol ||
-        boxRemoved[box2]! >= maxPerBox
-      ) {
-        continue;
+      if (removed > 0) {
+        this.shuffleArray(positions);
       }
-      
-      // Backup both cells
-      const backup1 = puzzle[row]![col]!;
-      const backup2 = puzzle[symRow]![symCol]!;
-      
-      // Remove both cells (symmetric removal)
-      puzzle[row]![col] = 0;
-      puzzle[symRow]![symCol] = 0;
 
-      // Validate uniqueness
-      const isValid = this.validatePuzzleRemoval(puzzle);
+      for (let i = 0; i < positions.length && removed < targetRemoval && consecutiveFailures < maxConsecutiveFailures; i++) {
+        const [row, col] = positions[i]!;
+        const symRow = this.size - 1 - row;
+        const symCol = this.size - 1 - col;
 
-      if (isValid) {
-        // Count how many cells we actually removed (1 if center, 2 otherwise)
-        const delta = (row === symRow && col === symCol) ? 1 : 2;
-        
-        removed += delta;
-        consecutiveFailures = 0;
+        // Skip if already removed
+        if (puzzle[row]![col] === 0) continue;
 
-        // Update density counters
-        rowRemoved[row]!++;
-        colRemoved[col]!++;
-        boxRemoved[box1]!++;
+        const box1 = getBoxIndex(row, col);
+        const box2 = getBoxIndex(symRow, symCol);
 
-        if (row !== symRow || col !== symCol) {
-          rowRemoved[symRow]!++;
-          colRemoved[symCol]!++;
-          boxRemoved[box2]!++;
+        // Density guard: prevent ugly clustering
+        if (
+          rowRemoved[row]! >= maxPerRow ||
+          colRemoved[col]! >= maxPerCol ||
+          boxRemoved[box1]! >= maxPerBox ||
+          rowRemoved[symRow]! >= maxPerRow ||
+          colRemoved[symCol]! >= maxPerCol ||
+          boxRemoved[box2]! >= maxPerBox
+        ) {
+          continue;
         }
-      } else {
-        // Restore both cells if it breaks uniqueness
-        puzzle[row]![col] = backup1;
-        puzzle[symRow]![symCol] = backup2;
-        consecutiveFailures++;
-        
-        // If we've failed too many times in a row, stop trying
-        if (consecutiveFailures >= maxConsecutiveFailures) {
-          break;
+
+        // Backup both cells
+        const backup1 = puzzle[row]![col]!;
+        const backup2 = puzzle[symRow]![symCol]!;
+
+        // Remove both cells (symmetric removal)
+        puzzle[row]![col] = 0;
+        puzzle[symRow]![symCol] = 0;
+
+        // Validate uniqueness
+        const isValid = this.validatePuzzleRemoval(puzzle);
+
+        if (isValid) {
+          // Count how many cells we actually removed (1 if center, 2 otherwise)
+          const delta = (row === symRow && col === symCol) ? 1 : 2;
+
+          removed += delta;
+          consecutiveFailures = 0;
+
+          // Update density counters
+          rowRemoved[row]!++;
+          colRemoved[col]!++;
+          boxRemoved[box1]!++;
+
+          if (row !== symRow || col !== symCol) {
+            rowRemoved[symRow]!++;
+            colRemoved[symCol]!++;
+            boxRemoved[box2]!++;
+          }
+        } else {
+          // Restore both cells if it breaks uniqueness
+          puzzle[row]![col] = backup1;
+          puzzle[symRow]![symCol] = backup2;
+          consecutiveFailures++;
         }
       }
     }
