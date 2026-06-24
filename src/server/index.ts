@@ -3,7 +3,6 @@ import {
   InitResponse,
   SubmitScoreRequest,
   SubmitScoreResponse,
-  LeaderboardResponse,
   LeaderboardEntry,
   GameMode,
   PuzzleRequest,
@@ -31,19 +30,9 @@ app.use(express.text());
 const router = express.Router();
 
 router.get<
-  { postId: string },
+  any,
   InitResponse | { status: string; message: string }
 >("/api/init", async (_req, res): Promise<void> => {
-  const { postId } = context;
-
-  if (!postId) {
-    console.error("API Init Error: postId not found in devvit context");
-    res.status(400).json({
-      status: "error",
-      message: "postId is required but missing from context",
-    });
-    return;
-  }
 
   try {
     const [count, username] = await Promise.all([
@@ -53,12 +42,12 @@ router.get<
 
     res.json({
       type: "init",
-      postId: postId,
+      postId: "global",
       count: count ? parseInt(count) : 0,
       username: username ?? "anonymous",
     });
   } catch (error) {
-    console.error(`API Init Error for post ${postId}:`, error);
+    console.error(`API Init Error:`, error);
     let errorMessage = "Unknown error during initialization";
     if (error instanceof Error) {
       errorMessage = `Initialization failed: ${error.message}`;
@@ -85,7 +74,7 @@ const VALID_MODES = new Set<string>(["4x4", "9x9"]);
  */
 function sanitiseLeaderboard(raw: unknown): LeaderboardEntry[] {
   if (!Array.isArray(raw)) return [];
-  return raw.filter(
+  const validEntries = raw.filter(
     (e): e is LeaderboardEntry =>
       e !== null &&
       typeof e === "object" &&
@@ -98,6 +87,20 @@ function sanitiseLeaderboard(raw: unknown): LeaderboardEntry[] {
       (e as LeaderboardEntry).time > 0 &&
       typeof (e as LeaderboardEntry).timestamp === "number",
   );
+
+  // Deduplicate: keep only the fastest time for each username
+  const deduplicated = new Map<string, LeaderboardEntry>();
+  for (const entry of validEntries) {
+    const existing = deduplicated.get(entry.username);
+    if (!existing || entry.time < existing.time) {
+      deduplicated.set(entry.username, entry);
+    }
+  }
+
+  // Sort ascending (fastest first) and cap at 50 entries
+  return Array.from(deduplicated.values())
+    .sort((a, b) => a.time - b.time)
+    .slice(0, 50);
 }
 
 router.post<{ postId: string }, SubmitScoreResponse, SubmitScoreRequest>(
@@ -210,17 +213,9 @@ router.post<{ postId: string }, SubmitScoreResponse, SubmitScoreRequest>(
 );
 
 router.get<
-  { postId: string },
-  LeaderboardResponse | { status: string; message: string }
+  any,
+  any | { status: string; message: string }
 >("/api/leaderboard", async (req, res): Promise<void> => {
-  const { postId } = context;
-  if (!postId) {
-    res.status(400).json({
-      status: "error",
-      message: "postId is required",
-    });
-    return;
-  }
 
   try {
     const mode = (req.query.mode as GameMode) || "4x4";
@@ -228,9 +223,16 @@ router.get<
 
     const leaderboardKey = `leaderboard:${mode}`;
     const rawData = await redis.get(leaderboardKey);
-    const entries: LeaderboardEntry[] = rawData
-      ? sanitiseLeaderboard(JSON.parse(rawData))
-      : [];
+    let parsedData = [];
+    if (rawData) {
+      try {
+        parsedData = JSON.parse(rawData);
+      } catch (parseError) {
+        console.warn(`[SERVER] Leaderboard data for ${mode} is corrupt. Resetting to empty array.`, parseError);
+        parsedData = [];
+      }
+    }
+    const entries: LeaderboardEntry[] = sanitiseLeaderboard(parsedData);
 
     // Return top entries
     res.json({
@@ -241,7 +243,7 @@ router.get<
     console.error(`Error fetching leaderboard: ${error}`);
     res.status(400).json({
       status: "error",
-      message: "Failed to fetch leaderboard",
+      message: `Failed to fetch leaderboard: ${error instanceof Error ? error.stack : String(error)}`,
     });
   }
 });

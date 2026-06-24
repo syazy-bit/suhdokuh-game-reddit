@@ -66,16 +66,22 @@ export class SudokuGenerator {
    * @returns Complete filled grid
    */
   private generateSolution(): number[][] {
-    // Create empty grid
-    const grid: number[][] = Array.from({ length: this.size }, () =>
-      Array(this.size).fill(0)
-    );
+    let grid: number[][] = [];
+    let solved = false;
+    
+    // Loop until we find a set of diagonal boxes that can be successfully solved
+    while (!solved) {
+      // Create empty grid
+      grid = Array.from({ length: this.size }, () =>
+        Array(this.size).fill(0)
+      );
 
-    // Fill diagonal boxes first (they're independent)
-    this.fillDiagonalBoxes(grid);
+      // Fill diagonal boxes first (they're independent)
+      this.fillDiagonalBoxes(grid);
 
-    // Fill remaining cells using backtracking
-    this.solveSudoku(grid);
+      // Fill remaining cells using backtracking
+      solved = this.solveSudoku(grid);
+    }
 
     return grid;
   }
