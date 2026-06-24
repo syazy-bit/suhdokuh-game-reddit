@@ -268,6 +268,15 @@ document.addEventListener("DOMContentLoaded", () => {
   const undoBtn = document.getElementById(
     "undo-btn",
   ) as HTMLButtonElement | null;
+  const helpBtn = document.getElementById(
+    "help-btn",
+  ) as HTMLButtonElement | null;
+  const helpModal = document.getElementById(
+    "help-modal",
+  ) as HTMLDivElement | null;
+  const closeModalBtn = document.getElementById(
+    "close-modal-btn",
+  ) as HTMLButtonElement | null;
 
   // Validate all required elements exist
   if (!gridEl || !numbersEl || !messageEl || !modeSelect || !leaderboardEl) {
@@ -316,6 +325,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let timerInterval: number | null = null;
   let winResetTimeout: number | null = null;
   const moveHistory: Move[] = [];
+  let isHelpOpen = false;
 
   /**
    * Get grid size based on mode
@@ -867,6 +877,32 @@ document.addEventListener("DOMContentLoaded", () => {
     undoBtn.addEventListener("click", undoMove);
   }
 
+  function closeHelp(): void {
+    isHelpOpen = false;
+    if (helpModal) {
+      helpModal.classList.add("hidden");
+    }
+  }
+
+  if (helpBtn && helpModal) {
+    helpBtn.addEventListener("click", () => {
+      isHelpOpen = true;
+      helpModal.classList.remove("hidden");
+    });
+  }
+
+  if (closeModalBtn && helpModal) {
+    closeModalBtn.addEventListener("click", closeHelp);
+  }
+
+  if (helpModal) {
+    helpModal.addEventListener("click", (e) => {
+      if (e.target === helpModal) {
+        closeHelp();
+      }
+    });
+  }
+
   function handleArrowKey(key: string): void {
     const size = getGridSize();
 
@@ -890,6 +926,15 @@ document.addEventListener("DOMContentLoaded", () => {
   // Handle keyboard input
   document.addEventListener("keydown", (e) => {
     const key = e.key;
+
+    // Help modal is open — only Escape is allowed
+    if (isHelpOpen) {
+      if (key === "Escape") {
+        closeHelp();
+      }
+      return;
+    }
+
     const maxNumbers = state.mode === "4x4" ? 4 : 9;
 
     // Ctrl+Z / Cmd+Z — allowed even when game is won

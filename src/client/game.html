@@ -10,7 +10,10 @@
 
 <body class="app">
   <div class="container">
-    <h1>🧩 Suhdokuh</h1>
+    <div class="title-row">
+      <h1>🧩 Suhdokuh</h1>
+      <button id="help-btn" class="help-btn" aria-label="Help and Rules">❓</button>
+    </div>
 
     <!-- Game Mode Selector -->
     <div class="mode-selector">
@@ -50,6 +53,48 @@
     <footer class="footer">
       Developed by u/syazyyy
     </footer>
+  </div>
+
+  <!-- Help Modal -->
+  <div id="help-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+    <div class="modal-content">
+      <button id="close-modal-btn" class="close-btn" aria-label="Close Help">&times;</button>
+
+      <h2>📖 How to Play</h2>
+      <p>Fill every empty cell. Each number may appear only once in:</p>
+      <ul>
+        <li>Every row</li>
+        <li>Every column</li>
+        <li>Every box</li>
+      </ul>
+
+      <h2>🔢 Game Modes</h2>
+      <h3>4&times;4 Sudoku</h3>
+      <p>Uses numbers 1&ndash;4. Fast and beginner friendly.</p>
+      <h3>9&times;9 Sudoku</h3>
+      <p>Uses numbers 1&ndash;9. Classic Sudoku experience.</p>
+
+      <h2>🎮 Controls</h2>
+      <ul>
+        <li>Click cells to select</li>
+        <li>Use number buttons or keyboard</li>
+        <li>Arrow keys move selection</li>
+        <li>Undo reverts moves</li>
+        <li>Ctrl+Z / Cmd+Z = Undo</li>
+        <li>Clear removes a number</li>
+        <li>New Puzzle generates a fresh puzzle</li>
+      </ul>
+
+      <h2>✨ Features</h2>
+      <ul>
+        <li>Cell highlighting</li>
+        <li>Conflict detection</li>
+        <li>Personal-best leaderboard tracking</li>
+        <li>Automatic score submission when solved</li>
+      </ul>
+
+      <p class="modal-version">Suhdokuh v0.0.33</p>
+    </div>
   </div>
 
   <script type="module" src="game/game.ts"></script>
