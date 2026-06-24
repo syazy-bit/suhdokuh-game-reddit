@@ -7,6 +7,8 @@ interface Cell {
 interface GameState {
   selected: Cell | null;
   grid: number[][];
+  notes: Set<number>[][];
+  notesMode: boolean;
   gameWon: boolean;
   mode: GameMode;
   difficulty: Difficulty;
@@ -28,6 +30,8 @@ interface Move {
   col: number;
   oldValue: number;
   newValue: number;
+  oldNotes: number[];
+  newNotes: number[];
   selectionBeforeMove: { r: number; c: number } | null;
 }
 
@@ -468,6 +472,8 @@ document.addEventListener("DOMContentLoaded", () => {
   let state: GameState = {
     selected: null,
     grid: [],
+    notes: [],
+    notesMode: false,
     gameWon: false,
     mode: "4x4",
     difficulty: "medium",
@@ -482,6 +488,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let winResetTimeout: number | null = null;
   const moveHistory: Move[] = [];
   let isHelpOpen = false;
+  let notesBtn: HTMLButtonElement | null = null;
 
   /**
    * Get grid size based on mode
@@ -658,6 +665,14 @@ document.addEventListener("DOMContentLoaded", () => {
     return div.innerHTML;
   }
 
+  function arraysEqual(a: number[], b: number[]): boolean {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+      if (a[i] !== b[i]) return false;
+    }
+    return true;
+  }
+
   /**
    * Render the grid with cells
    */
@@ -684,10 +699,30 @@ document.addEventListener("DOMContentLoaded", () => {
           cell.textContent = puzzleCell?.toString() ?? "";
           cell.classList.add("locked");
         } else {
-          // Editable cell
+          cell.innerHTML = "";
           const value = state.grid[r]?.[c];
           if (value && value !== 0) {
             cell.textContent = value.toString();
+          } else {
+            const cellNotes = state.notes[r]?.[c];
+            if (cellNotes && cellNotes.size > 0) {
+              const notesGrid = document.createElement("div");
+              notesGrid.className = "notes-grid";
+              const gridSize = getGridSize();
+              const cols = gridSize === 9 ? 3 : 2;
+              notesGrid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+              notesGrid.style.gridTemplateRows = `repeat(${cols}, 1fr)`;
+
+              for (let n = 1; n <= gridSize; n++) {
+                const noteEl = document.createElement("span");
+                noteEl.className = "note";
+                if (cellNotes.has(n)) {
+                  noteEl.textContent = n.toString();
+                }
+                notesGrid.appendChild(noteEl);
+              }
+              cell.appendChild(notesGrid);
+            }
           }
 
           // Check for validation errors (conflict with other cells)
@@ -781,19 +816,60 @@ document.addEventListener("DOMContentLoaded", () => {
     const puzzleCell = puzzle[r]?.[c];
     if (puzzleCell !== 0) return;
 
-    // Record move before changing the grid
     const gridRow = state.grid[r];
+    if (!gridRow) return;
+
+    if (state.notesMode) {
+      const cellNotes = state.notes[r]?.[c];
+      if (!cellNotes) return;
+
+      const oldValue = gridRow[c] ?? 0;
+      if (oldValue !== 0) return; // Can't note a filled cell
+
+      const hadNote = cellNotes.has(num);
+      const oldNotesArr = Array.from(cellNotes);
+
+      if (hadNote) {
+        cellNotes.delete(num);
+      } else {
+        cellNotes.add(num);
+      }
+
+      const newNotesArr = Array.from(cellNotes);
+      if (arraysEqual(oldNotesArr, newNotesArr)) return;
+
+      moveHistory.push({
+        row: r,
+        col: c,
+        oldValue: 0,
+        newValue: 0,
+        oldNotes: oldNotesArr,
+        newNotes: newNotesArr,
+        selectionBeforeMove: state.selected ? { ...state.selected } : null,
+      });
+
+      startTimer();
+      renderGrid();
+      updateUndoButton();
+      return;
+    }
+
+    // Normal mode: place number
     if (gridRow) {
       const oldValue = gridRow[c] ?? 0;
       if (oldValue === num) return;
+      const oldNotesArr = Array.from(state.notes[r]?.[c] ?? []);
       moveHistory.push({
         row: r,
         col: c,
         oldValue,
         newValue: num,
+        oldNotes: oldNotesArr,
+        newNotes: [],
         selectionBeforeMove: state.selected ? { ...state.selected } : null,
       });
       gridRow[c] = num;
+      state.notes[r]![c]!.clear();
     }
 
     // Start the timer on the first placement (valid or conflicting).
@@ -833,20 +909,42 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const { r, c } = state.selected;
     const puzzleCell = puzzle[r]?.[c];
-    if (puzzleCell === 0) {
-      const gridRow = state.grid[r];
-      if (gridRow) {
-        const oldValue = gridRow[c] ?? 0;
-        if (oldValue === 0) return;
-        moveHistory.push({
-          row: r,
-          col: c,
-          oldValue,
-          newValue: 0,
-          selectionBeforeMove: state.selected ? { ...state.selected } : null,
-        });
-        gridRow[c] = 0;
-      }
+    if (puzzleCell !== 0) return;
+
+    const gridRow = state.grid[r];
+    if (!gridRow) return;
+
+    const oldValue = gridRow[c] ?? 0;
+    const cellNotes = state.notes[r]?.[c];
+
+    if (oldValue !== 0) {
+      // Cell has a value — clear it
+      moveHistory.push({
+        row: r,
+        col: c,
+        oldValue,
+        newValue: 0,
+        oldNotes: Array.from(cellNotes ?? []),
+        newNotes: Array.from(cellNotes ?? []),
+        selectionBeforeMove: state.selected ? { ...state.selected } : null,
+      });
+      gridRow[c] = 0;
+      renderGrid();
+      updateUndoButton();
+      updateMessage("");
+    } else if (cellNotes && cellNotes.size > 0) {
+      // Cell has notes but no value — clear notes
+      const oldNotesArr = Array.from(cellNotes);
+      moveHistory.push({
+        row: r,
+        col: c,
+        oldValue: 0,
+        newValue: 0,
+        oldNotes: oldNotesArr,
+        newNotes: [],
+        selectionBeforeMove: state.selected ? { ...state.selected } : null,
+      });
+      cellNotes.clear();
       renderGrid();
       updateUndoButton();
       updateMessage("");
@@ -866,6 +964,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const gridRow = state.grid[move.row];
     if (gridRow) {
       gridRow[move.col] = move.oldValue;
+    }
+
+    const notesRow = state.notes[move.row];
+    if (notesRow) {
+      notesRow[move.col] = new Set(move.oldNotes);
     }
 
     state.selected = move.selectionBeforeMove;
@@ -931,6 +1034,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Reset game state
     state.grid = puzzle.map((r) => [...r]);
+    state.notes = Array.from({ length: puzzle.length }, () =>
+      Array.from({ length: puzzle.length }, () => new Set<number>())
+    );
+    state.notesMode = false;
     state.selected = null;
     state.gameWon = false;
     state.startTime = null;
@@ -999,6 +1106,21 @@ document.addEventListener("DOMContentLoaded", () => {
     clearBtn.textContent = "Clear";
     clearBtn.addEventListener("click", clearCell);
     numbers.appendChild(clearBtn);
+
+    // Notes toggle button
+    const nBtn = document.createElement("button");
+    nBtn.className = state.notesMode ? "notes-btn active" : "notes-btn";
+    nBtn.textContent = "✏️ Notes";
+    nBtn.addEventListener("click", toggleNotesMode);
+    numbers.appendChild(nBtn);
+    notesBtn = nBtn;
+  }
+
+  function toggleNotesMode(): void {
+    state.notesMode = !state.notesMode;
+    if (notesBtn) {
+      notesBtn.className = state.notesMode ? "notes-btn active" : "notes-btn";
+    }
   }
 
   /**
@@ -1127,6 +1249,9 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     } else if (key === "Backspace" || key === "Delete") {
       clearCell();
+    } else if ((key === "n" || key === "N") && !e.ctrlKey && !e.metaKey) {
+      e.preventDefault();
+      toggleNotesMode();
     } else if (key === "Escape") {
       state.selected = null;
       highlightSelected();
