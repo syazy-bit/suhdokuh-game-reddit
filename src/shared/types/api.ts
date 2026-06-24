@@ -8,6 +8,8 @@ export type InitResponse = {
 
 export type GameMode = "4x4" | "9x9";
 
+export type Difficulty = "easy" | "medium" | "hard";
+
 export type LeaderboardEntry = {
   username: string;
   mode: GameMode;
@@ -36,6 +38,7 @@ export type LeaderboardResponse = {
 
 export type PuzzleRequest = {
   mode: GameMode;
+  difficulty?: Difficulty;
 };
 
 export type PuzzleResponse = {

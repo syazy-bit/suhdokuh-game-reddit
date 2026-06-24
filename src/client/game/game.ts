@@ -9,12 +9,14 @@ interface GameState {
   grid: number[][];
   gameWon: boolean;
   mode: GameMode;
+  difficulty: Difficulty;
   startTime: number | null;
   elapsedTime: number;
   username: string; // Store the Reddit username
 }
 
 type GameMode = "4x4" | "9x9";
+type Difficulty = "easy" | "medium" | "hard";
 
 interface PuzzleData {
   puzzle: number[][];
@@ -29,166 +31,315 @@ interface Move {
   selectionBeforeMove: { r: number; c: number } | null;
 }
 
-// Fallback puzzle libraries (for when API fails)
-const puzzleLibrary4x4: PuzzleData[] = [
-  {
-    puzzle: [
-      [1, 0, 0, 4],
-      [0, 4, 1, 0],
-      [0, 1, 3, 0],
-      [3, 0, 0, 1],
-    ],
-    solution: [
-      [1, 3, 2, 4],
-      [2, 4, 1, 3],
-      [4, 1, 3, 2],
-      [3, 2, 4, 1],
-    ],
-  },
-  {
-    puzzle: [
-      [2, 0, 0, 1],
-      [0, 1, 2, 0],
-      [0, 4, 3, 0],
-      [3, 0, 0, 4],
-    ],
-    solution: [
-      [2, 3, 4, 1],
-      [4, 1, 2, 3],
-      [1, 4, 3, 2],
-      [3, 2, 1, 4],
-    ],
-  },
-  {
-    puzzle: [
-      [1, 2, 3, 0],
-      [3, 0, 0, 2],
-      [2, 0, 0, 3],
-      [0, 3, 2, 1],
-    ],
-    solution: [
-      [1, 2, 3, 4],
-      [3, 4, 1, 2],
-      [2, 1, 4, 3],
-      [4, 3, 2, 1],
-    ],
-  },
-];
+// Fallback puzzle libraries (for when API fails) — bucketed by difficulty
+const puzzleLibrary4x4: Record<Difficulty, PuzzleData[]> = {
+  easy: [
+    {
+      puzzle: [
+        [1, 2, 3, 0],
+        [3, 0, 0, 2],
+        [2, 0, 0, 3],
+        [0, 3, 2, 1],
+      ],
+      solution: [
+        [1, 2, 3, 4],
+        [3, 4, 1, 2],
+        [2, 1, 4, 3],
+        [4, 3, 2, 1],
+      ],
+    },
+    {
+      puzzle: [
+        [0, 3, 0, 2],
+        [4, 0, 2, 0],
+        [0, 1, 0, 3],
+        [3, 0, 1, 0],
+      ],
+      solution: [
+        [1, 3, 4, 2],
+        [4, 2, 3, 1],
+        [2, 1, 4, 3],
+        [3, 4, 1, 2],
+      ],
+    },
+  ],
+  medium: [
+    {
+      puzzle: [
+        [1, 0, 0, 4],
+        [0, 4, 1, 0],
+        [0, 1, 3, 0],
+        [3, 0, 0, 1],
+      ],
+      solution: [
+        [1, 3, 2, 4],
+        [2, 4, 1, 3],
+        [4, 1, 3, 2],
+        [3, 2, 4, 1],
+      ],
+    },
+    {
+      puzzle: [
+        [2, 0, 0, 1],
+        [0, 1, 2, 0],
+        [0, 4, 3, 0],
+        [3, 0, 0, 4],
+      ],
+      solution: [
+        [2, 3, 4, 1],
+        [4, 1, 2, 3],
+        [1, 4, 3, 2],
+        [3, 2, 1, 4],
+      ],
+    },
+  ],
+  hard: [
+    {
+      puzzle: [
+        [0, 3, 0, 0],
+        [0, 0, 0, 2],
+        [2, 0, 0, 0],
+        [0, 0, 1, 0],
+      ],
+      solution: [
+        [1, 3, 4, 2],
+        [4, 2, 3, 1],
+        [2, 1, 4, 3],
+        [3, 4, 1, 2],
+      ],
+    },
+    {
+      puzzle: [
+        [0, 0, 3, 0],
+        [4, 0, 0, 0],
+        [0, 0, 0, 3],
+        [0, 1, 0, 0],
+      ],
+      solution: [
+        [2, 4, 3, 1],
+        [4, 2, 1, 3],
+        [1, 3, 4, 2],
+        [3, 1, 2, 4],
+      ],
+    },
+  ],
+};
 
-// Fallback 9x9 Sudoku puzzles (for when API fails)
-const puzzleLibrary9x9: PuzzleData[] = [
-  {
-    puzzle: [
-      [5, 3, 0, 0, 7, 0, 0, 0, 0],
-      [6, 0, 0, 1, 9, 5, 0, 0, 0],
-      [0, 9, 8, 0, 0, 0, 0, 6, 0],
-      [8, 0, 0, 0, 6, 0, 0, 0, 3],
-      [4, 0, 0, 8, 0, 3, 0, 0, 1],
-      [7, 0, 0, 0, 2, 0, 0, 0, 6],
-      [0, 6, 0, 0, 0, 0, 2, 8, 0],
-      [0, 0, 0, 4, 1, 9, 0, 0, 5],
-      [0, 0, 0, 0, 8, 0, 0, 7, 9],
-    ],
-    solution: [
-      [5, 3, 4, 6, 7, 8, 9, 1, 2],
-      [6, 7, 2, 1, 9, 5, 3, 4, 8],
-      [1, 9, 8, 3, 4, 2, 5, 6, 7],
-      [8, 5, 9, 7, 6, 1, 4, 2, 3],
-      [4, 2, 6, 8, 5, 3, 7, 9, 1],
-      [7, 1, 3, 9, 2, 4, 8, 5, 6],
-      [9, 6, 1, 5, 3, 7, 2, 8, 4],
-      [2, 8, 7, 4, 1, 9, 6, 3, 5],
-      [3, 4, 5, 2, 8, 6, 1, 7, 9],
-    ],
-  },
-  {
-    puzzle: [
-      [0, 0, 0, 6, 0, 0, 4, 0, 0],
-      [7, 0, 0, 0, 0, 3, 6, 0, 0],
-      [0, 0, 0, 0, 9, 1, 0, 8, 0],
-      [0, 0, 0, 0, 0, 0, 0, 0, 0],
-      [0, 5, 0, 1, 8, 0, 0, 0, 3],
-      [0, 0, 0, 3, 0, 6, 0, 4, 5],
-      [0, 4, 0, 2, 0, 0, 0, 6, 0],
-      [9, 0, 3, 0, 0, 0, 0, 0, 0],
-      [0, 2, 0, 0, 0, 0, 1, 0, 0],
-    ],
-    solution: [
-      [5, 8, 1, 6, 7, 2, 4, 3, 9],
-      [7, 9, 2, 8, 4, 3, 6, 5, 1],
-      [3, 6, 4, 5, 9, 1, 7, 8, 2],
-      [4, 3, 8, 9, 5, 7, 2, 1, 6],
-      [2, 5, 6, 1, 8, 4, 9, 7, 3],
-      [1, 7, 9, 3, 2, 6, 8, 4, 5],
-      [8, 4, 5, 2, 1, 9, 3, 6, 7],
-      [9, 1, 3, 7, 6, 8, 5, 2, 4],
-      [6, 2, 7, 4, 3, 5, 1, 9, 8],
-    ],
-  },
-  {
-    puzzle: [
-      [0, 0, 3, 0, 2, 0, 6, 0, 0],
-      [9, 0, 0, 3, 0, 5, 0, 0, 1],
-      [0, 0, 1, 8, 0, 6, 4, 0, 0],
-      [0, 0, 8, 1, 0, 2, 9, 0, 0],
-      [7, 0, 0, 0, 0, 0, 0, 0, 8],
-      [0, 0, 6, 7, 0, 8, 2, 0, 0],
-      [0, 0, 2, 6, 0, 9, 5, 0, 0],
-      [8, 0, 0, 2, 0, 3, 0, 0, 9],
-      [0, 0, 5, 0, 1, 0, 3, 0, 0],
-    ],
-    solution: [
-      [4, 8, 3, 9, 2, 1, 6, 5, 7],
-      [9, 6, 7, 3, 4, 5, 8, 2, 1],
-      [2, 5, 1, 8, 7, 6, 4, 9, 3],
-      [5, 4, 8, 1, 3, 2, 9, 7, 6],
-      [7, 2, 9, 5, 6, 4, 1, 3, 8],
-      [1, 3, 6, 7, 9, 8, 2, 4, 5],
-      [3, 7, 2, 6, 8, 9, 5, 1, 4],
-      [8, 1, 4, 2, 5, 3, 7, 6, 9],
-      [6, 9, 5, 4, 1, 7, 3, 8, 2],
-    ],
-  },
-  {
-    puzzle: [
-      [0, 2, 0, 0, 0, 0, 0, 0, 0],
-      [0, 0, 0, 6, 0, 0, 0, 0, 3],
-      [0, 7, 4, 0, 8, 0, 0, 0, 0],
-      [0, 0, 0, 0, 0, 3, 0, 0, 2],
-      [0, 8, 0, 0, 4, 0, 0, 1, 0],
-      [6, 0, 0, 5, 0, 0, 0, 0, 0],
-      [0, 0, 0, 0, 1, 0, 7, 8, 0],
-      [5, 0, 0, 0, 0, 9, 0, 0, 0],
-      [0, 0, 0, 0, 0, 0, 0, 4, 0],
-    ],
-    solution: [
-      [1, 2, 6, 4, 3, 7, 9, 5, 8],
-      [8, 9, 5, 6, 2, 1, 4, 7, 3],
-      [3, 7, 4, 9, 8, 5, 1, 2, 6],
-      [4, 5, 7, 1, 9, 3, 8, 6, 2],
-      [9, 8, 3, 2, 4, 6, 5, 1, 7],
-      [6, 1, 2, 5, 7, 8, 3, 9, 4],
-      [2, 6, 9, 3, 1, 4, 7, 8, 5],
-      [5, 4, 8, 7, 6, 9, 2, 3, 1],
-      [7, 3, 1, 8, 5, 2, 6, 4, 9],
-    ],
-  },
-];
+const puzzleLibrary9x9: Record<Difficulty, PuzzleData[]> = {
+  easy: [
+    {
+      puzzle: [
+        [5, 3, 4, 0, 7, 0, 0, 0, 0],
+        [6, 0, 0, 1, 9, 5, 0, 0, 0],
+        [0, 9, 8, 0, 0, 0, 0, 6, 0],
+        [8, 0, 0, 0, 6, 0, 0, 0, 3],
+        [4, 0, 0, 8, 0, 3, 0, 0, 1],
+        [7, 0, 0, 0, 2, 0, 0, 0, 6],
+        [0, 6, 0, 0, 0, 0, 2, 8, 0],
+        [0, 0, 0, 4, 1, 9, 0, 0, 5],
+        [0, 0, 0, 0, 8, 0, 0, 7, 9],
+      ],
+      solution: [
+        [5, 3, 4, 6, 7, 8, 9, 1, 2],
+        [6, 7, 2, 1, 9, 5, 3, 4, 8],
+        [1, 9, 8, 3, 4, 2, 5, 6, 7],
+        [8, 5, 9, 7, 6, 1, 4, 2, 3],
+        [4, 2, 6, 8, 5, 3, 7, 9, 1],
+        [7, 1, 3, 9, 2, 4, 8, 5, 6],
+        [9, 6, 1, 5, 3, 7, 2, 8, 4],
+        [2, 8, 7, 4, 1, 9, 6, 3, 5],
+        [3, 4, 5, 2, 8, 6, 1, 7, 9],
+      ],
+    },
+    {
+      puzzle: [
+        [0, 2, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 6, 0, 0, 0, 0, 3],
+        [0, 7, 4, 0, 8, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 3, 0, 0, 2],
+        [0, 8, 0, 0, 4, 0, 0, 1, 0],
+        [6, 0, 0, 5, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 1, 0, 7, 8, 0],
+        [5, 0, 0, 0, 0, 9, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 4, 0],
+      ],
+      solution: [
+        [1, 2, 6, 4, 3, 7, 9, 5, 8],
+        [8, 9, 5, 6, 2, 1, 4, 7, 3],
+        [3, 7, 4, 9, 8, 5, 1, 2, 6],
+        [4, 5, 7, 1, 9, 3, 8, 6, 2],
+        [9, 8, 3, 2, 4, 6, 5, 1, 7],
+        [6, 1, 2, 5, 7, 8, 3, 9, 4],
+        [2, 6, 9, 3, 1, 4, 7, 8, 5],
+        [5, 4, 8, 7, 6, 9, 2, 3, 1],
+        [7, 3, 1, 8, 5, 2, 6, 4, 9],
+      ],
+    },
+  ],
+  medium: [
+    {
+      puzzle: [
+        [5, 3, 0, 0, 7, 0, 0, 0, 0],
+        [6, 0, 0, 1, 9, 5, 0, 0, 0],
+        [0, 9, 8, 0, 0, 0, 0, 6, 0],
+        [8, 0, 0, 0, 6, 0, 0, 0, 3],
+        [4, 0, 0, 8, 0, 3, 0, 0, 1],
+        [7, 0, 0, 0, 2, 0, 0, 0, 6],
+        [0, 6, 0, 0, 0, 0, 2, 8, 0],
+        [0, 0, 0, 4, 1, 9, 0, 0, 5],
+        [0, 0, 0, 0, 8, 0, 0, 7, 9],
+      ],
+      solution: [
+        [5, 3, 4, 6, 7, 8, 9, 1, 2],
+        [6, 7, 2, 1, 9, 5, 3, 4, 8],
+        [1, 9, 8, 3, 4, 2, 5, 6, 7],
+        [8, 5, 9, 7, 6, 1, 4, 2, 3],
+        [4, 2, 6, 8, 5, 3, 7, 9, 1],
+        [7, 1, 3, 9, 2, 4, 8, 5, 6],
+        [9, 6, 1, 5, 3, 7, 2, 8, 4],
+        [2, 8, 7, 4, 1, 9, 6, 3, 5],
+        [3, 4, 5, 2, 8, 6, 1, 7, 9],
+      ],
+    },
+    {
+      puzzle: [
+        [0, 0, 0, 6, 0, 0, 4, 0, 0],
+        [7, 0, 0, 0, 0, 3, 6, 0, 0],
+        [0, 0, 0, 0, 9, 1, 0, 8, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 5, 0, 1, 8, 0, 0, 0, 3],
+        [0, 0, 0, 3, 0, 6, 0, 4, 5],
+        [0, 4, 0, 2, 0, 0, 0, 6, 0],
+        [9, 0, 3, 0, 0, 0, 0, 0, 0],
+        [0, 2, 0, 0, 0, 0, 1, 0, 0],
+      ],
+      solution: [
+        [5, 8, 1, 6, 7, 2, 4, 3, 9],
+        [7, 9, 2, 8, 4, 3, 6, 5, 1],
+        [3, 6, 4, 5, 9, 1, 7, 8, 2],
+        [4, 3, 8, 9, 5, 7, 2, 1, 6],
+        [2, 5, 6, 1, 8, 4, 9, 7, 3],
+        [1, 7, 9, 3, 2, 6, 8, 4, 5],
+        [8, 4, 5, 2, 1, 9, 3, 6, 7],
+        [9, 1, 3, 7, 6, 8, 5, 2, 4],
+        [6, 2, 7, 4, 3, 5, 1, 9, 8],
+      ],
+    },
+    {
+      puzzle: [
+        [0, 0, 3, 0, 2, 0, 6, 0, 0],
+        [9, 0, 0, 3, 0, 5, 0, 0, 1],
+        [0, 0, 1, 8, 0, 6, 4, 0, 0],
+        [0, 0, 8, 1, 0, 2, 9, 0, 0],
+        [7, 0, 0, 0, 0, 0, 0, 0, 8],
+        [0, 0, 6, 7, 0, 8, 2, 0, 0],
+        [0, 0, 2, 6, 0, 9, 5, 0, 0],
+        [8, 0, 0, 2, 0, 3, 0, 0, 9],
+        [0, 0, 5, 0, 1, 0, 3, 0, 0],
+      ],
+      solution: [
+        [4, 8, 3, 9, 2, 1, 6, 5, 7],
+        [9, 6, 7, 3, 4, 5, 8, 2, 1],
+        [2, 5, 1, 8, 7, 6, 4, 9, 3],
+        [5, 4, 8, 1, 3, 2, 9, 7, 6],
+        [7, 2, 9, 5, 6, 4, 1, 3, 8],
+        [1, 3, 6, 7, 9, 8, 2, 4, 5],
+        [3, 7, 2, 6, 8, 9, 5, 1, 4],
+        [8, 1, 4, 2, 5, 3, 7, 6, 9],
+        [6, 9, 5, 4, 1, 7, 3, 8, 2],
+      ],
+    },
+    {
+      puzzle: [
+        [0, 2, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 6, 0, 0, 0, 0, 3],
+        [0, 7, 4, 0, 8, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 3, 0, 0, 2],
+        [0, 8, 0, 0, 4, 0, 0, 1, 0],
+        [6, 0, 0, 5, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 1, 0, 7, 8, 0],
+        [5, 0, 0, 0, 0, 9, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 4, 0],
+      ],
+      solution: [
+        [1, 2, 6, 4, 3, 7, 9, 5, 8],
+        [8, 9, 5, 6, 2, 1, 4, 7, 3],
+        [3, 7, 4, 9, 8, 5, 1, 2, 6],
+        [4, 5, 7, 1, 9, 3, 8, 6, 2],
+        [9, 8, 3, 2, 4, 6, 5, 1, 7],
+        [6, 1, 2, 5, 7, 8, 3, 9, 4],
+        [2, 6, 9, 3, 1, 4, 7, 8, 5],
+        [5, 4, 8, 7, 6, 9, 2, 3, 1],
+        [7, 3, 1, 8, 5, 2, 6, 4, 9],
+      ],
+    },
+  ],
+  hard: [
+    {
+      puzzle: [
+        [0, 3, 0, 0, 7, 0, 0, 0, 0],
+        [6, 0, 0, 0, 9, 5, 0, 0, 0],
+        [0, 0, 8, 0, 0, 0, 0, 6, 0],
+        [8, 0, 0, 0, 0, 0, 0, 0, 3],
+        [0, 0, 0, 8, 0, 0, 0, 0, 0],
+        [7, 0, 0, 0, 2, 0, 0, 0, 6],
+        [0, 6, 0, 0, 0, 0, 0, 8, 0],
+        [0, 0, 0, 4, 1, 9, 0, 0, 5],
+        [0, 0, 0, 0, 8, 0, 0, 7, 0],
+      ],
+      solution: [
+        [5, 3, 4, 6, 7, 8, 9, 1, 2],
+        [6, 7, 2, 1, 9, 5, 3, 4, 8],
+        [1, 9, 8, 3, 4, 2, 5, 6, 7],
+        [8, 5, 9, 7, 6, 1, 4, 2, 3],
+        [4, 2, 6, 8, 5, 3, 7, 9, 1],
+        [7, 1, 3, 9, 2, 4, 8, 5, 6],
+        [9, 6, 1, 5, 3, 7, 2, 8, 4],
+        [2, 8, 7, 4, 1, 9, 6, 3, 5],
+        [3, 4, 5, 2, 8, 6, 1, 7, 9],
+      ],
+    },
+    {
+      puzzle: [
+        [0, 0, 0, 6, 0, 0, 4, 0, 0],
+        [7, 0, 0, 0, 0, 0, 6, 0, 0],
+        [0, 0, 0, 0, 0, 1, 0, 8, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 5, 0, 0, 8, 0, 0, 0, 3],
+        [0, 0, 0, 3, 0, 0, 0, 0, 5],
+        [0, 4, 0, 2, 0, 0, 0, 6, 0],
+        [9, 0, 3, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 4, 0],
+      ],
+      solution: [
+        [5, 8, 1, 6, 7, 2, 4, 3, 9],
+        [7, 9, 2, 8, 4, 3, 6, 5, 1],
+        [3, 6, 4, 5, 9, 1, 7, 8, 2],
+        [4, 3, 8, 9, 5, 7, 2, 1, 6],
+        [2, 5, 6, 1, 8, 4, 9, 7, 3],
+        [1, 7, 9, 3, 2, 6, 8, 4, 5],
+        [8, 4, 5, 2, 1, 9, 3, 6, 7],
+        [9, 1, 3, 7, 6, 8, 5, 2, 4],
+        [6, 2, 7, 4, 3, 5, 1, 9, 8],
+      ],
+    },
+  ],
+};
 
 /**
  * Fetch puzzle from backend API
  * Backend handles calling API Ninjas with proper error handling
  */
-async function fetchPuzzleFromAPI(mode: GameMode): Promise<PuzzleData> {
+async function fetchPuzzleFromAPI(mode: GameMode, difficulty: Difficulty): Promise<PuzzleData> {
   try {
-    console.log(`[CLIENT] Requesting ${mode} puzzle from backend...`);
+    console.log(`[CLIENT] Requesting ${mode} ${difficulty} puzzle from backend...`);
 
     const response = await fetch("/api/puzzle", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ mode }),
+      body: JSON.stringify({ mode, difficulty }),
     });
 
     if (!response.ok) {
@@ -233,12 +384,13 @@ async function fetchPuzzleFromAPI(mode: GameMode): Promise<PuzzleData> {
 /**
  * Get a random puzzle from fallback library
  */
-function getRandomFallbackPuzzle(mode: GameMode): PuzzleData {
+function getRandomFallbackPuzzle(mode: GameMode, difficulty: Difficulty): PuzzleData {
   const library = mode === "4x4" ? puzzleLibrary4x4 : puzzleLibrary9x9;
-  const randomIndex = Math.floor(Math.random() * library.length);
-  const selected = library[randomIndex];
+  const bucket = library[difficulty];
+  const randomIndex = Math.floor(Math.random() * bucket.length);
+  const selected = bucket[randomIndex];
   if (!selected) {
-    const fallback = library[0];
+    const fallback = bucket[0];
     if (!fallback) {
       throw new Error("No puzzles available");
     }
@@ -257,6 +409,9 @@ document.addEventListener("DOMContentLoaded", () => {
   ) as HTMLButtonElement | null;
   const modeSelect = document.getElementById(
     "mode-select",
+  ) as HTMLSelectElement | null;
+  const difficultySelect = document.getElementById(
+    "difficulty-select",
   ) as HTMLSelectElement | null;
   const instructionsEl = document.getElementById(
     "instructions",
@@ -315,6 +470,7 @@ document.addEventListener("DOMContentLoaded", () => {
     grid: [],
     gameWon: false,
     mode: "4x4",
+    difficulty: "medium",
     startTime: null,
     elapsedTime: 0,
     username: "Anonymous Player",
@@ -749,7 +905,7 @@ document.addEventListener("DOMContentLoaded", () => {
     let usingFallback = false;
 
     try {
-      currentPuzzle = await fetchPuzzleFromAPI(state.mode);
+      currentPuzzle = await fetchPuzzleFromAPI(state.mode, state.difficulty);
     } catch (apiError) {
       // API is unreachable or returned an error — use local fallback.
       console.warn(
@@ -757,7 +913,7 @@ document.addEventListener("DOMContentLoaded", () => {
         apiError instanceof Error ? apiError.message : apiError,
       );
       try {
-        currentPuzzle = getRandomFallbackPuzzle(state.mode);
+        currentPuzzle = getRandomFallbackPuzzle(state.mode, state.difficulty);
         usingFallback = true;
       } catch (fallbackError) {
         // Both API and local library failed — this should never happen.
@@ -861,11 +1017,25 @@ document.addEventListener("DOMContentLoaded", () => {
     await loadLeaderboard();
   }
 
+  async function changeDifficulty(newDifficulty: Difficulty): Promise<void> {
+    state.difficulty = newDifficulty;
+    stopTimer();
+    await resetPuzzle();
+    await loadLeaderboard();
+  }
+
   // Event listeners
   modeSelectElem.addEventListener("change", (e) => {
     const target = e.target as HTMLSelectElement;
     changeGameMode(target.value as GameMode);
   });
+
+  if (difficultySelect) {
+    difficultySelect.addEventListener("change", (e) => {
+      const target = e.target as HTMLSelectElement;
+      changeDifficulty(target.value as Difficulty);
+    });
+  }
 
   if (resetBtn) {
     resetBtn.addEventListener("click", () => {

@@ -8,11 +8,14 @@
  * @version 1.0.0
  */
 
+import type { Difficulty } from "../../shared/types/api";
+
 export type GridSize = 4 | 9;
 
 export interface GeneratorConfig {
-  size: GridSize;        // Grid dimension (4 or 9)
-  boxSize: number;       // Sub-grid dimension (2 for 4×4, 3 for 9×9)
+  size: GridSize;
+  boxSize: number;
+  difficulty: Difficulty;
 }
 
 export interface GeneratedPuzzle {
@@ -31,10 +34,12 @@ export interface GeneratedPuzzle {
 export class SudokuGenerator {
   private size: GridSize;
   private boxSize: number;
+  private difficulty: Difficulty;
 
   constructor(config: GeneratorConfig) {
     this.size = config.size;
     this.boxSize = config.boxSize;
+    this.difficulty = config.difficulty;
 
     // Validate configuration
     if (this.boxSize * this.boxSize !== this.size) {
@@ -121,9 +126,13 @@ export class SudokuGenerator {
   private createPuzzle(solution: number[][]): number[][] {
     const puzzle = solution.map((row) => [...row]);
 
-    // Target removal count based on size
-    const totalCells = this.size * this.size;
-    const targetRemoval = Math.floor(totalCells * 0.5); // Remove ~50% of cells
+    // Target removal count based on size and difficulty
+    const targets: Record<Difficulty, Record<GridSize, number>> = {
+      easy:   { 4: 6, 9: 30 },
+      medium: { 4: 8, 9: 45 },
+      hard:   { 4: 10, 9: 55 },
+    };
+    const targetRemoval = targets[this.difficulty][this.size];
     
     // Create shuffled list of all cell positions
     const positions: Array<[number, number]> = [];
