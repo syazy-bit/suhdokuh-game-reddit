@@ -150,15 +150,25 @@ h2 {
 /* Locked cells (pre-filled) */
 .cell.locked {
   background-color: var(--bg-light);
-  cursor: default;
+  cursor: pointer;
   font-weight: 800;
   color: #333;
 }
 
+/* Cells in the selected cell's row, column, or box */
+.cell.related {
+  background-color: #eaf3fc;
+}
+
+/* Keep clue cells distinct while showing their relationship to selection */
+.cell.locked.related {
+  background-color: #dce8f3;
+}
+
 /* Selected cell highlight */
 .cell.selected {
-  background-color: #e3f2fd;
-  box-shadow: inset 0 0 0 2px var(--primary);
+  background-color: #cfe5fb;
+  box-shadow: inset 0 0 0 3px var(--primary);
 }
 
 /* Conflict highlighting */

@@ -511,12 +511,6 @@ document.addEventListener("DOMContentLoaded", () => {
             cell.textContent = value.toString();
           }
 
-          // Add click handler for selection only — timer starts on first number placement, not selection.
-          cell.addEventListener("click", () => {
-            state.selected = { r, c };
-            highlightSelected();
-          });
-
           // Check for validation errors (conflict with other cells)
           if (value && value !== 0) {
             const isValid = isValidMove(r, c, value);
@@ -525,6 +519,13 @@ document.addEventListener("DOMContentLoaded", () => {
             }
           }
         }
+
+        // All cells can be selected for highlighting. Locked clues remain
+        // protected from edits by placeNumber() and clearCell().
+        cell.addEventListener("click", () => {
+          state.selected = { r, c };
+          highlightSelected();
+        });
 
         // Highlight if selected
         if (
@@ -547,6 +548,8 @@ document.addEventListener("DOMContentLoaded", () => {
         grid.appendChild(cell);
       }
     }
+
+    highlightSelected();
   }
 
   /**
@@ -554,16 +557,33 @@ document.addEventListener("DOMContentLoaded", () => {
    */
   function highlightSelected(): void {
     const cells = document.querySelectorAll<HTMLDivElement>(".cell");
-    cells.forEach((c) => c.classList.remove("selected"));
+    cells.forEach((cell) => cell.classList.remove("selected", "related"));
 
     if (!state.selected) return;
 
     const size = getGridSize();
-    const index = state.selected.r * size + state.selected.c;
-    const cell = cells[index];
-    if (cell) {
-      cell.classList.add("selected");
-    }
+    const boxSize = state.mode === "4x4" ? 2 : 3;
+    const selectedRow = state.selected.r;
+    const selectedCol = state.selected.c;
+    const selectedBoxRow = Math.floor(selectedRow / boxSize);
+    const selectedBoxCol = Math.floor(selectedCol / boxSize);
+
+    cells.forEach((cell, index) => {
+      const row = Math.floor(index / size);
+      const col = index % size;
+      const isSelected = row === selectedRow && col === selectedCol;
+      const isSameRow = row === selectedRow;
+      const isSameColumn = col === selectedCol;
+      const isSameBox =
+        Math.floor(row / boxSize) === selectedBoxRow &&
+        Math.floor(col / boxSize) === selectedBoxCol;
+
+      if (isSelected) {
+        cell.classList.add("selected");
+      } else if (isSameRow || isSameColumn || isSameBox) {
+        cell.classList.add("related");
+      }
+    });
   }
 
   /**
@@ -592,7 +612,6 @@ document.addEventListener("DOMContentLoaded", () => {
     // startTimer() is a no-op if the timer is already running.
     startTimer();
 
-    state.selected = null;
     renderGrid();
 
     // Check for win condition.
