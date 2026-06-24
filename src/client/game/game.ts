@@ -790,6 +790,26 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  function handleArrowKey(key: string): void {
+    const size = getGridSize();
+
+    if (!state.selected) {
+      state.selected = { r: 0, c: 0 };
+      highlightSelected();
+      return;
+    }
+
+    let { r, c } = state.selected;
+    switch (key) {
+      case "ArrowUp":    r = Math.max(0, r - 1); break;
+      case "ArrowDown":  r = Math.min(size - 1, r + 1); break;
+      case "ArrowLeft":  c = Math.max(0, c - 1); break;
+      case "ArrowRight": c = Math.min(size - 1, c + 1); break;
+    }
+    state.selected = { r, c };
+    highlightSelected();
+  }
+
   // Handle keyboard input
   document.addEventListener("keydown", (e) => {
     if (state.gameWon) return;
@@ -797,7 +817,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const key = e.key;
     const maxNumbers = state.mode === "4x4" ? 4 : 9;
 
-    if (key >= "1" && key <= "9") {
+    if (key === "ArrowUp" || key === "ArrowDown" || key === "ArrowLeft" || key === "ArrowRight") {
+      e.preventDefault();
+      handleArrowKey(key);
+    } else if (key >= "1" && key <= "9") {
       const num = parseInt(key, 10);
       if (num <= maxNumbers) {
         placeNumber(num);
