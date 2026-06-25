@@ -414,6 +414,40 @@ h2 {
   box-shadow: none;
 }
 
+/* Hint button */
+.hint-btn {
+  padding: 12px 24px;
+  font-size: 1em;
+  font-weight: 600;
+  background-color: #fff;
+  color: #4caf50;
+  border: 2px solid #4caf50;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(76, 175, 80, 0.15);
+}
+
+.hint-btn:hover:not(:disabled) {
+  background-color: #4caf50;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+  transform: translateY(-2px);
+}
+
+.hint-btn:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 1px 4px rgba(76, 175, 80, 0.3);
+}
+
+.hint-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  border-color: #ccc;
+  color: #999;
+  box-shadow: none;
+}
+
 /* Reset button */
 .reset-btn {
   padding: 12px 24px;
@@ -575,6 +609,7 @@ h2 {
   }
 
   .undo-btn,
+  .hint-btn,
   .reset-btn {
     width: 100%;
   }

@@ -15,6 +15,7 @@ interface GameState {
   startTime: number | null;
   elapsedTime: number;
   username: string; // Store the Reddit username
+  hintUsed: boolean;
 }
 
 type GameMode = "4x4" | "9x9";
@@ -427,6 +428,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const undoBtn = document.getElementById(
     "undo-btn",
   ) as HTMLButtonElement | null;
+  const hintBtn = document.getElementById(
+    "hint-btn",
+  ) as HTMLButtonElement | null;
   const helpBtn = document.getElementById(
     "help-btn",
   ) as HTMLButtonElement | null;
@@ -480,6 +484,7 @@ document.addEventListener("DOMContentLoaded", () => {
     startTime: null,
     elapsedTime: 0,
     username: "Anonymous Player",
+    hintUsed: false,
   };
 
   let puzzle: number[][] = [];
@@ -801,6 +806,58 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   /**
+   * Use a hint: place the correct value from the solution into the selected cell.
+   * Only one hint is available per puzzle.
+   *
+   * Reuses the normal placement pipeline (placeNumber) so that rendering,
+   * timer, undo, conflict detection, and win detection all work identically
+   * to a manual move.
+   */
+  function useHint(): void {
+    if (state.hintUsed) {
+      updateMessage("Hint already used for this puzzle.");
+      return;
+    }
+
+    if (state.gameWon) return;
+
+    if (!state.selected) {
+      updateMessage("No cell selected.");
+      return;
+    }
+
+    const { r, c } = state.selected;
+
+    const puzzleCell = puzzle[r]?.[c];
+    if (puzzleCell !== 0) {
+      updateMessage("Cannot use a hint on a locked cell.");
+      return;
+    }
+
+    const currentValue = state.grid[r]?.[c];
+    if (currentValue && currentValue !== 0) {
+      updateMessage("Select an empty editable cell.");
+      return;
+    }
+
+    state.hintUsed = true;
+
+    const correctValue = solution[r]?.[c];
+    if (!correctValue) return;
+
+    // Temporarily disable notes mode so placeNumber uses the normal value
+    // placement path instead of toggling notes.
+    const wasNotesMode = state.notesMode;
+    state.notesMode = false;
+
+    placeNumber(correctValue);
+
+    state.notesMode = wasNotesMode;
+
+    updateHintButton();
+  }
+
+  /**
    * Place a number in the selected cell.
    *
    * Conflicting placements are allowed — they are written to the grid and
@@ -957,6 +1014,17 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  function updateHintButton(): void {
+    if (!hintBtn) return;
+    if (state.hintUsed) {
+      hintBtn.disabled = true;
+      hintBtn.textContent = "💡 Hint Used";
+    } else {
+      hintBtn.disabled = false;
+      hintBtn.textContent = "💡 Hint (1)";
+    }
+  }
+
   function undoMove(): void {
     if (moveHistory.length === 0) return;
 
@@ -1040,6 +1108,7 @@ document.addEventListener("DOMContentLoaded", () => {
     state.notesMode = false;
     state.selected = null;
     state.gameWon = false;
+    state.hintUsed = false;
     state.startTime = null;
     state.elapsedTime = 0;
     stopTimer();
@@ -1069,6 +1138,7 @@ document.addEventListener("DOMContentLoaded", () => {
     renderGrid();
     renderNumbers();
     updateUndoButton();
+    updateHintButton();
   }
 
   /**
@@ -1169,6 +1239,10 @@ document.addEventListener("DOMContentLoaded", () => {
     undoBtn.addEventListener("click", undoMove);
   }
 
+  if (hintBtn) {
+    hintBtn.addEventListener("click", useHint);
+  }
+
   function closeHelp(): void {
     isHelpOpen = false;
     if (helpModal) {
@@ -1252,6 +1326,9 @@ document.addEventListener("DOMContentLoaded", () => {
     } else if ((key === "n" || key === "N") && !e.ctrlKey && !e.metaKey) {
       e.preventDefault();
       toggleNotesMode();
+    } else if ((key === "h" || key === "H") && !e.ctrlKey && !e.metaKey) {
+      e.preventDefault();
+      useHint();
     } else if (key === "Escape") {
       state.selected = null;
       highlightSelected();
