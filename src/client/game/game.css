@@ -162,7 +162,6 @@ h2 {
   background-color: #fff;
   color: var(--text-dark);
   user-select: none;
-  transition: all 0.15s ease;
   position: relative;
 }
 
@@ -206,6 +205,24 @@ h2 {
 .cell.selected {
   background-color: #cfe5fb;
   box-shadow: inset 0 0 0 3px var(--primary);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .cell {
+    transition: background-color 150ms ease-out;
+  }
+
+  .cell.related {
+    transition: background-color 100ms ease-out;
+  }
+
+  .cell.selected {
+    transition: background-color 60ms ease-out;
+  }
+
+  .cell.conflict {
+    transition: background-color 150ms ease-out;
+  }
 }
 
 /* Value span for animated number placement */
