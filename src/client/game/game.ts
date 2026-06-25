@@ -494,6 +494,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const moveHistory: Move[] = [];
   let isHelpOpen = false;
   let notesBtn: HTMLButtonElement | null = null;
+  let previousFocusedElement: HTMLElement | null = null;
 
   /**
    * Get grid size based on mode
@@ -681,6 +682,38 @@ document.addEventListener("DOMContentLoaded", () => {
   /**
    * Render the grid with cells
    */
+  function getCellDescription(r: number, c: number): string {
+    const row = r + 1;
+    const col = c + 1;
+    const puzzleCell = puzzle[r]?.[c];
+    const isLocked = puzzleCell !== 0;
+    let desc = `Row ${row}, Column ${col}. `;
+
+    if (isLocked) {
+      desc += "Locked. ";
+      desc += `Value ${puzzleCell}.`;
+    } else {
+      desc += "Editable. ";
+      const value = state.grid[r]?.[c];
+      if (value && value !== 0) {
+        desc += `Value ${value}.`;
+        const isValid = isValidMove(r, c, value);
+        if (!isValid) {
+          desc += " Conflict.";
+        }
+      } else {
+        const cellNotes = state.notes[r]?.[c];
+        if (cellNotes && cellNotes.size > 0) {
+          const sortedNotes = Array.from(cellNotes).sort((a, b) => a - b);
+          desc += "Empty. Notes: " + sortedNotes.join(", ") + ".";
+        } else {
+          desc += "Empty.";
+        }
+      }
+    }
+    return desc;
+  }
+
   function renderGrid(): void {
     const size = getGridSize();
     const boxSize = state.mode === "4x4" ? 2 : 3;
@@ -695,6 +728,9 @@ document.addEventListener("DOMContentLoaded", () => {
         cell.className = "cell";
         cell.dataset.row = r.toString();
         cell.dataset.col = c.toString();
+        cell.id = `cell-${r}-${c}`;
+        cell.role = "gridcell";
+        cell.setAttribute("aria-label", getCellDescription(r, c));
 
         // Check if cell is locked (from original puzzle)
         const puzzleCell = puzzle[r]?.[c];
@@ -753,6 +789,9 @@ document.addEventListener("DOMContentLoaded", () => {
           state.selected.c === c
         ) {
           cell.classList.add("selected");
+          cell.setAttribute("aria-selected", "true");
+        } else {
+          cell.setAttribute("aria-selected", "false");
         }
 
         // Add box border styling
@@ -774,11 +813,25 @@ document.addEventListener("DOMContentLoaded", () => {
   /**
    * Highlight the currently selected cell
    */
+  function updateActiveDescendant(): void {
+    if (state.selected) {
+      grid.setAttribute("aria-activedescendant", `cell-${state.selected.r}-${state.selected.c}`);
+    } else {
+      grid.removeAttribute("aria-activedescendant");
+    }
+  }
+
   function highlightSelected(): void {
     const cells = document.querySelectorAll<HTMLDivElement>(".cell");
-    cells.forEach((cell) => cell.classList.remove("selected", "related"));
+    cells.forEach((cell) => {
+      cell.classList.remove("selected", "related");
+      cell.setAttribute("aria-selected", "false");
+    });
 
-    if (!state.selected) return;
+    if (!state.selected) {
+      updateActiveDescendant();
+      return;
+    }
 
     const size = getGridSize();
     const boxSize = state.mode === "4x4" ? 2 : 3;
@@ -799,10 +852,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
       if (isSelected) {
         cell.classList.add("selected");
+        cell.setAttribute("aria-selected", "true");
       } else if (isSameRow || isSameColumn || isSameBox) {
         cell.classList.add("related");
       }
     });
+
+    updateActiveDescendant();
   }
 
   /**
@@ -1019,9 +1075,11 @@ document.addEventListener("DOMContentLoaded", () => {
     if (state.hintUsed) {
       hintBtn.disabled = true;
       hintBtn.textContent = "💡 Hint Used";
+      hintBtn.setAttribute("aria-label", "Hint already used");
     } else {
       hintBtn.disabled = false;
       hintBtn.textContent = "💡 Hint (1)";
+      hintBtn.setAttribute("aria-label", "Hint. One remaining.");
     }
   }
 
@@ -1181,6 +1239,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const nBtn = document.createElement("button");
     nBtn.className = state.notesMode ? "notes-btn active" : "notes-btn";
     nBtn.textContent = "✏️ Notes";
+    nBtn.setAttribute("aria-pressed", state.notesMode ? "true" : "false");
     nBtn.addEventListener("click", toggleNotesMode);
     numbers.appendChild(nBtn);
     notesBtn = nBtn;
@@ -1190,6 +1249,7 @@ document.addEventListener("DOMContentLoaded", () => {
     state.notesMode = !state.notesMode;
     if (notesBtn) {
       notesBtn.className = state.notesMode ? "notes-btn active" : "notes-btn";
+      notesBtn.setAttribute("aria-pressed", state.notesMode ? "true" : "false");
     }
   }
 
@@ -1248,12 +1308,20 @@ document.addEventListener("DOMContentLoaded", () => {
     if (helpModal) {
       helpModal.classList.add("hidden");
     }
+    if (previousFocusedElement) {
+      previousFocusedElement.focus();
+      previousFocusedElement = null;
+    }
   }
 
   if (helpBtn && helpModal) {
     helpBtn.addEventListener("click", () => {
+      previousFocusedElement = document.activeElement as HTMLElement | null;
       isHelpOpen = true;
       helpModal.classList.remove("hidden");
+      if (closeModalBtn) {
+        closeModalBtn.focus();
+      }
     });
   }
 

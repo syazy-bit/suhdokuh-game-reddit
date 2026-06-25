@@ -33,8 +33,8 @@
 
     <p class="instructions" id="instructions">Click a cell, then use number buttons or keyboard (1-4) to fill</p>
 
-    <div id="grid" class="grid"></div>
-    <div id="message" class="message"></div>
+    <div id="grid" class="grid" role="grid" tabindex="0" aria-label="Sudoku board"></div>
+    <div id="message" class="message" aria-live="polite"></div>
 
     <!-- Timer display -->
     <div class="timer-display">
@@ -44,9 +44,9 @@
     <div id="numbers" class="numbers"></div>
 
     <div class="action-buttons">
-      <button id="undo-btn" class="undo-btn" disabled>↩ Undo</button>
+      <button id="undo-btn" class="undo-btn" disabled aria-label="Undo last move">↩ Undo</button>
       <button id="hint-btn" class="hint-btn" aria-label="Get a hint">💡 Hint (1)</button>
-      <button id="reset-btn" class="reset-btn">↻ New Puzzle</button>
+      <button id="reset-btn" class="reset-btn" aria-label="Start a new puzzle">↻ New Puzzle</button>
     </div>
 
     <!-- Leaderboard Section -->
@@ -64,11 +64,11 @@
   </div>
 
   <!-- Help Modal -->
-  <div id="help-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+  <div id="help-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="help-modal-title">
     <div class="modal-content">
       <button id="close-modal-btn" class="close-btn" aria-label="Close Help">&times;</button>
 
-      <h2>📖 How to Play</h2>
+      <h2 id="help-modal-title">📖 How to Play</h2>
       <p>Fill every empty cell. Each number may appear only once in:</p>
       <ul>
         <li>Every row</li>
