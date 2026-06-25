@@ -208,6 +208,28 @@ h2 {
   box-shadow: inset 0 0 0 3px var(--primary);
 }
 
+/* Value span for animated number placement */
+.value {
+  display: inline-block;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes value-pop {
+    from {
+      transform: scale(0.85);
+      opacity: 0;
+    }
+    to {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+
+  .value-pop {
+    animation: value-pop 150ms cubic-bezier(0.2, 0.0, 0, 1.0) forwards;
+  }
+}
+
 /* Notes grid inside cells */
 .cell .notes-grid {
   display: grid;

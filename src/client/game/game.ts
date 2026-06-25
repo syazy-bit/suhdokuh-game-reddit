@@ -509,6 +509,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let timerInterval: number | null = null;
   let winResetTimeout: number | null = null;
   const moveHistory: Move[] = [];
+  let lastPlacedCell: { r: number; c: number } | null = null;
   let isHelpOpen = false;
   let isStatsOpen = false;
   let notesBtn: HTMLButtonElement | null = null;
@@ -784,13 +785,22 @@ document.addEventListener("DOMContentLoaded", () => {
         const isLocked = puzzleCell !== 0;
 
         if (isLocked) {
-          cell.textContent = puzzleCell?.toString() ?? "";
+          const valueSpan = document.createElement("span");
+          valueSpan.className = "value";
+          valueSpan.textContent = puzzleCell?.toString() ?? "";
+          cell.appendChild(valueSpan);
           cell.classList.add("locked");
         } else {
-          cell.innerHTML = "";
+          cell.replaceChildren();
           const value = state.grid[r]?.[c];
           if (value && value !== 0) {
-            cell.textContent = value.toString();
+            const valueSpan = document.createElement("span");
+            valueSpan.className = "value";
+            valueSpan.textContent = value.toString();
+            if (lastPlacedCell?.r === r && lastPlacedCell?.c === c) {
+              valueSpan.classList.add("value-pop");
+            }
+            cell.appendChild(valueSpan);
           } else {
             const cellNotes = state.notes[r]?.[c];
             if (cellNotes && cellNotes.size > 0) {
@@ -855,6 +865,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     highlightSelected();
+    lastPlacedCell = null;
   }
 
   /**
@@ -1036,7 +1047,9 @@ document.addEventListener("DOMContentLoaded", () => {
     // startTimer() is a no-op if the timer is already running.
     startTimer();
 
+    lastPlacedCell = { r, c };
     renderGrid();
+
     updateUndoButton();
 
     // Check for win condition.
@@ -1597,8 +1610,9 @@ document.addEventListener("DOMContentLoaded", () => {
       useHint();
     } else if (key === "Escape") {
       state.selected = null;
-      highlightSelected();
-    }
+    highlightSelected();
+    lastPlacedCell = null;
+  }
   });
 
   // Initial setup
