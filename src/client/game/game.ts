@@ -422,9 +422,12 @@ document.addEventListener("DOMContentLoaded", () => {
     "instructions",
   ) as HTMLParagraphElement | null;
   const timerEl = document.getElementById("timer") as HTMLSpanElement | null;
-  const leaderboardEl = document.getElementById(
-    "leaderboard",
-  ) as HTMLDivElement | null;
+    const leaderboardEl = document.getElementById(
+      "leaderboard",
+    ) as HTMLDivElement | null;
+    const leaderboardTitleEl = document.getElementById(
+      "leaderboard-title",
+    ) as HTMLHeadingElement | null;
   const undoBtn = document.getElementById(
     "undo-btn",
   ) as HTMLButtonElement | null;
@@ -455,6 +458,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const instructions = instructionsEl as HTMLParagraphElement;
   const timer = timerEl as HTMLSpanElement;
   const leaderboard = leaderboardEl as HTMLDivElement;
+  const leaderboardTitle = leaderboardTitleEl as HTMLHeadingElement;
 
   // Fetch Reddit username from server
   async function getRedditUsername(): Promise<string> {
@@ -607,6 +611,7 @@ document.addEventListener("DOMContentLoaded", () => {
           // username is NOT sent — the server resolves it from the
           // authenticated Reddit session to prevent spoofing.
           mode: state.mode,
+          difficulty: state.difficulty,
           time: state.elapsedTime,
         }),
       });
@@ -623,12 +628,25 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   /**
+   * Update the leaderboard section title based on current game state
+   */
+  function updateLeaderboardTitle(): void {
+    if (leaderboardTitle) {
+      const modeDisplay = state.mode === "4x4" ? "4×4" : "9×9";
+      const difficultyDisplay =
+        state.difficulty.charAt(0).toUpperCase() + state.difficulty.slice(1);
+      leaderboardTitle.textContent =
+        `🏆 ${modeDisplay} ${difficultyDisplay} Leaderboard`;
+    }
+  }
+
+  /**
    * Load and display leaderboard
    */
   async function loadLeaderboard(): Promise<void> {
     try {
       const response = await fetch(
-        `/api/leaderboard?mode=${state.mode}&limit=10`,
+        `/api/leaderboard?mode=${state.mode}&difficulty=${state.difficulty}&limit=10`,
       );
       if (!response.ok) {
         const text = await response.text().catch(() => "No response text");
@@ -640,9 +658,11 @@ document.addEventListener("DOMContentLoaded", () => {
       const data = await response.json();
       const entries = data.entries || [];
 
+      updateLeaderboardTitle();
+
       if (entries.length === 0) {
         leaderboard.innerHTML =
-          '<p class="empty">No scores yet. Be the first!</p>';
+          '<p class="empty">No scores yet. Be the first to solve this puzzle!</p>';
         return;
       }
 
@@ -1410,6 +1430,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Then initialize the game
     await changeGameMode("4x4");
+    updateLeaderboardTitle();
     await loadLeaderboard();
   })();
 });

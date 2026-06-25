@@ -13,6 +13,7 @@ export type Difficulty = "easy" | "medium" | "hard";
 export type LeaderboardEntry = {
   username: string;
   mode: GameMode;
+  difficulty: Difficulty;
   time: number; // completion time in seconds
   timestamp: number;
 };
@@ -21,6 +22,7 @@ export type SubmitScoreRequest = {
   // username is intentionally omitted — the server resolves it from
   // the authenticated Reddit session via reddit.getCurrentUsername().
   mode: GameMode;
+  difficulty: Difficulty;
   time: number; // completion time in seconds
 };
 

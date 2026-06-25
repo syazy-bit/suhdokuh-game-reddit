@@ -67,6 +67,8 @@ const MAX_TIME = 86_400;
 
 // Valid mode literals – used to prevent Redis key injection.
 const VALID_MODES = new Set<string>(["4x4", "9x9"]);
+// Valid difficulty literals
+const VALID_DIFFICULTIES = new Set<string>(["easy", "medium", "hard"]);
 
 /**
  * Sanitise a raw leaderboard array read from Redis.
@@ -104,6 +106,74 @@ function sanitiseLeaderboard(raw: unknown): LeaderboardEntry[] {
     .slice(0, 50);
 }
 
+/**
+ * Read (and for medium difficulty, lazily migrate) a leaderboard.
+ *
+ * For non-medium difficulties the new-key is always authoritative.
+ *
+ * For medium difficulty:
+ *   1. If leaderboard:${mode}:medium exists, return it.
+ *   2. Otherwise check the legacy leaderboard:${mode} key.
+ *   3. If legacy data exists, patch `difficulty` → "medium", persist to the
+ *      new key, and return the migrated entries.
+ *   4. If nothing exists, return an empty array.
+ *
+ * Both the read and write endpoints MUST call this helper before touching
+ * the data so that legacy scores are never orphaned by a premature write.
+ */
+async function getOrCreateLeaderboardData(
+  mode: GameMode,
+  difficulty: Difficulty,
+): Promise<LeaderboardEntry[]> {
+  const leaderboardKey = `leaderboard:${mode}:${difficulty}`;
+
+  // ── Non-medium difficulties: always authoritative ────────────────────
+  if (difficulty !== "medium") {
+    const raw = await redis.get(leaderboardKey);
+    if (!raw) return [];
+    try {
+      return sanitiseLeaderboard(JSON.parse(raw));
+    } catch (parseError) {
+      console.warn(`[SERVER] Leaderboard data for ${leaderboardKey} is corrupt. Resetting to empty array.`, parseError);
+      return [];
+    }
+  }
+
+  // ── Medium: try new key first ────────────────────────────────────────
+  const raw = await redis.get(leaderboardKey);
+  if (raw) {
+    try {
+      return sanitiseLeaderboard(JSON.parse(raw));
+    } catch (parseError) {
+      console.warn(`[SERVER] Leaderboard data for ${leaderboardKey} is corrupt. Resetting to empty array.`, parseError);
+      return [];
+    }
+  }
+
+  // ── New key does not exist — attempt lazy migration from legacy key ──
+  const oldKey = `leaderboard:${mode}`;
+  const oldRaw = await redis.get(oldKey);
+  if (!oldRaw) return [];
+
+  try {
+    const oldEntries = sanitiseLeaderboard(JSON.parse(oldRaw));
+    if (oldEntries.length === 0) return [];
+
+    const migratedEntries: LeaderboardEntry[] = oldEntries.map((e) => ({
+      ...e,
+      difficulty: "medium",
+    }));
+    await redis.set(leaderboardKey, JSON.stringify(migratedEntries));
+    console.log(
+      `[MIGRATION] Migrated ${migratedEntries.length} entries from ${oldKey} to ${leaderboardKey}`,
+    );
+    return migratedEntries;
+  } catch (parseError) {
+    console.warn(`[MIGRATION] Failed to migrate ${oldKey}:`, parseError);
+    return [];
+  }
+}
+
 router.post<{ postId: string }, SubmitScoreResponse, SubmitScoreRequest>(
   "/api/submit-score",
   async (req, res): Promise<void> => {
@@ -131,7 +201,7 @@ router.post<{ postId: string }, SubmitScoreResponse, SubmitScoreRequest>(
       }
 
       // ── 2. Validate mode ─────────────────────────────────────────────
-      const { mode, time } = req.body;
+      const { mode, difficulty, time } = req.body;
       if (!mode || !VALID_MODES.has(mode)) {
         res.status(400).json({
           type: "submit-score",
@@ -141,7 +211,17 @@ router.post<{ postId: string }, SubmitScoreResponse, SubmitScoreRequest>(
         return;
       }
 
-      // ── 3. Validate time ─────────────────────────────────────────────
+      // ── 3. Validate difficulty ────────────────────────────────────────
+      if (!difficulty || !VALID_DIFFICULTIES.has(difficulty)) {
+        res.status(400).json({
+          type: "submit-score",
+          status: "error",
+          message: "Invalid difficulty",
+        });
+        return;
+      }
+
+      // ── 4. Validate time ─────────────────────────────────────────────
       if (
         typeof time !== "number" ||
         !Number.isFinite(time) ||
@@ -156,14 +236,10 @@ router.post<{ postId: string }, SubmitScoreResponse, SubmitScoreRequest>(
         return;
       }
 
-      // ── 4. Load and sanitise the existing leaderboard ────────────────
-      const leaderboardKey = `leaderboard:${mode}`;
-      const raw = await redis.get(leaderboardKey);
-      let entries: LeaderboardEntry[] = raw
-        ? sanitiseLeaderboard(JSON.parse(raw))
-        : [];
+      // ── 5. Load (and migrate if needed) existing leaderboard ─────────
+      let entries: LeaderboardEntry[] = await getOrCreateLeaderboardData(mode, difficulty);
 
-      // ── 5. Deduplicate: keep only the user's personal best ───────────
+      // ── 6. Deduplicate: keep only the user's personal best ───────────
       const existingEntry = entries.find((e) => e.username === username);
 
       // If they already have a faster (or equal) time, keep it and ignore this slower submission.
@@ -183,15 +259,16 @@ router.post<{ postId: string }, SubmitScoreResponse, SubmitScoreRequest>(
       entries.push({
         username,
         mode,
+        difficulty,
         time,
         timestamp: Date.now(),
       });
 
-      // ── 6. Sort ascending (fastest first) and cap at 50 entries ──────
+      // ── 7. Sort ascending (fastest first) and cap at 50 entries ──────
       entries.sort((a, b) => a.time - b.time);
       entries = entries.slice(0, 50);
 
-      await redis.set(leaderboardKey, JSON.stringify(entries));
+      await redis.set(`leaderboard:${mode}:${difficulty}`, JSON.stringify(entries));
 
       console.log(
         `[SCORE] ${username} submitted ${time}s for ${mode}`,
@@ -220,20 +297,20 @@ router.get<
 
   try {
     const mode = (req.query.mode as GameMode) || "4x4";
+    const difficulty = (req.query.difficulty as Difficulty) || "medium";
     const limit = Math.min(parseInt(req.query.limit as string) || 10, 50);
 
-    const leaderboardKey = `leaderboard:${mode}`;
-    const rawData = await redis.get(leaderboardKey);
-    let parsedData = [];
-    if (rawData) {
-      try {
-        parsedData = JSON.parse(rawData);
-      } catch (parseError) {
-        console.warn(`[SERVER] Leaderboard data for ${mode} is corrupt. Resetting to empty array.`, parseError);
-        parsedData = [];
-      }
+    if (!VALID_MODES.has(mode)) {
+      res.status(400).json({ status: "error", message: "Invalid game mode" });
+      return;
     }
-    const entries: LeaderboardEntry[] = sanitiseLeaderboard(parsedData);
+
+    if (!VALID_DIFFICULTIES.has(difficulty)) {
+      res.status(400).json({ status: "error", message: "Invalid difficulty" });
+      return;
+    }
+
+    const entries: LeaderboardEntry[] = await getOrCreateLeaderboardData(mode, difficulty);
 
     // Return top entries
     res.json({
