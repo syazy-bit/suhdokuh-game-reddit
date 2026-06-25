@@ -8,6 +8,8 @@ import {
   Difficulty,
   PuzzleRequest,
   PuzzleResponse,
+  PlayerStats,
+  StatsResponse,
 } from "../shared/types/api";
 import {
   createServer,
@@ -236,10 +238,49 @@ router.post<{ postId: string }, SubmitScoreResponse, SubmitScoreRequest>(
         return;
       }
 
-      // ── 5. Load (and migrate if needed) existing leaderboard ─────────
+      // ── 5. Update player statistics ─────────────────────────────────
+      // Always update stats on completion, regardless of personal best.
+      try {
+        const statsKey = `stats:${username}`;
+        const rawStats = await redis.get(statsKey);
+        const stats: PlayerStats = rawStats
+          ? JSON.parse(rawStats)
+          : {
+              username,
+              totalWins: 0,
+              totalPlayTime: 0,
+              records: {
+                "4x4": { easy: null, medium: null, hard: null },
+                "9x9": { easy: null, medium: null, hard: null },
+              },
+              progress: {
+                "4x4": 0,
+                "9x9": 0,
+                easy: 0,
+                medium: 0,
+                hard: 0,
+              },
+            };
+
+        stats.totalWins++;
+        stats.totalPlayTime += time;
+        stats.progress[mode as keyof typeof stats.progress]++;
+        stats.progress[difficulty as keyof typeof stats.progress]++;
+
+        const currentRecord = stats.records[mode as keyof typeof stats.records]?.[difficulty as keyof typeof stats.records["4x4"]];
+        if (currentRecord === null || time < currentRecord) {
+          (stats.records[mode as keyof typeof stats.records] as Record<string, number | null>)[difficulty] = time;
+        }
+
+        await redis.set(statsKey, JSON.stringify(stats));
+      } catch (statsError) {
+        console.warn("[STATS] Failed to update player stats (non-fatal):", statsError);
+      }
+
+      // ── 6. Load (and migrate if needed) existing leaderboard ─────────
       let entries: LeaderboardEntry[] = await getOrCreateLeaderboardData(mode, difficulty);
 
-      // ── 6. Deduplicate: keep only the user's personal best ───────────
+      // ── 7. Deduplicate: keep only the user's personal best ───────────
       const existingEntry = entries.find((e) => e.username === username);
 
       // If they already have a faster (or equal) time, keep it and ignore this slower submission.
@@ -264,7 +305,7 @@ router.post<{ postId: string }, SubmitScoreResponse, SubmitScoreRequest>(
         timestamp: Date.now(),
       });
 
-      // ── 7. Sort ascending (fastest first) and cap at 50 entries ──────
+      // ── 8. Sort ascending (fastest first) and cap at 50 entries ──────
       entries.sort((a, b) => a.time - b.time);
       entries = entries.slice(0, 50);
 
@@ -323,6 +364,48 @@ router.get<
       status: "error",
       message: `Failed to fetch leaderboard: ${error instanceof Error ? error.stack : String(error)}`,
     });
+  }
+});
+
+router.get<
+  any,
+  StatsResponse | { status: string; message: string }
+>("/api/stats", async (_req, res): Promise<void> => {
+  try {
+    const username = await reddit.getCurrentUsername();
+    if (!username) {
+      res.status(401).json({ status: "error", message: "Not authenticated" });
+      return;
+    }
+
+    const raw = await redis.get(`stats:${username}`);
+    if (raw) {
+      const stats = JSON.parse(raw) as PlayerStats;
+      res.json({ type: "stats", stats });
+      return;
+    }
+
+    const emptyStats: PlayerStats = {
+      username,
+      totalWins: 0,
+      totalPlayTime: 0,
+      records: {
+        "4x4": { easy: null, medium: null, hard: null },
+        "9x9": { easy: null, medium: null, hard: null },
+      },
+      progress: {
+        "4x4": 0,
+        "9x9": 0,
+        easy: 0,
+        medium: 0,
+        hard: 0,
+      },
+    };
+
+    res.json({ type: "stats", stats: emptyStats });
+  } catch (error) {
+    console.error("Error fetching stats:", error);
+    res.status(500).json({ status: "error", message: "Failed to fetch stats" });
   }
 });
 

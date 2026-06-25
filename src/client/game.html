@@ -13,6 +13,7 @@
     <div class="title-row">
       <h1>🧩 Suhdokuh</h1>
       <button id="help-btn" class="help-btn" aria-label="Help and Rules">❓</button>
+      <button id="stats-btn" class="help-btn" aria-label="View Statistics">📊</button>
     </div>
 
     <!-- Game Mode Selector -->
@@ -106,6 +107,15 @@
       </ul>
 
       <p class="modal-version">Suhdokuh v0.0.33</p>
+    </div>
+  </div>
+
+  <!-- Statistics Modal -->
+  <div id="stats-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="stats-modal-title">
+    <div class="modal-content">
+      <button id="close-stats-btn" class="close-btn" aria-label="Close Statistics">&times;</button>
+      <h2 id="stats-modal-title">📊 Player Statistics</h2>
+      <div id="stats-accordion" class="accordion"></div>
     </div>
   </div>
 

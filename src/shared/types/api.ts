@@ -50,3 +50,25 @@ export type PuzzleResponse = {
   solution: number[][];
   message?: string;
 };
+
+export type PlayerStats = {
+  username: string;
+  totalWins: number;
+  totalPlayTime: number;
+  records: {
+    "4x4": { easy: number | null; medium: number | null; hard: number | null };
+    "9x9": { easy: number | null; medium: number | null; hard: number | null };
+  };
+  progress: {
+    "4x4": number;
+    "9x9": number;
+    easy: number;
+    medium: number;
+    hard: number;
+  };
+};
+
+export type StatsResponse = {
+  type: "stats";
+  stats: PlayerStats;
+};

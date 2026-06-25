@@ -1,3 +1,5 @@
+import type { PlayerStats } from "../../shared/types/api";
+
 // Type definitions for type-safe implementation
 interface Cell {
   r: number;
@@ -35,6 +37,8 @@ interface Move {
   newNotes: number[];
   selectionBeforeMove: { r: number; c: number } | null;
 }
+
+
 
 // Fallback puzzle libraries (for when API fails) — bucketed by difficulty
 const puzzleLibrary4x4: Record<Difficulty, PuzzleData[]> = {
@@ -443,6 +447,15 @@ document.addEventListener("DOMContentLoaded", () => {
   const closeModalBtn = document.getElementById(
     "close-modal-btn",
   ) as HTMLButtonElement | null;
+  const statsBtn = document.getElementById(
+    "stats-btn",
+  ) as HTMLButtonElement | null;
+  const statsModal = document.getElementById(
+    "stats-modal",
+  ) as HTMLDivElement | null;
+  const closeStatsBtn = document.getElementById(
+    "close-stats-btn",
+  ) as HTMLButtonElement | null;
 
   // Validate all required elements exist
   if (!gridEl || !numbersEl || !messageEl || !modeSelect || !leaderboardEl) {
@@ -497,6 +510,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let winResetTimeout: number | null = null;
   const moveHistory: Move[] = [];
   let isHelpOpen = false;
+  let isStatsOpen = false;
   let notesBtn: HTMLButtonElement | null = null;
   let previousFocusedElement: HTMLElement | null = null;
 
@@ -569,6 +583,19 @@ document.addEventListener("DOMContentLoaded", () => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, "0")}`;
+  }
+
+  /**
+   * Format cumulative play time into readable text
+   */
+  function formatPlayTime(totalSeconds: number): string {
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const secs = totalSeconds % 60;
+    if (hours > 0) {
+      return `${hours}h ${minutes.toString().padStart(2, "0")}m`;
+    }
+    return `${minutes}m ${secs.toString().padStart(2, "0")}s`;
   }
 
   /**
@@ -1357,6 +1384,151 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  // ── Statistics Modal ────────────────────────────────────────────────
+
+  function closeStats(): void {
+    isStatsOpen = false;
+    if (statsModal) {
+      statsModal.classList.add("hidden");
+    }
+    if (previousFocusedElement) {
+      previousFocusedElement.focus();
+      previousFocusedElement = null;
+    }
+  }
+
+  async function fetchStats(): Promise<PlayerStats | null> {
+    try {
+      const response = await fetch("/api/stats");
+      if (!response.ok) return null;
+      const data = await response.json();
+      return data.stats || null;
+    } catch (error) {
+      console.error("Error fetching stats:", error);
+      return null;
+    }
+  }
+
+  function toggleAccordion(headerEl: HTMLElement): void {
+    const section = headerEl.closest(".accordion-section");
+    if (!section) return;
+
+    const accordion = section.closest(".accordion");
+    if (!accordion) return;
+
+    const isActive = section.classList.contains("active");
+
+    accordion.querySelectorAll(".accordion-section").forEach((s) => {
+      s.classList.remove("active");
+    });
+
+    if (!isActive) {
+      section.classList.add("active");
+    }
+  }
+
+  function renderStatsModal(stats: PlayerStats): void {
+    const accordion = document.getElementById("stats-accordion");
+    if (!accordion) return;
+
+    function recordRow(label: string, value: number | null): string {
+      const display = value !== null
+        ? formatTime(value)
+        : '<span class="stats-record-null">—</span>';
+      return `<tr><td>${label}</td><td>${display}</td></tr>`;
+    }
+
+    accordion.innerHTML = `
+      <div class="accordion-section active">
+        <button class="accordion-header" type="button">
+          <span class="accordion-icon">▶</span>
+          Overall
+        </button>
+        <div class="accordion-content">
+          <table class="stats-table">
+            <tr><td>Total Wins</td><td>${stats.totalWins}</td></tr>
+            <tr><td>Total Play Time</td><td>${formatPlayTime(stats.totalPlayTime)}</td></tr>
+          </table>
+        </div>
+      </div>
+      <div class="accordion-section">
+        <button class="accordion-header" type="button">
+          <span class="accordion-icon">▶</span>
+          Records
+        </button>
+        <div class="accordion-content">
+          <table class="stats-table">
+            ${recordRow("4×4 Easy", stats.records["4x4"].easy)}
+            ${recordRow("4×4 Medium", stats.records["4x4"].medium)}
+            ${recordRow("4×4 Hard", stats.records["4x4"].hard)}
+            ${recordRow("9×9 Easy", stats.records["9x9"].easy)}
+            ${recordRow("9×9 Medium", stats.records["9x9"].medium)}
+            ${recordRow("9×9 Hard", stats.records["9x9"].hard)}
+          </table>
+        </div>
+      </div>
+      <div class="accordion-section">
+        <button class="accordion-header" type="button">
+          <span class="accordion-icon">▶</span>
+          Progress
+        </button>
+        <div class="accordion-content">
+          <table class="stats-table">
+            <tr><td>4×4 Wins</td><td>${stats.progress["4x4"]}</td></tr>
+            <tr><td>9×9 Wins</td><td>${stats.progress["9x9"]}</td></tr>
+            <tr><td>Easy Wins</td><td>${stats.progress.easy}</td></tr>
+            <tr><td>Medium Wins</td><td>${stats.progress.medium}</td></tr>
+            <tr><td>Hard Wins</td><td>${stats.progress.hard}</td></tr>
+          </table>
+        </div>
+      </div>
+    `;
+
+    accordion.querySelectorAll(".accordion-header").forEach((header) => {
+      header.addEventListener("click", () => {
+        toggleAccordion(header as HTMLElement);
+      });
+    });
+  }
+
+  if (statsBtn && statsModal) {
+    statsBtn.addEventListener("click", async () => {
+      previousFocusedElement = document.activeElement as HTMLElement | null;
+      isStatsOpen = true;
+      statsModal.classList.remove("hidden");
+
+      const stats = await fetchStats();
+      if (stats) {
+        renderStatsModal(stats);
+      } else {
+        const accordion = document.getElementById("stats-accordion");
+        if (accordion) {
+          accordion.innerHTML = '<p class="error">Failed to load statistics.</p>';
+        }
+      }
+
+      if (closeStatsBtn) {
+        closeStatsBtn.focus();
+      }
+    });
+  }
+
+  if (closeStatsBtn && statsModal) {
+    closeStatsBtn.addEventListener("click", closeStats);
+  }
+
+  if (statsModal) {
+    statsModal.addEventListener("click", (e) => {
+      if (e.target === statsModal) {
+        closeStats();
+      }
+    });
+  }
+
+  // ── Accordion focus management ───────────────────────────────────────
+  // Clicking an accordion header should not focus the button after
+  // rendering — the close button retains focus.
+
   function handleArrowKey(key: string): void {
     const size = getGridSize();
 
@@ -1381,10 +1553,16 @@ document.addEventListener("DOMContentLoaded", () => {
   document.addEventListener("keydown", (e) => {
     const key = e.key;
 
-    // Help modal is open — only Escape is allowed
+    // Help or Stats modal is open — only Escape is allowed
     if (isHelpOpen) {
       if (key === "Escape") {
         closeHelp();
+      }
+      return;
+    }
+    if (isStatsOpen) {
+      if (key === "Escape") {
+        closeStats();
       }
       return;
     }
