@@ -250,12 +250,17 @@ export class SudokuGenerator {
    */
   private hasUniqueSolutionOptimized(puzzle: number[][]): boolean {
     let solutionCount = 0;
+    let cutoffReached = false;
     let steps = 0;
     const MAX_STEPS = 200_000; // mobile-safe cutoff
 
     const countSolutions = (grid: number[][]): void => {
+      if (cutoffReached) return;
       if (solutionCount >= 2) return;
-      if (steps++ > MAX_STEPS) return;
+      if (steps++ > MAX_STEPS) {
+        cutoffReached = true;
+        return;
+      }
 
       for (let r = 0; r < this.size; r++) {
         for (let c = 0; c < this.size; c++) {
@@ -278,7 +283,7 @@ export class SudokuGenerator {
     const gridCopy = puzzle.map((row) => [...row]);
     countSolutions(gridCopy);
 
-    return solutionCount === 1;
+    return !cutoffReached && solutionCount === 1;
   }
 
   /**
