@@ -945,3 +945,104 @@ h2 {
     padding: 24px 20px;
   }
 }
+
+/* ── Completion Dialog ───────────────────────────────────────────── */
+
+#completion-dialog {
+  padding: 0;
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  max-width: 360px;
+  width: 100%;
+}
+
+#completion-dialog::backdrop {
+  background-color: rgba(0, 0, 0, 0.5);
+  animation: backdrop-fade-in 200ms ease-out;
+}
+
+@keyframes backdrop-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+#completion-dialog[open] {
+  animation: completion-fade-in 200ms ease-out;
+}
+
+@keyframes completion-fade-in {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.completion-content {
+  padding: 32px 28px;
+  text-align: center;
+}
+
+.completion-title {
+  font-size: 1.4em;
+  font-weight: 700;
+  color: var(--text-dark);
+  margin-bottom: 24px;
+}
+
+.completion-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 28px;
+}
+
+.completion-stat {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.completion-stat:last-child {
+  border-bottom: none;
+}
+
+.completion-stat-label {
+  font-size: 0.95em;
+  color: #666;
+}
+
+.completion-stat-value {
+  font-size: 1em;
+  font-weight: 600;
+  color: var(--primary);
+}
+
+.completion-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.completion-actions .reset-btn,
+.completion-actions .undo-btn,
+.completion-actions .clear-btn {
+  width: 100%;
+  text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #completion-dialog[open] {
+    animation: none;
+  }
+
+  #completion-dialog::backdrop {
+    animation: none;
+  }
+}

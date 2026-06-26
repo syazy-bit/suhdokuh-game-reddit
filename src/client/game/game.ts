@@ -468,6 +468,27 @@ document.addEventListener("DOMContentLoaded", () => {
   const closeStatsBtn = document.getElementById(
     "close-stats-btn",
   ) as HTMLButtonElement | null;
+  const completionDialog = document.getElementById(
+    "completion-dialog",
+  ) as HTMLDialogElement | null;
+  const completionTime = document.getElementById(
+    "completion-time",
+  ) as HTMLSpanElement | null;
+  const completionDifficulty = document.getElementById(
+    "completion-difficulty",
+  ) as HTMLSpanElement | null;
+  const completionHints = document.getElementById(
+    "completion-hints",
+  ) as HTMLSpanElement | null;
+  const completionNewBtn = document.getElementById(
+    "completion-new-btn",
+  ) as HTMLButtonElement | null;
+  const completionLbBtn = document.getElementById(
+    "completion-lb-btn",
+  ) as HTMLButtonElement | null;
+  const completionCloseBtn = document.getElementById(
+    "completion-close-btn",
+  ) as HTMLButtonElement | null;
 
   // Validate all required elements exist
   if (!gridEl || !numbersEl || !messageEl || !modeSelect || !leaderboardEl) {
@@ -639,6 +660,31 @@ document.addEventListener("DOMContentLoaded", () => {
       clearInterval(timerInterval);
       timerInterval = null;
     }
+  }
+
+  /**
+   * Show the completion dialog with final puzzle stats.
+   * Presentation-only — no game logic, no network requests.
+   */
+  function showCompletionDialog(): void {
+    if (!completionDialog) return;
+
+    if (completionTime) {
+      completionTime.textContent = formatPlayTime(state.elapsedTime);
+    }
+    if (completionDifficulty) {
+      const modeDisplay = state.mode === "4x4" ? "4×4" : "9×9";
+      const difficultyDisplay =
+        state.difficulty.charAt(0).toUpperCase() + state.difficulty.slice(1);
+      completionDifficulty.textContent = `${difficultyDisplay} • ${modeDisplay}`;
+    }
+    if (completionHints) {
+      completionHints.textContent = state.hintUsed
+        ? "Used 1 Hint"
+        : "Perfect (No Hints)";
+    }
+
+    completionDialog.showModal();
   }
 
   /**
@@ -1224,16 +1270,17 @@ document.addEventListener("DOMContentLoaded", () => {
       });
 
       message.classList.add("success");
-      message.textContent = "🎉 You solved the puzzle! Submitting score...";
+      message.textContent = "🎉 Puzzle complete.";
 
-      // Submit score and load next puzzle
-      submitScore().then(() => {
-        if (state.gameWon) {
-          winResetTimeout = window.setTimeout(() => {
-            resetPuzzle();
-          }, 2000);
-        }
-      });
+      // Submit score and refresh leaderboard in the background.
+      // Decoupled from the dialog — success/failure does not block UI.
+      submitScore();
+
+      // Show the completion dialog after the victory animation plays.
+      // The solved board remains visible until the player acts.
+      winResetTimeout = window.setTimeout(() => {
+        showCompletionDialog();
+      }, 1500);
     } else {
       updateMessage("");
     }
@@ -1357,9 +1404,12 @@ document.addEventListener("DOMContentLoaded", () => {
         triggerVictoryAnimation({ r: move.row, c: move.col });
       });
       message.classList.add("success");
-      message.textContent = "🎉 Puzzle solved!";
+      message.textContent = "🎉 Puzzle complete.";
       // Score was already submitted during the original placement.
       // No duplicate network request.
+      winResetTimeout = window.setTimeout(() => {
+        showCompletionDialog();
+      }, 1500);
     } else {
       renderGrid();
       highlightSelected();
@@ -1411,6 +1461,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (state.gameWon) {
       state.gameWon = false;
+      completionDialog?.close();
       message.classList.remove("success");
       message.textContent = "";
       if (winResetTimeout !== null) {
@@ -1440,6 +1491,9 @@ document.addEventListener("DOMContentLoaded", () => {
    *      user can always play without a page refresh.
    */
   async function resetPuzzle(): Promise<void> {
+    // Close any open completion dialog
+    completionDialog?.close();
+
     // Show loading state
     message.classList.remove("success", "error");
     message.classList.add("info");
@@ -1800,6 +1854,31 @@ document.addEventListener("DOMContentLoaded", () => {
 
   if (closeStatsBtn && statsModal) {
     closeStatsBtn.addEventListener("click", closeStats);
+  }
+
+  // ── Completion Dialog Buttons ──────────────────────────────────────
+
+  if (completionNewBtn) {
+    completionNewBtn.addEventListener("click", () => {
+      completionDialog?.close();
+      resetPuzzle();
+    });
+  }
+
+  if (completionLbBtn) {
+    completionLbBtn.addEventListener("click", () => {
+      completionDialog?.close();
+      const container = document.querySelector(".leaderboard-container");
+      if (container) {
+        container.scrollIntoView({ behavior: "smooth" });
+      }
+    });
+  }
+
+  if (completionCloseBtn) {
+    completionCloseBtn.addEventListener("click", () => {
+      completionDialog?.close();
+    });
   }
 
   if (statsModal) {
