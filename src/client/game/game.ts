@@ -42,6 +42,8 @@ interface Move {
   oldNotes: number[];
   newNotes: number[];
   selectionBeforeMove: { r: number; c: number } | null;
+  selectionAfterMove: { r: number; c: number } | null;
+  completedPuzzle: boolean;
   clearedNotes: ClearedNote[];
 }
 
@@ -442,6 +444,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const undoBtn = document.getElementById(
     "undo-btn",
   ) as HTMLButtonElement | null;
+  const redoBtn = document.getElementById(
+    "redo-btn",
+  ) as HTMLButtonElement | null;
   const hintBtn = document.getElementById(
     "hint-btn",
   ) as HTMLButtonElement | null;
@@ -516,6 +521,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let timerInterval: number | null = null;
   let winResetTimeout: number | null = null;
   const moveHistory: Move[] = [];
+  const redoHistory: Move[] = [];
   let lastPlacedCell: { r: number; c: number } | null = null;
   let lastHintedCell: { r: number; c: number } | null = null;
   let isHelpOpen = false;
@@ -1101,6 +1107,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const newNotesArr = Array.from(cellNotes);
       if (arraysEqual(oldNotesArr, newNotesArr)) return;
 
+      redoHistory.length = 0;
       moveHistory.push({
         row: r,
         col: c,
@@ -1109,16 +1116,20 @@ document.addEventListener("DOMContentLoaded", () => {
         oldNotes: oldNotesArr,
         newNotes: newNotesArr,
         selectionBeforeMove: state.selected ? { ...state.selected } : null,
+        selectionAfterMove: state.selected ? { ...state.selected } : null,
+        completedPuzzle: false,
         clearedNotes: [],
       });
 
       startTimer();
       renderGrid();
       updateUndoButton();
+      updateRedoButton();
       return;
     }
 
     // Normal mode: place number
+    let isWon = false;
     if (gridRow) {
       const oldValue = gridRow[c] ?? 0;
       if (oldValue === num) return;
@@ -1160,6 +1171,12 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       }
 
+      redoHistory.length = 0;
+      isWon = checkWin();
+      const nextSelection = isWon
+        ? null
+        : findNextEditableCell(r, c) ?? state.selected;
+
       moveHistory.push({
         row: r,
         col: c,
@@ -1168,8 +1185,17 @@ document.addEventListener("DOMContentLoaded", () => {
         oldNotes: oldNotesArr,
         newNotes: [],
         selectionBeforeMove: state.selected ? { ...state.selected } : null,
+        selectionAfterMove: nextSelection,
+        completedPuzzle: isWon,
         clearedNotes,
       });
+
+      // Apply auto-advance to live state before render.
+      // On the winning move, stay put — the victory handler sets
+      // state.selected = null independently.
+      if (!isWon) {
+        state.selected = nextSelection;
+      }
     }
 
     // Start the timer on the first placement (valid or conflicting).
@@ -1177,21 +1203,9 @@ document.addEventListener("DOMContentLoaded", () => {
     startTimer();
 
     lastPlacedCell = { r, c };
-
-    // Evaluate win condition once and share between auto-advance and the
-    // victory handler below.
-    const isWon = checkWin();
-
-    // Auto-advance cursor to the next empty editable cell.
-    // Must not fire on the winning move — the victory sequence
-    // sets state.selected = null independently.
-    if (!isWon) {
-      state.selected = findNextEditableCell(r, c) ?? state.selected;
-    }
-
     renderGrid();
-
     updateUndoButton();
+    updateRedoButton();
 
     if (isWon) {
       state.gameWon = true;
@@ -1244,6 +1258,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (oldValue !== 0) {
       // Cell has a value — clear it
+      redoHistory.length = 0;
       moveHistory.push({
         row: r,
         col: c,
@@ -1252,15 +1267,19 @@ document.addEventListener("DOMContentLoaded", () => {
         oldNotes: Array.from(cellNotes ?? []),
         newNotes: Array.from(cellNotes ?? []),
         selectionBeforeMove: state.selected ? { ...state.selected } : null,
+        selectionAfterMove: state.selected ? { ...state.selected } : null,
+        completedPuzzle: false,
         clearedNotes: [],
       });
       gridRow[c] = 0;
       renderGrid();
       updateUndoButton();
+      updateRedoButton();
       updateMessage("");
     } else if (cellNotes && cellNotes.size > 0) {
       // Cell has notes but no value — clear notes
       const oldNotesArr = Array.from(cellNotes);
+      redoHistory.length = 0;
       moveHistory.push({
         row: r,
         col: c,
@@ -1269,11 +1288,14 @@ document.addEventListener("DOMContentLoaded", () => {
         oldNotes: oldNotesArr,
         newNotes: [],
         selectionBeforeMove: state.selected ? { ...state.selected } : null,
+        selectionAfterMove: state.selected ? { ...state.selected } : null,
+        completedPuzzle: false,
         clearedNotes: [],
       });
       cellNotes.clear();
       renderGrid();
       updateUndoButton();
+      updateRedoButton();
       updateMessage("");
     }
   }
@@ -1282,6 +1304,69 @@ document.addEventListener("DOMContentLoaded", () => {
     if (undoBtn) {
       undoBtn.disabled = moveHistory.length === 0;
     }
+  }
+
+  function updateRedoButton(): void {
+    if (redoBtn) {
+      redoBtn.disabled = redoHistory.length === 0;
+    }
+  }
+
+  /**
+   * Redo the last undone move by replaying the recorded transaction.
+   * History is replayed, never recomputed — no game logic executes.
+   */
+  function redoMove(): void {
+    if (redoHistory.length === 0) return;
+
+    const move = redoHistory.pop()!;
+
+    // Restore grid value
+    const gridRow = state.grid[move.row];
+    if (gridRow) {
+      gridRow[move.col] = move.newValue;
+    }
+
+    // Restore notes for this cell
+    const notesRow = state.notes[move.row];
+    if (notesRow) {
+      notesRow[move.col] = new Set(move.newNotes);
+    }
+
+    // Re-apply auto-cleaned notes (undo restored them, redo removes them again)
+    if (move.clearedNotes.length > 0) {
+      for (const cn of move.clearedNotes) {
+        const cellNotes = state.notes[cn.r]?.[cn.c];
+        if (cellNotes) {
+          cellNotes.delete(cn.val);
+        }
+      }
+    }
+
+    state.selected = move.selectionAfterMove;
+
+    moveHistory.push(move);
+
+    // Restore victory state if the move completed the puzzle
+    if (move.completedPuzzle) {
+      state.gameWon = true;
+      stopTimer();
+      state.selected = null;
+      renderGrid();
+      requestAnimationFrame(() => {
+        triggerVictoryAnimation({ r: move.row, c: move.col });
+      });
+      message.classList.add("success");
+      message.textContent = "🎉 Puzzle solved!";
+      // Score was already submitted during the original placement.
+      // No duplicate network request.
+    } else {
+      renderGrid();
+      highlightSelected();
+    }
+
+    updateUndoButton();
+    updateRedoButton();
   }
 
   function updateHintButton(): void {
@@ -1301,6 +1386,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (moveHistory.length === 0) return;
 
     const move = moveHistory.pop()!;
+    redoHistory.push(move);
     const gridRow = state.grid[move.row];
     if (gridRow) {
       gridRow[move.col] = move.oldValue;
@@ -1336,6 +1422,7 @@ document.addEventListener("DOMContentLoaded", () => {
     renderGrid();
     highlightSelected();
     updateUndoButton();
+    updateRedoButton();
   }
 
   /**
@@ -1395,6 +1482,7 @@ document.addEventListener("DOMContentLoaded", () => {
     state.elapsedTime = 0;
     stopTimer();
     moveHistory.length = 0;
+    redoHistory.length = 0;
     if (winResetTimeout !== null) {
       clearTimeout(winResetTimeout);
       winResetTimeout = null;
@@ -1420,6 +1508,7 @@ document.addEventListener("DOMContentLoaded", () => {
     renderGrid();
     renderNumbers();
     updateUndoButton();
+    updateRedoButton();
     updateHintButton();
   }
 
@@ -1521,6 +1610,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
   if (undoBtn) {
     undoBtn.addEventListener("click", undoMove);
+  }
+
+  if (redoBtn) {
+    redoBtn.addEventListener("click", redoMove);
   }
 
   if (hintBtn) {
@@ -1761,6 +1854,18 @@ document.addEventListener("DOMContentLoaded", () => {
     if ((e.ctrlKey || e.metaKey) && key.toLowerCase() === "z" && !e.shiftKey) {
       e.preventDefault();
       undoMove();
+      return;
+    }
+
+    // Ctrl+Shift+Z / Cmd+Shift+Z or Ctrl+Y / Cmd+Y — allowed even when game is won
+    if ((e.ctrlKey || e.metaKey) && key.toLowerCase() === "y") {
+      e.preventDefault();
+      redoMove();
+      return;
+    }
+    if ((e.ctrlKey || e.metaKey) && key.toLowerCase() === "z" && e.shiftKey) {
+      e.preventDefault();
+      redoMove();
       return;
     }
 

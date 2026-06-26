@@ -457,8 +457,9 @@ h2 {
   justify-content: center;
 }
 
-/* Undo button */
-.undo-btn {
+/* Undo / Redo buttons (symmetric operations) */
+.undo-btn,
+.redo-btn {
   padding: 12px 24px;
   font-size: 1em;
   font-weight: 600;
@@ -471,19 +472,22 @@ h2 {
   box-shadow: 0 2px 8px rgba(217, 57, 0, 0.15);
 }
 
-.undo-btn:hover:not(:disabled) {
+.undo-btn:hover:not(:disabled),
+.redo-btn:hover:not(:disabled) {
   background-color: var(--primary);
   color: #fff;
   box-shadow: 0 4px 12px rgba(217, 57, 0, 0.3);
   transform: translateY(-2px);
 }
 
-.undo-btn:active:not(:disabled) {
+.undo-btn:active:not(:disabled),
+.redo-btn:active:not(:disabled) {
   transform: translateY(0);
   box-shadow: 0 1px 4px rgba(217, 57, 0, 0.3);
 }
 
-.undo-btn:disabled {
+.undo-btn:disabled,
+.redo-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
   border-color: #ccc;
