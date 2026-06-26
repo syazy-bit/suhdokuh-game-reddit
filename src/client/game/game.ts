@@ -1417,6 +1417,10 @@ document.addEventListener("DOMContentLoaded", () => {
         clearTimeout(winResetTimeout);
         winResetTimeout = null;
       }
+      // Resume the timer from the stored elapsed time.
+      // startTimer() recalculates the virtual startTime from
+      // state.elapsedTime, so it correctly continues counting.
+      startTimer();
     }
 
     renderGrid();
