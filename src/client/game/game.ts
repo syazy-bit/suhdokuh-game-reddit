@@ -839,6 +839,7 @@ document.addEventListener("DOMContentLoaded", () => {
         // All cells can be selected for highlighting. Locked clues remain
         // protected from edits by placeNumber() and clearCell().
         cell.addEventListener("click", () => {
+          if (state.gameWon) return;
           state.selected = { r, c };
           highlightSelected();
         });
@@ -978,6 +979,31 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   /**
+   * Orchestrates a localized, subtle victory splash originating from the final placed cell.
+   * Must be called AFTER the native render pipeline has produced the final inactive board.
+   */
+  function triggerVictoryAnimation(finalCell: { r: number; c: number }): void {
+    const MAX_RADIUS = 3;
+    const cells = document.querySelectorAll<HTMLDivElement>(".cell");
+
+    cells.forEach(cell => {
+      const row = parseInt(cell.dataset.row!);
+      const col = parseInt(cell.dataset.col!);
+      const distance = Math.abs(row - finalCell.r) + Math.abs(col - finalCell.c);
+
+      if (distance <= MAX_RADIUS) {
+        cell.style.setProperty("--victory-delay", `${distance * 35}ms`);
+        cell.classList.add("victory-pulse");
+
+        cell.addEventListener("animationend", () => {
+          cell.classList.remove("victory-pulse");
+          cell.style.removeProperty("--victory-delay");
+        }, { once: true });
+      }
+    });
+  }
+
+  /**
    * Place a number in the selected cell.
    *
    * Conflicting placements are allowed — they are written to the grid and
@@ -1064,6 +1090,19 @@ document.addEventListener("DOMContentLoaded", () => {
     if (checkWin()) {
       state.gameWon = true;
       stopTimer();
+
+      // 1. Deactivate the board state
+      state.selected = null;
+
+      // 2. Re-run the native pipeline to produce the pristine inactive board
+      // (This inherently destroys all cursors, hints, and crosshairs)
+      renderGrid();
+
+      // 3. Schedule the visual overlay on the next frame so the DOM is settled
+      requestAnimationFrame(() => {
+        triggerVictoryAnimation({ r, c });
+      });
+
       message.classList.add("success");
       message.textContent = "🎉 You solved the puzzle! Submitting score...";
 
@@ -1085,6 +1124,7 @@ document.addEventListener("DOMContentLoaded", () => {
    */
   function clearCell(): void {
     if (!state.selected) return;
+    if (state.gameWon) return;
 
     const { r, c } = state.selected;
     const puzzleCell = puzzle[r]?.[c];

@@ -255,6 +255,17 @@ h2 {
   .cell.hint-flash {
     animation: hint-bg-flash 400ms ease-out;
   }
+
+  @keyframes victory-bg {
+    0% {
+      background-color: #c8e6c9;
+    }
+  }
+
+  .cell.victory-pulse {
+    animation: victory-bg 400ms ease-out;
+    animation-delay: var(--victory-delay, 0ms);
+  }
 }
 
 /* Notes grid inside cells */
