@@ -953,8 +953,8 @@ h2 {
   border: none;
   border-radius: 12px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
-  max-width: 360px;
-  width: 100%;
+  width: min(90vw, 480px);
+  margin: auto;
 }
 
 #completion-dialog::backdrop {
