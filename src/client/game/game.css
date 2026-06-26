@@ -245,6 +245,16 @@ h2 {
   .value-pop {
     animation: value-pop 150ms cubic-bezier(0.2, 0.0, 0, 1.0) forwards;
   }
+
+  @keyframes hint-bg-flash {
+    0% {
+      background-color: #c8e6c9;
+    }
+  }
+
+  .cell.hint-flash {
+    animation: hint-bg-flash 400ms ease-out;
+  }
 }
 
 /* Notes grid inside cells */

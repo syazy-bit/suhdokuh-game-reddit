@@ -510,6 +510,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let winResetTimeout: number | null = null;
   const moveHistory: Move[] = [];
   let lastPlacedCell: { r: number; c: number } | null = null;
+  let lastHintedCell: { r: number; c: number } | null = null;
   let isHelpOpen = false;
   let isStatsOpen = false;
   let notesBtn: HTMLButtonElement | null = null;
@@ -797,7 +798,10 @@ document.addEventListener("DOMContentLoaded", () => {
             const valueSpan = document.createElement("span");
             valueSpan.className = "value";
             valueSpan.textContent = value.toString();
-            if (lastPlacedCell?.r === r && lastPlacedCell?.c === c) {
+            if (lastHintedCell?.r === r && lastHintedCell?.c === c) {
+              valueSpan.classList.add("value-pop");
+              cell.classList.add("hint-flash");
+            } else if (lastPlacedCell?.r === r && lastPlacedCell?.c === c) {
               valueSpan.classList.add("value-pop");
             }
             cell.appendChild(valueSpan);
@@ -866,6 +870,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     highlightSelected();
     lastPlacedCell = null;
+    lastHintedCell = null;
   }
 
   /**
@@ -964,6 +969,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const wasNotesMode = state.notesMode;
     state.notesMode = false;
 
+    lastHintedCell = { r, c };
     placeNumber(correctValue);
 
     state.notesMode = wasNotesMode;
