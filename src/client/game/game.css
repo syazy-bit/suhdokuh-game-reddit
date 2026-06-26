@@ -15,6 +15,7 @@
   --border: #ccc;
   --bg-light: #f5f5f5;
   --text-dark: #000;
+  --player-ink: #1a4b82;
   --cell-border: 2px solid #999;
   --box-border: 3px solid #333;
 }
@@ -157,10 +158,10 @@ h2 {
   justify-content: center;
   border: var(--cell-border);
   font-size: 2em;
-  font-weight: 700;
+  font-weight: 500;
   cursor: pointer;
   background-color: #fff;
-  color: var(--text-dark);
+  color: var(--player-ink);
   user-select: none;
   position: relative;
 }
@@ -187,8 +188,8 @@ h2 {
 .cell.locked {
   background-color: var(--bg-light);
   cursor: pointer;
-  font-weight: 800;
-  color: #333;
+  font-weight: 700;
+  color: var(--text-dark);
 }
 
 /* Cells in the selected cell's row, column, or box */
@@ -330,7 +331,7 @@ h2 {
 .cell.conflict {
   background-color: #ffebee;
   color: var(--error);
-  font-weight: 800;
+  font-weight: 700;
 }
 
 /* Number buttons container */
