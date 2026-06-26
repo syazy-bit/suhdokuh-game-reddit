@@ -951,14 +951,16 @@ h2 {
 #completion-dialog {
   padding: 0;
   border: none;
-  border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
-  width: min(90vw, 480px);
+  border-radius: 22px;
+  background: #fff;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.18);
+  width: min(92vw, 460px);
   margin: auto;
 }
 
 #completion-dialog::backdrop {
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(3px);
   animation: backdrop-fade-in 200ms ease-out;
 }
 
@@ -983,21 +985,107 @@ h2 {
 }
 
 .completion-content {
-  padding: 32px 28px;
+  padding: 32px;
+  text-align: center;
+  position: relative;
+}
+
+/* Close button (top-right) */
+.completion-btn-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 40px;
+  height: 40px;
+  border: none;
+  background: none;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 1.5em;
+  color: #999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease;
+  line-height: 1;
+  padding: 0;
+}
+
+.completion-btn-close:hover {
+  background: #f4f4f4;
+}
+
+/* Hero section */
+.completion-hero {
+  margin-bottom: 20px;
+}
+
+.completion-sparkles {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.sparkle {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.sparkle-orange {
+  background: #ff8c00;
+}
+
+.sparkle-blue {
+  background: #4a90d9;
+}
+
+.sparkle-pink {
+  background: #e94e77;
+}
+
+.completion-trophy {
+  font-size: 56px;
+  line-height: 1;
+}
+
+/* Title */
+.completion-title {
+  font-size: 36px;
+  font-weight: 700;
+  color: #222;
+  margin: 0 0 20px;
   text-align: center;
 }
 
-.completion-title {
-  font-size: 1.4em;
-  font-weight: 700;
-  color: var(--text-dark);
-  margin-bottom: 24px;
+/* Decorative divider */
+.completion-divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 220px;
+  margin: 0 auto 28px;
 }
 
+.divider-line {
+  flex: 1;
+  height: 1px;
+  background: #e65100;
+}
+
+.divider-diamond {
+  width: 10px;
+  height: 10px;
+  background: #e65100;
+  transform: rotate(45deg);
+  flex-shrink: 0;
+}
+
+/* Statistics */
 .completion-stats {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
   margin-bottom: 28px;
 }
 
@@ -1005,36 +1093,114 @@ h2 {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 0;
-  border-bottom: 1px solid var(--border);
+  height: 64px;
+  border-bottom: 1px solid #eee;
 }
 
 .completion-stat:last-child {
   border-bottom: none;
 }
 
+.completion-stat-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.completion-stat-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.icon-time {
+  background: #fff3ec;
+}
+
+.icon-difficulty {
+  background: #f2eeff;
+}
+
+.icon-hints {
+  background: #eaf8ee;
+}
+
 .completion-stat-label {
-  font-size: 0.95em;
-  color: #666;
+  font-size: 1em;
+  color: #222;
 }
 
 .completion-stat-value {
   font-size: 1em;
-  font-weight: 600;
-  color: var(--primary);
+  font-weight: 700;
 }
 
+#completion-time {
+  color: #d34e15;
+}
+
+#completion-difficulty {
+  color: #544699;
+}
+
+#completion-hints {
+  color: #17863d;
+}
+
+/* Action buttons */
 .completion-actions {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 14px;
 }
 
-.completion-actions .reset-btn,
-.completion-actions .undo-btn,
-.completion-actions .clear-btn {
+.completion-btn {
   width: 100%;
-  text-align: center;
+  height: 56px;
+  border-radius: 14px;
+  font-size: 1em;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 24px;
+}
+
+.completion-btn-primary {
+  background: #e65100;
+  color: #fff;
+  border: none;
+}
+
+.completion-btn-primary:hover {
+  background: #d84315;
+}
+
+.completion-btn-secondary {
+  background: #fff;
+  color: #544699;
+  border: 2px solid #544699;
+}
+
+.completion-btn-secondary:hover {
+  background: #f5f0ff;
+}
+
+.completion-btn-ghost {
+  background: #fff;
+  color: #999;
+  border: 2px solid #ddd;
+}
+
+.completion-btn-ghost:hover {
+  background: #f7f7f7;
 }
 
 @media (prefers-reduced-motion: reduce) {

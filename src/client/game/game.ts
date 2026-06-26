@@ -489,6 +489,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const completionCloseBtn = document.getElementById(
     "completion-close-btn",
   ) as HTMLButtonElement | null;
+  const completionDismissBtn = document.getElementById(
+    "completion-dismiss-btn",
+  ) as HTMLButtonElement | null;
 
   // Validate all required elements exist
   if (!gridEl || !numbersEl || !messageEl || !modeSelect || !leaderboardEl) {
@@ -1877,6 +1880,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
   if (completionCloseBtn) {
     completionCloseBtn.addEventListener("click", () => {
+      completionDialog?.close();
+    });
+  }
+
+  if (completionDismissBtn) {
+    completionDismissBtn.addEventListener("click", () => {
       completionDialog?.close();
     });
   }

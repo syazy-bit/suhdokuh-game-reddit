@@ -144,25 +144,71 @@
   <!-- Completion Dialog -->
   <dialog id="completion-dialog" aria-labelledby="completion-dialog-title">
     <div class="completion-content">
-      <h2 id="completion-dialog-title" class="completion-title">🧩 Puzzle Complete</h2>
+      <button id="completion-dismiss-btn" class="completion-btn-close" aria-label="Close">&times;</button>
+
+      <div class="completion-hero">
+        <div class="completion-sparkles">
+          <span class="sparkle sparkle-orange"></span>
+          <span class="sparkle sparkle-blue"></span>
+          <span class="sparkle sparkle-pink"></span>
+        </div>
+        <div class="completion-trophy">🏆</div>
+      </div>
+
+      <h2 id="completion-dialog-title" class="completion-title">Puzzle Complete</h2>
+
+      <div class="completion-divider">
+        <span class="divider-line"></span>
+        <span class="divider-diamond"></span>
+        <span class="divider-line"></span>
+      </div>
+
       <div class="completion-stats">
         <div class="completion-stat">
-          <span class="completion-stat-label">Time</span>
+          <div class="completion-stat-left">
+            <span class="completion-stat-icon icon-time">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#D34E15" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <polyline points="12 6 12 12 16 14"/>
+              </svg>
+            </span>
+            <span class="completion-stat-label">Time</span>
+          </div>
           <span class="completion-stat-value" id="completion-time">—</span>
         </div>
         <div class="completion-stat">
-          <span class="completion-stat-label">Difficulty</span>
+          <div class="completion-stat-left">
+            <span class="completion-stat-icon icon-difficulty">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#544699" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="4" y1="21" x2="4" y2="14"/>
+                <line x1="9" y1="21" x2="9" y2="10"/>
+                <line x1="14" y1="21" x2="14" y2="6"/>
+                <line x1="19" y1="21" x2="19" y2="2"/>
+              </svg>
+            </span>
+            <span class="completion-stat-label">Difficulty</span>
+          </div>
           <span class="completion-stat-value" id="completion-difficulty">—</span>
         </div>
         <div class="completion-stat">
-          <span class="completion-stat-label">Hints</span>
+          <div class="completion-stat-left">
+            <span class="completion-stat-icon icon-hints">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#17863D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M9 18h6"/>
+                <path d="M10 22h4"/>
+                <path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/>
+              </svg>
+            </span>
+            <span class="completion-stat-label">Hints</span>
+          </div>
           <span class="completion-stat-value" id="completion-hints">—</span>
         </div>
       </div>
+
       <div class="completion-actions">
-        <button id="completion-new-btn" class="reset-btn">↻ New Puzzle</button>
-        <button id="completion-lb-btn" class="undo-btn">🏆 View Leaderboard</button>
-        <button id="completion-close-btn" class="clear-btn">Close</button>
+        <button id="completion-new-btn" class="completion-btn completion-btn-primary">↻ New Puzzle</button>
+        <button id="completion-lb-btn" class="completion-btn completion-btn-secondary">🏆 View Leaderboard</button>
+        <button id="completion-close-btn" class="completion-btn completion-btn-ghost">Close</button>
       </div>
     </div>
   </dialog>
