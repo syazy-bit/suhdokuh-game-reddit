@@ -637,6 +637,15 @@ h2 {
   font-size: 0.95em;
 }
 
+.empty-state,
+.unavailable-state {
+  text-align: center;
+  color: #555;
+  padding: 24px 12px;
+  font-size: 0.95em;
+  line-height: 1.5;
+}
+
 .leaderboard p.empty {
   color: #666;
 }

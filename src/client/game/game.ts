@@ -678,9 +678,8 @@ document.addEventListener("DOMContentLoaded", () => {
         `/api/leaderboard?mode=${state.mode}&difficulty=${state.difficulty}&limit=10`,
       );
       if (!response.ok) {
-        const text = await response.text().catch(() => "No response text");
         leaderboard.innerHTML =
-          `<p class="error">Failed to load leaderboard: ${response.status} ${text}</p>`;
+          '<p class="unavailable-state">Leaderboard currently unavailable.</p>';
         return;
       }
 
@@ -691,7 +690,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       if (entries.length === 0) {
         leaderboard.innerHTML =
-          '<p class="empty">No scores yet. Be the first to solve this puzzle!</p>';
+          '<p class="empty-state">This puzzle awaits its first solution.</p>';
         return;
       }
 
@@ -707,7 +706,7 @@ document.addEventListener("DOMContentLoaded", () => {
       leaderboard.innerHTML = html;
     } catch (error) {
       console.error("Error loading leaderboard:", error);
-      leaderboard.innerHTML = `<p class="error">Error loading leaderboard: ${error instanceof Error ? error.message : String(error)}</p>`;
+      leaderboard.innerHTML = '<p class="unavailable-state">Leaderboard currently unavailable.</p>';
     }
   }
 
@@ -1492,6 +1491,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const accordion = document.getElementById("stats-accordion");
     if (!accordion) return;
 
+    if (stats.totalWins === 0) {
+      accordion.innerHTML =
+        '<p class="empty-state">Your statistics will appear here after you complete your first puzzle.</p>';
+      return;
+    }
+
     function recordRow(label: string, value: number | null): string {
       const display = value !== null
         ? formatTime(value)
@@ -1564,7 +1569,7 @@ document.addEventListener("DOMContentLoaded", () => {
       } else {
         const accordion = document.getElementById("stats-accordion");
         if (accordion) {
-          accordion.innerHTML = '<p class="error">Failed to load statistics.</p>';
+          accordion.innerHTML = '<p class="unavailable-state">Statistics are currently unavailable.</p>';
         }
       }
 
