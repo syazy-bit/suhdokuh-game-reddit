@@ -768,6 +768,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const boxSize = state.mode === "4x4" ? 2 : 3;
 
     grid.innerHTML = "";
+    grid.className = "grid";
+    grid.classList.add(`grid-${state.mode}`);
     grid.style.gridTemplateColumns = `repeat(${size}, 1fr)`;
     grid.style.gridTemplateRows = `repeat(${size}, 1fr)`;
 
