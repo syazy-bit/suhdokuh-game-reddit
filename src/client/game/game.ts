@@ -1037,6 +1037,33 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   /**
+   * Find the next empty editable cell after the given position, treating
+   * the board as a linear array that wraps to the top.  Returns null when
+   * every cell is filled (puzzle complete).
+   */
+  function findNextEditableCell(
+    startRow: number,
+    startCol: number,
+  ): { r: number; c: number } | null {
+    const size = getGridSize();
+    const totalCells = size * size;
+    const startIndex = startRow * size + startCol;
+
+    for (let i = 1; i <= totalCells; i++) {
+      const linearIndex = (startIndex + i) % totalCells;
+      const cr = Math.floor(linearIndex / size);
+      const cc = linearIndex % size;
+      const puzzleCell = puzzle[cr]?.[cc];
+      const gridCell = state.grid[cr]?.[cc];
+      if (puzzleCell === 0 && (!gridCell || gridCell === 0)) {
+        return { r: cr, c: cc };
+      }
+    }
+
+    return null;
+  }
+
+  /**
    * Place a number in the selected cell.
    *
    * Conflicting placements are allowed — they are written to the grid and
@@ -1150,14 +1177,23 @@ document.addEventListener("DOMContentLoaded", () => {
     startTimer();
 
     lastPlacedCell = { r, c };
+
+    // Evaluate win condition once and share between auto-advance and the
+    // victory handler below.
+    const isWon = checkWin();
+
+    // Auto-advance cursor to the next empty editable cell.
+    // Must not fire on the winning move — the victory sequence
+    // sets state.selected = null independently.
+    if (!isWon) {
+      state.selected = findNextEditableCell(r, c) ?? state.selected;
+    }
+
     renderGrid();
 
     updateUndoButton();
 
-    // Check for win condition.
-    // checkWin() compares state.grid against the solution array, so a board
-    // containing any conflicting or incorrect value will never return true.
-    if (checkWin()) {
+    if (isWon) {
       state.gameWon = true;
       stopTimer();
 
