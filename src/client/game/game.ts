@@ -28,6 +28,12 @@ interface PuzzleData {
   solution: number[][];
 }
 
+interface ClearedNote {
+  r: number;
+  c: number;
+  val: number;
+}
+
 interface Move {
   row: number;
   col: number;
@@ -36,6 +42,7 @@ interface Move {
   oldNotes: number[];
   newNotes: number[];
   selectionBeforeMove: { r: number; c: number } | null;
+  clearedNotes: ClearedNote[];
 }
 
 
@@ -1075,6 +1082,7 @@ document.addEventListener("DOMContentLoaded", () => {
         oldNotes: oldNotesArr,
         newNotes: newNotesArr,
         selectionBeforeMove: state.selected ? { ...state.selected } : null,
+        clearedNotes: [],
       });
 
       startTimer();
@@ -1088,6 +1096,43 @@ document.addEventListener("DOMContentLoaded", () => {
       const oldValue = gridRow[c] ?? 0;
       if (oldValue === num) return;
       const oldNotesArr = Array.from(state.notes[r]?.[c] ?? []);
+
+      gridRow[c] = num;
+      state.notes[r]![c]!.clear();
+
+      // Intelligent note cleanup — only for objectively valid placements.
+      // Removes the placed number from pencil marks in the same row,
+      // column, and box. Invalid/conflicting placements are treated as
+      // deliberate mistakes and must not destroy the player's notes.
+      const clearedNotes: ClearedNote[] = [];
+      if (isValidMove(r, c, num)) {
+        const size = getGridSize();
+        const boxSize = state.mode === "4x4" ? 2 : 3;
+        const seen = new Set<string>();
+
+        const cleanCell = (cr: number, cc: number): void => {
+          if (cr === r && cc === c) return;
+          const key = `${cr},${cc}`;
+          if (seen.has(key)) return;
+          seen.add(key);
+          const cellNotes = state.notes[cr]?.[cc];
+          if (cellNotes?.has(num)) {
+            cellNotes.delete(num);
+            clearedNotes.push({ r: cr, c: cc, val: num });
+          }
+        };
+
+        for (let i = 0; i < size; i++) cleanCell(r, i);
+        for (let i = 0; i < size; i++) cleanCell(i, c);
+        const boxRow = Math.floor(r / boxSize) * boxSize;
+        const boxCol = Math.floor(c / boxSize) * boxSize;
+        for (let br = boxRow; br < boxRow + boxSize; br++) {
+          for (let bc = boxCol; bc < boxCol + boxSize; bc++) {
+            cleanCell(br, bc);
+          }
+        }
+      }
+
       moveHistory.push({
         row: r,
         col: c,
@@ -1096,9 +1141,8 @@ document.addEventListener("DOMContentLoaded", () => {
         oldNotes: oldNotesArr,
         newNotes: [],
         selectionBeforeMove: state.selected ? { ...state.selected } : null,
+        clearedNotes,
       });
-      gridRow[c] = num;
-      state.notes[r]![c]!.clear();
     }
 
     // Start the timer on the first placement (valid or conflicting).
@@ -1172,6 +1216,7 @@ document.addEventListener("DOMContentLoaded", () => {
         oldNotes: Array.from(cellNotes ?? []),
         newNotes: Array.from(cellNotes ?? []),
         selectionBeforeMove: state.selected ? { ...state.selected } : null,
+        clearedNotes: [],
       });
       gridRow[c] = 0;
       renderGrid();
@@ -1188,6 +1233,7 @@ document.addEventListener("DOMContentLoaded", () => {
         oldNotes: oldNotesArr,
         newNotes: [],
         selectionBeforeMove: state.selected ? { ...state.selected } : null,
+        clearedNotes: [],
       });
       cellNotes.clear();
       renderGrid();
@@ -1227,6 +1273,16 @@ document.addEventListener("DOMContentLoaded", () => {
     const notesRow = state.notes[move.row];
     if (notesRow) {
       notesRow[move.col] = new Set(move.oldNotes);
+    }
+
+    // Restore any notes that were auto-cleaned by intelligent notes
+    if (move.clearedNotes.length > 0) {
+      for (const cn of move.clearedNotes) {
+        const cellNotes = state.notes[cn.r]?.[cn.c];
+        if (cellNotes) {
+          cellNotes.add(cn.val);
+        }
+      }
     }
 
     state.selected = move.selectionBeforeMove;
