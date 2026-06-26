@@ -637,6 +637,27 @@ h2 {
   font-size: 0.95em;
 }
 
+/* Skeleton loading placeholders */
+.skeleton-block {
+  background-color: #e2e8f0;
+  border-radius: 4px;
+  height: 1.2em;
+  width: 100%;
+}
+
+.skeleton-breathe {
+  animation: skeleton-breathe 2s infinite ease-in-out;
+}
+
+@keyframes skeleton-breathe {
+  0%, 100% { opacity: 0.8; }
+  50% { opacity: 0.4; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-breathe { animation: none; opacity: 0.7; }
+}
+
 .empty-state,
 .unavailable-state {
   text-align: center;

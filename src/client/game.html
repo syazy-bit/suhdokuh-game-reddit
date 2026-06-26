@@ -53,8 +53,29 @@
     <!-- Leaderboard Section -->
     <div class="leaderboard-container">
       <h2 id="leaderboard-title">🏆 Leaderboard</h2>
-      <div id="leaderboard" class="leaderboard">
-        <p class="loading">Loading leaderboard...</p>
+      <div id="leaderboard" class="leaderboard" aria-busy="true">
+        <table class="leaderboard-table" aria-hidden="true">
+          <thead>
+            <tr><th>#</th><th>Player</th><th>Time</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><div class="skeleton-block skeleton-breathe" style="height:1em;width:24px;margin:0 auto;"></div></td>
+              <td><div class="skeleton-block skeleton-breathe" style="height:1em;width:60%;"></div></td>
+              <td><div class="skeleton-block skeleton-breathe" style="height:1em;width:50px;margin-left:auto;"></div></td>
+            </tr>
+            <tr>
+              <td><div class="skeleton-block skeleton-breathe" style="height:1em;width:24px;margin:0 auto;"></div></td>
+              <td><div class="skeleton-block skeleton-breathe" style="height:1em;width:60%;"></div></td>
+              <td><div class="skeleton-block skeleton-breathe" style="height:1em;width:50px;margin-left:auto;"></div></td>
+            </tr>
+            <tr>
+              <td><div class="skeleton-block skeleton-breathe" style="height:1em;width:24px;margin:0 auto;"></div></td>
+              <td><div class="skeleton-block skeleton-breathe" style="height:1em;width:60%;"></div></td>
+              <td><div class="skeleton-block skeleton-breathe" style="height:1em;width:50px;margin-left:auto;"></div></td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
 

@@ -670,9 +670,32 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   /**
+   * Build a skeleton table that reserves the leaderboard layout during loading.
+   * Three rows of muted, breathing blocks match the real table structure.
+   */
+  function getLeaderboardSkeleton(): string {
+    const rows = Array.from({ length: 3 }, () => `
+          <tr>
+            <td><div class="skeleton-block skeleton-breathe" style="height:1em;width:24px;margin:0 auto;"></div></td>
+            <td><div class="skeleton-block skeleton-breathe" style="height:1em;width:60%;"></div></td>
+            <td><div class="skeleton-block skeleton-breathe" style="height:1em;width:50px;margin-left:auto;"></div></td>
+          </tr>`).join("");
+    return `
+      <table class="leaderboard-table" aria-hidden="true">
+        <thead>
+          <tr><th>#</th><th>Player</th><th>Time</th></tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+  }
+
+  /**
    * Load and display leaderboard
    */
   async function loadLeaderboard(): Promise<void> {
+    leaderboard.innerHTML = getLeaderboardSkeleton();
+    leaderboard.setAttribute("aria-busy", "true");
+
     try {
       const response = await fetch(
         `/api/leaderboard?mode=${state.mode}&difficulty=${state.difficulty}&limit=10`,
@@ -707,6 +730,8 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch (error) {
       console.error("Error loading leaderboard:", error);
       leaderboard.innerHTML = '<p class="unavailable-state">Leaderboard currently unavailable.</p>';
+    } finally {
+      leaderboard.removeAttribute("aria-busy");
     }
   }
 
@@ -1563,11 +1588,16 @@ document.addEventListener("DOMContentLoaded", () => {
       isStatsOpen = true;
       statsModal.classList.remove("hidden");
 
+      // Show a calm placeholder while the (fast) query resolves.
+      const accordion = document.getElementById("stats-accordion");
+      if (accordion) {
+        accordion.innerHTML = '<p class="empty-state">Loading...</p>';
+      }
+
       const stats = await fetchStats();
       if (stats) {
         renderStatsModal(stats);
       } else {
-        const accordion = document.getElementById("stats-accordion");
         if (accordion) {
           accordion.innerHTML = '<p class="unavailable-state">Statistics are currently unavailable.</p>';
         }
