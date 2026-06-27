@@ -197,18 +197,18 @@ describe("createEmptyAnalysis", () => {
 describe("difficultyFromScore", () => {
   it("returns easy for scores at or below the easy threshold", () => {
     expect(difficultyFromScore(0)).toBe("easy");
-    expect(difficultyFromScore(5)).toBe("easy");
-    expect(difficultyFromScore(10)).toBe("easy");
+    expect(difficultyFromScore(15)).toBe("easy");
+    expect(difficultyFromScore(30)).toBe("easy");
   });
 
   it("returns medium for scores between easy and medium thresholds", () => {
-    expect(difficultyFromScore(11)).toBe("medium");
-    expect(difficultyFromScore(20)).toBe("medium");
-    expect(difficultyFromScore(30)).toBe("medium");
+    expect(difficultyFromScore(31)).toBe("medium");
+    expect(difficultyFromScore(40)).toBe("medium");
+    expect(difficultyFromScore(52)).toBe("medium");
   });
 
   it("returns hard for scores above the medium threshold", () => {
-    expect(difficultyFromScore(31)).toBe("hard");
+    expect(difficultyFromScore(53)).toBe("hard");
     expect(difficultyFromScore(60)).toBe("hard");
     expect(difficultyFromScore(100)).toBe("hard");
   });
@@ -309,7 +309,7 @@ describe("analyzeSolveResult", () => {
   it("populates difficulty via difficultyFromScore", () => {
     const result = makeSolveResult([eliminationMove("X-Wing")]);
     const analysis = analyzeSolveResult(result);
-    // score = 7, thresholds: easy <= 10
+    // score = 7, thresholds: easy <= 30
     expect(analysis.difficulty).toBe("easy");
     expect(analysis.assignmentCount).toBe(0);
     expect(analysis.eliminationCount).toBe(1);

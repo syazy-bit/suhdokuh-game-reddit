@@ -15,8 +15,8 @@ export const TECHNIQUE_WEIGHTS: Record<Technique, number> = {
 };
 
 export const DIFFICULTY_THRESHOLDS: Record<Difficulty, number> = {
-  easy: 10,
-  medium: 30,
+  easy: 30,
+  medium: 52,
   hard: 60,
 };
 
