@@ -15,7 +15,8 @@
     "dev:server": "cd src/server && vite build --watch",
     "login": "npx devvit login",
     "launch": "npm run build && npm run deploy && npx devvit publish",
-    "type-check": "tsc --build"
+    "type-check": "tsc --build",
+    "validate-fallbacks": "npx tsx tools/validateFallbackPuzzles.ts"
   },
   "dependencies": {
     "@devvit/web": "^0.13.5",
