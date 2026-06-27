@@ -1,4 +1,5 @@
-import { isValidPlacement, cloneGrid, type GridSize } from "./SudokuValidator";
+import { cloneGrid, type GridSize } from "./SudokuValidator";
+import { getCandidates, getCandidateCount } from "./CandidateEngine";
 
 export function hasUniqueSolution(
   grid: number[][],
@@ -20,21 +21,13 @@ export function hasUniqueSolution(
         for (let c = 0; c < size; c++) {
           if (g[r]![c] !== 0) continue;
 
-          let last = -1;
-          let count = 0;
-          for (let num = 1; num <= size; num++) {
-            if (isValidPlacement(g, r, c, num, size, boxSize)) {
-              count++;
-              last = num;
-              if (count > 1) break;
-            }
-          }
-
-          if (count === 0) return { ok: false, filled };
-          if (count === 1) {
-            g[r]![c] = last;
+          const candidates = getCandidates(g, r, c, size, boxSize);
+          if (candidates.length === 1) {
+            g[r]![c] = candidates[0]!;
             filled.push({ r, c });
             progress = true;
+          } else if (candidates.length === 0) {
+            return { ok: false, filled };
           }
         }
       }
@@ -66,12 +59,7 @@ export function hasUniqueSolution(
       for (let c = 0; c < size; c++) {
         if (g[r]![c] !== 0) continue;
 
-        let count = 0;
-        for (let num = 1; num <= size; num++) {
-          if (isValidPlacement(g, r, c, num, size, boxSize)) {
-            count++;
-          }
-        }
+        const count = getCandidateCount(g, r, c, size, boxSize);
 
         if (count < mrvCount) {
           mrvCount = count;
@@ -85,8 +73,7 @@ export function hasUniqueSolution(
     if (mrvRow === -1) {
       solutionCount++;
     } else if (mrvCount > 0) {
-      for (let num = 1; num <= size; num++) {
-        if (!isValidPlacement(g, mrvRow, mrvCol, num, size, boxSize)) continue;
+      for (const num of getCandidates(g, mrvRow, mrvCol, size, boxSize)) {
         g[mrvRow]![mrvCol] = num;
         solve(g);
         g[mrvRow]![mrvCol] = 0;

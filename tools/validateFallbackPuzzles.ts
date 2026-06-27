@@ -1,6 +1,7 @@
 import { readFileSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
+import { getCandidates } from "../src/server/core/CandidateEngine";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const serverPath = join(__dirname, "..", "src", "server", "index.ts");
@@ -147,20 +148,7 @@ function getReasons(solution: number[][], puzzle: number[][], size: number): str
 // ── Solver (backtracking with step limit) ──────────────────────────────────
 
 function countSolutions(grid: number[][], size: number, limit: number, maxSteps: number): number {
-  const bSize = boxSize(size);
-
-  function isValid(g: number[][], row: number, col: number, num: number): boolean {
-    for (let c = 0; c < size; c++) if (g[row]![c] === num) return false;
-    for (let r = 0; r < size; r++) if (g[r]![col] === num) return false;
-    const boxRow = Math.floor(row / bSize) * bSize;
-    const boxCol = Math.floor(col / bSize) * bSize;
-    for (let r = boxRow; r < boxRow + bSize; r++) {
-      for (let c = boxCol; c < boxCol + bSize; c++) {
-        if (g[r]![c] === num) return false;
-      }
-    }
-    return true;
-  }
+  const bSize = boxSize(size) as 2 | 3;
 
   let count = 0;
   let steps = 0;
@@ -171,12 +159,10 @@ function countSolutions(grid: number[][], size: number, limit: number, maxSteps:
     for (let r = 0; r < size; r++) {
       for (let c = 0; c < size; c++) {
         if (g[r]![c] === 0) {
-          for (let num = 1; num <= size; num++) {
-            if (isValid(g, r, c, num)) {
-              g[r]![c] = num;
-              solve(g);
-              g[r]![c] = 0;
-            }
+          for (const num of getCandidates(g, r, c, size as 4 | 9, bSize)) {
+            g[r]![c] = num;
+            solve(g);
+            g[r]![c] = 0;
           }
           return;
         }

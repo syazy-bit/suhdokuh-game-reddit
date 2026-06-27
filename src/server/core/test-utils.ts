@@ -1,5 +1,6 @@
 import type { Difficulty } from "../../shared/types/api";
-import { isValidPlacement, cloneGrid, type GridSize } from "./SudokuValidator";
+import { cloneGrid, type GridSize } from "./SudokuValidator";
+import { getCandidates, getCandidateCount } from "./CandidateEngine";
 
 export type { GridSize } from "./SudokuValidator";
 
@@ -35,21 +36,13 @@ export function countSolutions(grid: number[][], size: GridSize, limit: number, 
         for (let c = 0; c < size; c++) {
           if (g[r]![c] !== 0) continue;
 
-          let last = -1;
-          let count = 0;
-          for (let num = 1; num <= size; num++) {
-            if (isValidPlacement(g, r, c, num, size, bSize)) {
-              count++;
-              last = num;
-              if (count > 1) break;
-            }
-          }
-
-          if (count === 0) return { ok: false, filled };
-          if (count === 1) {
-            g[r]![c] = last;
+          const candidates = getCandidates(g, r, c, size, bSize);
+          if (candidates.length === 1) {
+            g[r]![c] = candidates[0]!;
             filled.push({ r, c });
             progress = true;
+          } else if (candidates.length === 0) {
+            return { ok: false, filled };
           }
         }
       }
@@ -78,12 +71,7 @@ export function countSolutions(grid: number[][], size: GridSize, limit: number, 
       for (let c = 0; c < size; c++) {
         if (g[r]![c] !== 0) continue;
 
-        let count = 0;
-        for (let num = 1; num <= size; num++) {
-          if (isValidPlacement(g, r, c, num, size, bSize)) {
-            count++;
-          }
-        }
+        const count = getCandidateCount(g, r, c, size, bSize);
 
         if (count < mrvCount) {
           mrvCount = count;
@@ -97,8 +85,7 @@ export function countSolutions(grid: number[][], size: GridSize, limit: number, 
     if (mrvRow === -1) {
       solutionCount++;
     } else if (mrvCount > 0) {
-      for (let num = 1; num <= size; num++) {
-        if (!isValidPlacement(g, mrvRow, mrvCol, num, size, bSize)) continue;
+      for (const num of getCandidates(g, mrvRow, mrvCol, size, bSize)) {
         g[mrvRow]![mrvCol] = num;
         solve(g);
         g[mrvRow]![mrvCol] = 0;
