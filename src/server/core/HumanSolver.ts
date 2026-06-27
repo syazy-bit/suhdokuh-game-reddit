@@ -662,3 +662,172 @@ export function findClaimingPairs(ctx: HumanSolverContext): LogicalMove[] {
   }
   return moves;
 }
+
+export function findXWings(ctx: HumanSolverContext): LogicalMove[] {
+  const { board, size, candidateMap } = ctx;
+  const xwingMap = new Map<
+    string,
+    {
+      patternCells: Array<{ row: number; col: number }>;
+      eliminations: Map<string, { row: number; col: number; value: number }>;
+    }
+  >();
+
+  // Row-based X-Wing
+  for (let v = 1; v <= size; v++) {
+    const rowCols = new Map<number, number[]>();
+
+    for (let row = 0; row < size; row++) {
+      const cols: number[] = [];
+      for (let col = 0; col < size; col++) {
+        if (board[row]![col] !== 0) continue;
+        const list = candidateMap[row]![col]!;
+        if (list.includes(v)) {
+          cols.push(col);
+        }
+      }
+      if (cols.length === 2) {
+        rowCols.set(row, cols);
+      }
+    }
+
+    const rows = [...rowCols.keys()];
+    for (let i = 0; i < rows.length; i++) {
+      for (let j = i + 1; j < rows.length; j++) {
+        const r1 = rows[i]!;
+        const r2 = rows[j]!;
+        const cols1 = rowCols.get(r1)!;
+        const cols2 = rowCols.get(r2)!;
+
+        const c1 = cols1[0]!;
+        const c2 = cols1[1]!;
+        if (cols2[0] === c1 && cols2[1] === c2) {
+          // X-Wing found: rows r1, r2; columns c1, c2
+          const eliminations = new Map<
+            string,
+            { row: number; col: number; value: number }
+          >();
+
+          for (let row = 0; row < size; row++) {
+            if (row === r1 || row === r2) continue;
+            for (const c of [c1, c2]) {
+              if (board[row]![c] !== 0) continue;
+              const list = candidateMap[row]![c]!;
+              if (list.includes(v)) {
+                const ek = eliminationCellKey(row, c, v);
+                if (!eliminations.has(ek)) {
+                  eliminations.set(ek, { row, col: c, value: v });
+                }
+              }
+            }
+          }
+
+          if (eliminations.size > 0) {
+            const patternCells = [
+              { row: r1, col: c1 },
+              { row: r1, col: c2 },
+              { row: r2, col: c1 },
+              { row: r2, col: c2 },
+            ].sort((a, b) => a.row - b.row || a.col - b.col);
+            const dk = `xwing-v${v}-${patternCells.map((c) => `${c.row},${c.col}`).join("-")}`;
+            const existing = xwingMap.get(dk);
+            if (existing) {
+              for (const [ek, e] of eliminations) {
+                if (!existing.eliminations.has(ek)) {
+                  existing.eliminations.set(ek, e);
+                }
+              }
+            } else {
+              xwingMap.set(dk, { patternCells, eliminations });
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Column-based X-Wing
+  for (let v = 1; v <= size; v++) {
+    const colRows = new Map<number, number[]>();
+
+    for (let col = 0; col < size; col++) {
+      const rows: number[] = [];
+      for (let row = 0; row < size; row++) {
+        if (board[row]![col] !== 0) continue;
+        const list = candidateMap[row]![col]!;
+        if (list.includes(v)) {
+          rows.push(row);
+        }
+      }
+      if (rows.length === 2) {
+        colRows.set(col, rows);
+      }
+    }
+
+    const cols = [...colRows.keys()];
+    for (let i = 0; i < cols.length; i++) {
+      for (let j = i + 1; j < cols.length; j++) {
+        const c1 = cols[i]!;
+        const c2 = cols[j]!;
+        const rows1 = colRows.get(c1)!;
+        const rows2 = colRows.get(c2)!;
+
+        const r1 = rows1[0]!;
+        const r2 = rows1[1]!;
+        if (rows2[0] === r1 && rows2[1] === r2) {
+          // X-Wing found: columns c1, c2; rows r1, r2
+          const eliminations = new Map<
+            string,
+            { row: number; col: number; value: number }
+          >();
+
+          for (let col = 0; col < size; col++) {
+            if (col === c1 || col === c2) continue;
+            for (const r of [r1, r2]) {
+              if (board[r]![col] !== 0) continue;
+              const list = candidateMap[r]![col]!;
+              if (list.includes(v)) {
+                const ek = eliminationCellKey(r, col, v);
+                if (!eliminations.has(ek)) {
+                  eliminations.set(ek, { row: r, col, value: v });
+                }
+              }
+            }
+          }
+
+          if (eliminations.size > 0) {
+            const patternCells = [
+              { row: r1, col: c1 },
+              { row: r1, col: c2 },
+              { row: r2, col: c1 },
+              { row: r2, col: c2 },
+            ].sort((a, b) => a.row - b.row || a.col - b.col);
+            const dk = `xwing-v${v}-${patternCells.map((c) => `${c.row},${c.col}`).join("-")}`;
+            // Merge eliminations with any existing row-based entry for this X-Wing
+            const existing = xwingMap.get(dk);
+            if (existing) {
+              for (const [ek, e] of eliminations) {
+                if (!existing.eliminations.has(ek)) {
+                  existing.eliminations.set(ek, e);
+                }
+              }
+            } else {
+              xwingMap.set(dk, { patternCells, eliminations });
+            }
+          }
+        }
+      }
+    }
+  }
+
+  const moves: LogicalMove[] = [];
+  for (const { patternCells, eliminations } of xwingMap.values()) {
+    moves.push({
+      type: "elimination",
+      technique: "X-Wing",
+      patternCells,
+      eliminations: [...eliminations.values()],
+    });
+  }
+  return moves;
+}

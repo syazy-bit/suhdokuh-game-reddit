@@ -7,6 +7,7 @@ import {
   findHiddenPairs,
   findPointingPairs,
   findClaimingPairs,
+  findXWings,
   type HumanSolverContext,
 } from "./HumanSolver";
 import type { GridSize } from "./SudokuValidator";
@@ -1169,6 +1170,187 @@ describe("findClaimingPairs — board immutability", () => {
     const ctx = createCtx(board, 4, 2);
 
     findClaimingPairs(ctx);
+
+    expect(board).toEqual(snapshot);
+  });
+});
+
+// ── Zero X-Wing ────────────────────────────────────────────────────
+
+describe("findXWings — zero X-Wing", () => {
+  it("returns empty array for empty 4x4 board", () => {
+    const board = [
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+    ];
+    const ctx = createCtx(board, 4, 2);
+
+    const result = findXWings(ctx);
+
+    expect(result).toEqual([]);
+  });
+
+  it("returns empty array when no value appears in exactly two rows in the same two columns", () => {
+    const board = [
+      [0, 0, 1, 2],
+      [0, 0, 3, 4],
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+    ];
+    const ctx = createCtx(board, 4, 2);
+
+    const result = findXWings(ctx);
+
+    expect(result).toEqual([]);
+  });
+});
+
+// ── Row-based X-Wing ──────────────────────────────────────────────
+
+describe("findXWings — row-based", () => {
+  it("finds a row-based X-Wing for value 1 in 4x4", () => {
+    const board = [
+      [0, 0, 2, 3],
+      [0, 0, 0, 4],
+      [0, 0, 4, 2],
+      [0, 0, 0, 0],
+    ];
+    const ctx = createCtx(board, 4, 2);
+
+    const result = findXWings(ctx);
+
+    expect(result.length).toBeGreaterThanOrEqual(1);
+    const move = result.find(
+      (m) => m.type === "elimination" && m.technique === "X-Wing"
+    )!;
+    expect(move).toBeDefined();
+    if (move.type !== "elimination") return;
+    expect(move.patternCells).toHaveLength(4);
+    expect(move.patternCells).toContainEqual({ row: 0, col: 0 });
+    expect(move.patternCells).toContainEqual({ row: 0, col: 1 });
+    expect(move.patternCells).toContainEqual({ row: 2, col: 0 });
+    expect(move.patternCells).toContainEqual({ row: 2, col: 1 });
+    expect(move.eliminations).toContainEqual({ row: 1, col: 0, value: 1 });
+    expect(move.eliminations).toContainEqual({ row: 1, col: 1, value: 1 });
+  });
+});
+
+// ── Column-based X-Wing ───────────────────────────────────────────
+
+describe("findXWings — column-based", () => {
+  it("finds a column-based X-Wing for value 1 in 4x4", () => {
+    // Column 0: 1 at rows 0,1 (cols 0,2 block 1 in rows 2,3 via givens).
+    // Column 2: 1 at rows 0,1 (same).
+    // Column-based X-Wing: cols 0,2; rows 0,1.
+    // Row 0 has 1 in cols 0,2,3 (3 cells) and row 1 has 1 in cols 0,1,2
+    // (3 cells) → row scan finds both rows individually but no matching pair,
+    // so only the column-based scan produces a move.
+    const board = [
+      [0, 2, 0, 0],
+      [0, 0, 0, 2],
+      [2, 0, 3, 0],
+      [3, 0, 2, 0],
+    ];
+    const ctx = createCtx(board, 4, 2);
+
+    const result = findXWings(ctx);
+
+    // There may also be a row-based X-Wing from rows 2,3 cols 1,3 (different rectangle).
+    const move = result.find(
+      (m) =>
+        m.type === "elimination" &&
+        m.technique === "X-Wing" &&
+        m.patternCells.some((c) => c.row === 0 && c.col === 0)
+    )!;
+    expect(move).toBeDefined();
+    if (move.type !== "elimination") return;
+    expect(move.patternCells).toHaveLength(4);
+    expect(move.patternCells).toContainEqual({ row: 0, col: 0 });
+    expect(move.patternCells).toContainEqual({ row: 0, col: 2 });
+    expect(move.patternCells).toContainEqual({ row: 1, col: 0 });
+    expect(move.patternCells).toContainEqual({ row: 1, col: 2 });
+    // Column-based eliminations: rows 0,1 in other cols (1,3)
+    expect(move.eliminations).toContainEqual({ row: 0, col: 3, value: 1 });
+    expect(move.eliminations).toContainEqual({ row: 1, col: 1, value: 1 });
+    expect(move.eliminations).toHaveLength(2);
+  });
+});
+
+// ── X-Wing with no eliminations ───────────────────────────────────
+
+describe("findXWings — no eliminations", () => {
+  it("ignores an X-Wing whose columns outside the pattern rows have no candidates to eliminate", () => {
+    const board = [
+      [0, 0, 2, 3],
+      [2, 3, 0, 4],
+      [0, 0, 4, 2],
+      [3, 2, 0, 0],
+    ];
+    const ctx = createCtx(board, 4, 2);
+
+    const resultBlocked = findXWings(ctx);
+
+    expect(
+      resultBlocked.filter((m) => m.type === "elimination")
+    ).toHaveLength(0);
+
+    const boardActive = [
+      [0, 0, 2, 3],
+      [0, 0, 0, 4],
+      [0, 0, 4, 2],
+      [0, 0, 0, 0],
+    ];
+    const ctxActive = createCtx(boardActive, 4, 2);
+    const resultActive = findXWings(ctxActive);
+
+    expect(resultActive.length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+// ── Duplicate prevention ──────────────────────────────────────────
+
+describe("findXWings — duplicate prevention", () => {
+  it("returns only one LogicalMove per X-Wing", () => {
+    const board = [
+      [0, 0, 2, 3],
+      [0, 0, 0, 4],
+      [0, 0, 4, 2],
+      [0, 0, 0, 0],
+    ];
+    const ctx = createCtx(board, 4, 2);
+
+    const result = findXWings(ctx);
+
+    const xwingMoves = result.filter(
+      (m) => m.type === "elimination" && m.technique === "X-Wing"
+    );
+
+    const seen = new Set<string>();
+    for (const m of xwingMoves) {
+      if (m.type !== "elimination") continue;
+      const key = `${m.patternCells.map((c) => `${c.row},${c.col}`).sort().join("|")}|${m.eliminations.map((e) => `${e.row},${e.col},${e.value}`).sort().join("|")}`;
+      expect(seen.has(key)).toBe(false);
+      seen.add(key);
+    }
+  });
+});
+
+// ── Board immutability ────────────────────────────────────────────
+
+describe("findXWings — board immutability", () => {
+  it("does not mutate the board", () => {
+    const board = [
+      [0, 0, 2, 3],
+      [0, 0, 0, 4],
+      [0, 0, 4, 2],
+      [0, 0, 0, 0],
+    ];
+    const snapshot = cloneBoard(board);
+    const ctx = createCtx(board, 4, 2);
+
+    findXWings(ctx);
 
     expect(board).toEqual(snapshot);
   });
