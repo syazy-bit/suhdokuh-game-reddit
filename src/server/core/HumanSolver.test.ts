@@ -5,6 +5,7 @@ import {
   findHiddenSingles,
   findNakedPairs,
   findHiddenPairs,
+  findPointingPairs,
   type HumanSolverContext,
 } from "./HumanSolver";
 import type { GridSize } from "./SudokuValidator";
@@ -713,6 +714,226 @@ describe("findHiddenPairs — board immutability", () => {
     const ctx = createCtx(board, 4, 2);
 
     findHiddenPairs(ctx);
+
+    expect(board).toEqual(snapshot);
+  });
+});
+
+// ── Zero Pointing Pairs ──────────────────────────────────────────────
+
+describe("findPointingPairs — zero Pointing Pairs", () => {
+  it("returns empty array for empty 4x4 board", () => {
+    const board = [
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+    ];
+    const ctx = createCtx(board, 4, 2);
+
+    const result = findPointingPairs(ctx);
+
+    expect(result).toEqual([]);
+  });
+
+  it("returns empty array when no value is confined to a single row or column in any box", () => {
+    // Each box has at least one filled cell in each row, so every value
+    // appears in all rows of each box.
+    const board = [
+      [1, 2, 0, 0],
+      [3, 4, 0, 0],
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+    ];
+    const ctx = createCtx(board, 4, 2);
+
+    const result = findPointingPairs(ctx);
+
+    expect(result).toEqual([]);
+  });
+});
+
+// ── Row-based Pointing Pair ──────────────────────────────────────────
+
+describe("findPointingPairs — row-based", () => {
+  it("finds a row-based Pointing Pair (value 1 aligned to row 0 in box)", () => {
+    // Box (0,0)-(1,1): (0,0)[1,3,4] (0,1)[1,3,4] — 1 only in row 0.
+    // Row 0 outside box: (0,2)[1,2,3,4], (0,3)[1,2,3,4] → 1 eliminated.
+    const board = [
+      [0, 0, 0, 0],
+      [2, 5, 0, 0],
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+    ];
+    const ctx = createCtx(board, 4, 2);
+
+    const result = findPointingPairs(ctx);
+
+    expect(result.length).toBeGreaterThanOrEqual(1);
+    const move = result.find(
+      (m) =>
+        m.type === "elimination" && m.technique === "Pointing Pair"
+    )!;
+    expect(move).toBeDefined();
+    if (move.type !== "elimination") return;
+    expect(move.eliminations).toContainEqual({
+      row: 0,
+      col: 2,
+      value: 1,
+    });
+    expect(move.eliminations).toContainEqual({
+      row: 0,
+      col: 3,
+      value: 1,
+    });
+  });
+});
+
+// ── Column-based Pointing Pair ───────────────────────────────────────
+
+describe("findPointingPairs — column-based", () => {
+  it("finds a column-based Pointing Pair (value 1 aligned to column 0 in box)", () => {
+    // Box (0,0)-(1,1): (0,0)[1,4] (1,0)[1,4] — 1 only in col 0.
+    // Column 0 outside box: (2,0)[1,2,3,4], (3,0)[1,2,3,4] → 1 eliminated.
+    const board = [
+      [0, 2, 0, 0],
+      [0, 3, 0, 0],
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+    ];
+    const ctx = createCtx(board, 4, 2);
+
+    const result = findPointingPairs(ctx);
+
+    expect(result.length).toBeGreaterThanOrEqual(1);
+    const move = result.find(
+      (m) =>
+        m.type === "elimination" && m.technique === "Pointing Pair"
+    )!;
+    expect(move).toBeDefined();
+    if (move.type !== "elimination") return;
+    expect(move.eliminations).toContainEqual({
+      row: 2,
+      col: 0,
+      value: 1,
+    });
+    expect(move.eliminations).toContainEqual({
+      row: 3,
+      col: 0,
+      value: 1,
+    });
+  });
+});
+
+// ── Pointing Triple ─────────────────────────────────────────────────
+
+describe("findPointingPairs — Pointing Triple", () => {
+  it("finds a pointing pattern with three cells in a 9x9 box", () => {
+    // Box (0,0)-(2,2): rows 1-2 filled, value 1 only in (0,0)(0,1)(0,2).
+    // Row 0 outside box: cols 3-8 all have 1 → eliminated.
+    const board = [
+      [0, 0, 0, 0, 0, 0, 0, 0, 0],
+      [2, 3, 4, 0, 0, 0, 0, 0, 0],
+      [5, 6, 7, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    ];
+    const ctx = createCtx(board, 9, 3);
+
+    const result = findPointingPairs(ctx);
+
+    expect(result.length).toBeGreaterThanOrEqual(1);
+    const move = result.find(
+      (m) =>
+        m.type === "elimination" && m.technique === "Pointing Pair"
+    )!;
+    expect(move).toBeDefined();
+    if (move.type !== "elimination") return;
+    expect(move.patternCells).toHaveLength(3);
+    expect(move.patternCells).toContainEqual({ row: 0, col: 0 });
+    expect(move.patternCells).toContainEqual({ row: 0, col: 1 });
+    expect(move.patternCells).toContainEqual({ row: 0, col: 2 });
+    expect(move.eliminations).toContainEqual({ row: 0, col: 3, value: 1 });
+    expect(move.eliminations).toContainEqual({ row: 0, col: 4, value: 1 });
+    expect(move.eliminations).toContainEqual({ row: 0, col: 5, value: 1 });
+    expect(move.eliminations).toContainEqual({ row: 0, col: 6, value: 1 });
+    expect(move.eliminations).toContainEqual({ row: 0, col: 7, value: 1 });
+    expect(move.eliminations).toContainEqual({ row: 0, col: 8, value: 1 });
+  });
+});
+
+// ── Pointing Pair with no eliminations ───────────────────────────────
+
+describe("findPointingPairs — no eliminations", () => {
+  it("ignores a pointing pair whose line outside the box has no candidates to eliminate", () => {
+    // Box (0,0)-(1,1): values 1 and 4 confined to column 0.
+    // Column 0 outside box: (2,0)[2,3], (3,0)[2,3] — neither 1 nor 4.
+    const board = [
+      [0, 2, 0, 0],
+      [0, 3, 0, 0],
+      [0, 1, 4, 0],
+      [0, 0, 1, 4],
+    ];
+    const ctx = createCtx(board, 4, 2);
+
+    const result = findPointingPairs(ctx);
+
+    expect(
+      result.filter((m) => m.type === "elimination")
+    ).toHaveLength(0);
+  });
+});
+
+// ── Duplicate prevention ─────────────────────────────────────────────
+
+describe("findPointingPairs — duplicate prevention", () => {
+  it("returns only one LogicalMove per pointing deduction", () => {
+    // Pointing pair for value 1 in box (0,0)-(1,1), row 0.
+    // Only one move should be emitted even though the same box  is scanned once.
+    const board = [
+      [0, 0, 0, 0],
+      [2, 5, 0, 0],
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+    ];
+    const ctx = createCtx(board, 4, 2);
+
+    const result = findPointingPairs(ctx);
+
+    // Count distinct pointing-pair moves
+    const pointingMoves = result.filter(
+      (m) => m.type === "elimination" && m.technique === "Pointing Pair"
+    );
+    // At least one, each with a unique (box,row/col,value) key.
+    // Verify no duplicate (box,row,value) combo exists.
+    const seen = new Set<string>();
+    for (const m of pointingMoves) {
+      if (m.type !== "elimination") continue;
+      const key = `${m.patternCells.map((c) => `${c.row},${c.col}`).sort().join("|")}|${m.eliminations.map((e) => `${e.row},${e.col},${e.value}`).sort().join("|")}`;
+      expect(seen.has(key)).toBe(false);
+      seen.add(key);
+    }
+  });
+});
+
+// ── Board immutability ──────────────────────────────────────────────
+
+describe("findPointingPairs — board immutability", () => {
+  it("does not mutate the board", () => {
+    const board = [
+      [0, 0, 0, 0],
+      [2, 5, 0, 0],
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+    ];
+    const snapshot = cloneBoard(board);
+    const ctx = createCtx(board, 4, 2);
+
+    findPointingPairs(ctx);
 
     expect(board).toEqual(snapshot);
   });

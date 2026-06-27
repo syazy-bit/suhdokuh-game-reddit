@@ -398,3 +398,125 @@ export function findHiddenPairs(ctx: HumanSolverContext): LogicalMove[] {
   }
   return moves;
 }
+
+export function findPointingPairs(ctx: HumanSolverContext): LogicalMove[] {
+  const { board, size, boxSize, candidateMap } = ctx;
+  const pairMap = new Map<
+    string,
+    {
+      patternCells: Array<{ row: number; col: number }>;
+      eliminations: Map<string, { row: number; col: number; value: number }>;
+    }
+  >();
+
+  for (let boxRow = 0; boxRow < size; boxRow += boxSize) {
+    for (let boxCol = 0; boxCol < size; boxCol += boxSize) {
+      const valueCells = new Map<
+        number,
+        Array<{ row: number; col: number }>
+      >();
+
+      for (let r = boxRow; r < boxRow + boxSize; r++) {
+        for (let c = boxCol; c < boxCol + boxSize; c++) {
+          if (board[r]![c] !== 0) continue;
+          const list = candidateMap[r]![c]!;
+          for (const v of list) {
+            const arr = valueCells.get(v) ?? [];
+            arr.push({ row: r, col: c });
+            valueCells.set(v, arr);
+          }
+        }
+      }
+
+      for (const [v, cells] of valueCells) {
+        if (cells.length < 2) continue;
+
+        const rows = new Set<number>();
+        const cols = new Set<number>();
+        for (const c of cells) {
+          rows.add(c.row);
+          cols.add(c.col);
+        }
+
+        if (rows.size === 1) {
+          const row = rows.values().next().value;
+          if (row === undefined) continue;
+          const eliminations = new Map<
+            string,
+            { row: number; col: number; value: number }
+          >();
+
+          for (let col = 0; col < size; col++) {
+            if (col >= boxCol && col < boxCol + boxSize) continue;
+            if (board[row]![col] !== 0) continue;
+            const list = candidateMap[row]![col]!;
+            if (list.includes(v)) {
+              const ek = eliminationCellKey(row, col, v);
+              if (!eliminations.has(ek)) {
+                eliminations.set(ek, { row, col, value: v });
+              }
+            }
+          }
+
+          if (eliminations.size > 0) {
+            const dk = `pointing-${boxRow},${boxCol}-row-${row}-val-${v}`;
+            if (!pairMap.has(dk)) {
+              pairMap.set(dk, {
+                patternCells: cells.map((c) => ({
+                  row: c.row,
+                  col: c.col,
+                })),
+                eliminations,
+              });
+            }
+          }
+        }
+
+        if (cols.size === 1) {
+          const col = cols.values().next().value;
+          if (col === undefined) continue;
+          const eliminations = new Map<
+            string,
+            { row: number; col: number; value: number }
+          >();
+
+          for (let row = 0; row < size; row++) {
+            if (row >= boxRow && row < boxRow + boxSize) continue;
+            if (board[row]![col] !== 0) continue;
+            const list = candidateMap[row]![col]!;
+            if (list.includes(v)) {
+              const ek = eliminationCellKey(row, col, v);
+              if (!eliminations.has(ek)) {
+                eliminations.set(ek, { row, col, value: v });
+              }
+            }
+          }
+
+          if (eliminations.size > 0) {
+            const dk = `pointing-${boxRow},${boxCol}-col-${col}-val-${v}`;
+            if (!pairMap.has(dk)) {
+              pairMap.set(dk, {
+                patternCells: cells.map((c) => ({
+                  row: c.row,
+                  col: c.col,
+                })),
+                eliminations,
+              });
+            }
+          }
+        }
+      }
+    }
+  }
+
+  const moves: LogicalMove[] = [];
+  for (const { patternCells, eliminations } of pairMap.values()) {
+    moves.push({
+      type: "elimination",
+      technique: "Pointing Pair",
+      patternCells,
+      eliminations: [...eliminations.values()],
+    });
+  }
+  return moves;
+}
