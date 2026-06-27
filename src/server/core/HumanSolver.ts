@@ -1,28 +1,45 @@
-import { getCandidates } from "./CandidateEngine";
+import type { CandidateMap } from "./CandidateEngine";
 import type { GridSize } from "./SudokuValidator";
 
-export interface LogicalMove {
-  row: number;
-  col: number;
-  value: number;
-  technique: "Naked Single" | "Hidden Single";
+export interface HumanSolverContext {
+  board: number[][];
+  size: GridSize;
+  boxSize: number;
+  candidateMap: CandidateMap;
 }
 
-export function findNakedSingles(
-  board: number[][],
-  size: GridSize,
-  boxSize: number
-): LogicalMove[] {
+export type LogicalMove =
+  | {
+      type: "assignment";
+      technique: "Naked Single" | "Hidden Single";
+      row: number;
+      col: number;
+      value: number;
+    }
+  | {
+      type: "elimination";
+      technique: string;
+      patternCells: Array<{ row: number; col: number }>;
+      eliminations: Array<{
+        row: number;
+        col: number;
+        value: number;
+      }>;
+    };
+
+export function findNakedSingles(ctx: HumanSolverContext): LogicalMove[] {
   const moves: LogicalMove[] = [];
+  const { board, size, candidateMap } = ctx;
 
   for (let row = 0; row < size; row++) {
     for (let col = 0; col < size; col++) {
       if (board[row]![col] !== 0) continue;
 
-      const candidates = getCandidates(board, row, col, size, boxSize);
+      const candidates = candidateMap[row]![col]!;
 
       if (candidates.length === 1) {
         moves.push({
+          type: "assignment",
           row,
           col,
           value: candidates[0]!,
@@ -35,19 +52,16 @@ export function findNakedSingles(
   return moves;
 }
 
-export function findHiddenSingles(
-  board: number[][],
-  size: GridSize,
-  boxSize: number
-): LogicalMove[] {
+export function findHiddenSingles(ctx: HumanSolverContext): LogicalMove[] {
   const moves: LogicalMove[] = [];
   const seen = new Set<string>();
+  const { board, size, boxSize, candidateMap } = ctx;
 
   function tryAdd(row: number, col: number, value: number): void {
     const key = `${row}-${col}-${value}`;
     if (seen.has(key)) return;
     seen.add(key);
-    moves.push({ row, col, value, technique: "Hidden Single" });
+    moves.push({ type: "assignment", row, col, value, technique: "Hidden Single" });
   }
 
   // Scan rows
@@ -57,9 +71,9 @@ export function findHiddenSingles(
 
     for (let col = 0; col < size; col++) {
       if (board[row]![col] !== 0) continue;
-      const candidates = getCandidates(board, row, col, size, boxSize);
-      cellCandidates.push({ row, col, list: candidates });
-      for (const v of candidates) {
+      const list = candidateMap[row]![col]!;
+      cellCandidates.push({ row, col, list });
+      for (const v of list) {
         counts.set(v, (counts.get(v) ?? 0) + 1);
       }
     }
@@ -78,9 +92,9 @@ export function findHiddenSingles(
 
     for (let row = 0; row < size; row++) {
       if (board[row]![col] !== 0) continue;
-      const candidates = getCandidates(board, row, col, size, boxSize);
-      cellCandidates.push({ row, col, list: candidates });
-      for (const v of candidates) {
+      const list = candidateMap[row]![col]!;
+      cellCandidates.push({ row, col, list });
+      for (const v of list) {
         counts.set(v, (counts.get(v) ?? 0) + 1);
       }
     }
@@ -101,9 +115,9 @@ export function findHiddenSingles(
       for (let r = boxRow; r < boxRow + boxSize; r++) {
         for (let c = boxCol; c < boxCol + boxSize; c++) {
           if (board[r]![c] !== 0) continue;
-          const candidates = getCandidates(board, r, c, size, boxSize);
-          cellCandidates.push({ row: r, col: c, list: candidates });
-          for (const v of candidates) {
+          const list = candidateMap[r]![c]!;
+          cellCandidates.push({ row: r, col: c, list });
+          for (const v of list) {
             counts.set(v, (counts.get(v) ?? 0) + 1);
           }
         }

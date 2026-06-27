@@ -1,5 +1,26 @@
 import { isValidPlacement, type GridSize } from "./SudokuValidator";
 
+export type CandidateMap = number[][][];
+
+export function buildCandidateMap(
+  board: number[][],
+  size: GridSize,
+  boxSize: number
+): CandidateMap {
+  const map: CandidateMap = [];
+  for (let r = 0; r < size; r++) {
+    map[r] = [];
+    for (let c = 0; c < size; c++) {
+      if (board[r]![c] === 0) {
+        map[r]![c] = getCandidates(board, r, c, size, boxSize);
+      } else {
+        map[r]![c] = [];
+      }
+    }
+  }
+  return map;
+}
+
 export function getCandidates(
   board: number[][],
   row: number,
