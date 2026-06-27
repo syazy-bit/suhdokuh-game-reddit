@@ -115,12 +115,18 @@ describe("AnalysisResult", () => {
       difficulty: "medium",
       hardestTechnique: "X-Wing",
       techniqueCounts: { "Naked Single": 10, "Hidden Single": 5 },
+      assignmentCount: 8,
+      eliminationCount: 4,
+      totalSteps: 12,
     };
     expect(result.score).toBe(42);
     expect(result.difficulty).toBe("medium");
     expect(result.hardestTechnique).toBe("X-Wing");
     expect(result.techniqueCounts["Naked Single"]).toBe(10);
     expect(result.techniqueCounts["Hidden Single"]).toBe(5);
+    expect(result.assignmentCount).toBe(8);
+    expect(result.eliminationCount).toBe(4);
+    expect(result.totalSteps).toBe(12);
   });
 
   it("accepts extra fields without breaking (future compat)", () => {
@@ -129,11 +135,17 @@ describe("AnalysisResult", () => {
       difficulty: "easy",
       hardestTechnique: "Naked Single",
       techniqueCounts: {},
+      assignmentCount: 0,
+      eliminationCount: 0,
+      totalSteps: 0,
     };
     expect(result).toHaveProperty("score");
     expect(result).toHaveProperty("difficulty");
     expect(result).toHaveProperty("hardestTechnique");
     expect(result).toHaveProperty("techniqueCounts");
+    expect(result).toHaveProperty("assignmentCount");
+    expect(result).toHaveProperty("eliminationCount");
+    expect(result).toHaveProperty("totalSteps");
   });
 });
 
@@ -146,6 +158,9 @@ describe("createEmptyAnalysis", () => {
     expect(result).toHaveProperty("difficulty");
     expect(result).toHaveProperty("hardestTechnique");
     expect(result).toHaveProperty("techniqueCounts");
+    expect(result).toHaveProperty("assignmentCount");
+    expect(result).toHaveProperty("eliminationCount");
+    expect(result).toHaveProperty("totalSteps");
   });
 
   it("returns a score of 0", () => {
@@ -162,6 +177,18 @@ describe("createEmptyAnalysis", () => {
 
   it("returns empty techniqueCounts", () => {
     expect(createEmptyAnalysis().techniqueCounts).toEqual({});
+  });
+
+  it("returns assignmentCount of 0", () => {
+    expect(createEmptyAnalysis().assignmentCount).toBe(0);
+  });
+
+  it("returns eliminationCount of 0", () => {
+    expect(createEmptyAnalysis().eliminationCount).toBe(0);
+  });
+
+  it("returns totalSteps of 0", () => {
+    expect(createEmptyAnalysis().totalSteps).toBe(0);
   });
 });
 
@@ -196,6 +223,9 @@ describe("analyzeSolveResult", () => {
     expect(analysis.score).toBe(0);
     expect(analysis.hardestTechnique).toBeNull();
     expect(analysis.techniqueCounts).toEqual({});
+    expect(analysis.assignmentCount).toBe(0);
+    expect(analysis.eliminationCount).toBe(0);
+    expect(analysis.totalSteps).toBe(0);
   });
 
   it("scores a single Naked Single correctly", () => {
@@ -204,6 +234,9 @@ describe("analyzeSolveResult", () => {
     expect(analysis.score).toBe(1.0);
     expect(analysis.hardestTechnique).toBe("Naked Single");
     expect(analysis.techniqueCounts).toEqual({ "Naked Single": 1 });
+    expect(analysis.assignmentCount).toBe(1);
+    expect(analysis.eliminationCount).toBe(0);
+    expect(analysis.totalSteps).toBe(1);
   });
 
   it("scores multiple identical techniques correctly", () => {
@@ -217,6 +250,9 @@ describe("analyzeSolveResult", () => {
     expect(analysis.score).toBe(3 * 1.5);
     expect(analysis.hardestTechnique).toBe("Hidden Single");
     expect(analysis.techniqueCounts).toEqual({ "Hidden Single": 3 });
+    expect(analysis.assignmentCount).toBe(3);
+    expect(analysis.eliminationCount).toBe(0);
+    expect(analysis.totalSteps).toBe(3);
   });
 
   it("accumulates score from mixed techniques", () => {
@@ -231,6 +267,9 @@ describe("analyzeSolveResult", () => {
     expect(analysis.score).toBe(expected);
     expect(analysis.hardestTechnique).toBe("X-Wing");
     expect(analysis.techniqueCounts).toEqual({ "Naked Single": 2, "X-Wing": 1 });
+    expect(analysis.assignmentCount).toBe(2);
+    expect(analysis.eliminationCount).toBe(1);
+    expect(analysis.totalSteps).toBe(3);
   });
 
   it("handles elimination-only techniques", () => {
@@ -239,6 +278,9 @@ describe("analyzeSolveResult", () => {
     expect(analysis.score).toBe(3.0);
     expect(analysis.hardestTechnique).toBe("Naked Pair");
     expect(analysis.techniqueCounts).toEqual({ "Naked Pair": 1 });
+    expect(analysis.assignmentCount).toBe(0);
+    expect(analysis.eliminationCount).toBe(1);
+    expect(analysis.totalSteps).toBe(1);
   });
 
   it("reports the hardest technique by TECHNIQUE_PRIORITY order, not move order", () => {
@@ -250,12 +292,18 @@ describe("analyzeSolveResult", () => {
     const analysis = analyzeSolveResult(result);
     // X-Wing has higher priority index than Naked Single
     expect(analysis.hardestTechnique).toBe("X-Wing");
+    expect(analysis.assignmentCount).toBe(1);
+    expect(analysis.eliminationCount).toBe(1);
+    expect(analysis.totalSteps).toBe(2);
   });
 
   it("reports null hardestTechnique when no moves exist", () => {
     const result = makeSolveResult([]);
     const analysis = analyzeSolveResult(result);
     expect(analysis.hardestTechnique).toBeNull();
+    expect(analysis.assignmentCount).toBe(0);
+    expect(analysis.eliminationCount).toBe(0);
+    expect(analysis.totalSteps).toBe(0);
   });
 
   it("populates difficulty via difficultyFromScore", () => {
@@ -263,6 +311,9 @@ describe("analyzeSolveResult", () => {
     const analysis = analyzeSolveResult(result);
     // score = 7, thresholds: easy <= 10
     expect(analysis.difficulty).toBe("easy");
+    expect(analysis.assignmentCount).toBe(0);
+    expect(analysis.eliminationCount).toBe(1);
+    expect(analysis.totalSteps).toBe(1);
   });
 
   it("produces deterministic output for identical inputs", () => {
@@ -275,5 +326,100 @@ describe("analyzeSolveResult", () => {
     const a1 = analyzeSolveResult(result);
     const a2 = analyzeSolveResult(result);
     expect(a1).toEqual(a2);
+  });
+});
+
+// ── Analysis Statistics (Phase 5.4) ──────────────────────────────────────────
+
+describe("Analysis statistics", () => {
+  it("empty SolveResult has zero counts", () => {
+    const result = makeSolveResult([]);
+    const analysis = analyzeSolveResult(result);
+    expect(analysis.assignmentCount).toBe(0);
+    expect(analysis.eliminationCount).toBe(0);
+    expect(analysis.totalSteps).toBe(0);
+  });
+
+  it("assignment-only solution has correct counts", () => {
+    const moves = [
+      assignmentMove("Naked Single"),
+      assignmentMove("Hidden Single"),
+      assignmentMove("Naked Single"),
+    ];
+    const result = makeSolveResult(moves);
+    const analysis = analyzeSolveResult(result);
+    expect(analysis.assignmentCount).toBe(3);
+    expect(analysis.eliminationCount).toBe(0);
+    expect(analysis.totalSteps).toBe(3);
+  });
+
+  it("elimination-only solution has correct counts", () => {
+    const moves = [
+      eliminationMove("Naked Pair"),
+      eliminationMove("Pointing Pair"),
+    ];
+    const result = makeSolveResult(moves);
+    const analysis = analyzeSolveResult(result);
+    expect(analysis.assignmentCount).toBe(0);
+    expect(analysis.eliminationCount).toBe(2);
+    expect(analysis.totalSteps).toBe(2);
+  });
+
+  it("mixed moves have correct counts", () => {
+    const moves = [
+      assignmentMove("Naked Single"),
+      eliminationMove("X-Wing"),
+      eliminationMove("Hidden Pair"),
+      assignmentMove("Hidden Single"),
+    ];
+    const result = makeSolveResult(moves);
+    const analysis = analyzeSolveResult(result);
+    expect(analysis.assignmentCount).toBe(2);
+    expect(analysis.eliminationCount).toBe(2);
+    expect(analysis.totalSteps).toBe(4);
+  });
+
+  it("totalSteps equals moves.length", () => {
+    const moves = [
+      assignmentMove("Naked Single"),
+      eliminationMove("Pointing Pair"),
+      eliminationMove("Claiming Pair"),
+      eliminationMove("X-Wing"),
+      assignmentMove("Hidden Single"),
+    ];
+    const result = makeSolveResult(moves);
+    const analysis = analyzeSolveResult(result);
+    expect(analysis.totalSteps).toBe(5);
+    expect(analysis.totalSteps).toBe(result.moves.length);
+  });
+
+  it("assignmentCount + eliminationCount === totalSteps for assignment-only", () => {
+    const result = makeSolveResult([assignmentMove("Naked Single"), assignmentMove("Hidden Single")]);
+    const analysis = analyzeSolveResult(result);
+    expect(analysis.assignmentCount + analysis.eliminationCount).toBe(analysis.totalSteps);
+  });
+
+  it("assignmentCount + eliminationCount === totalSteps for elimination-only", () => {
+    const result = makeSolveResult([eliminationMove("X-Wing"), eliminationMove("Naked Pair")]);
+    const analysis = analyzeSolveResult(result);
+    expect(analysis.assignmentCount + analysis.eliminationCount).toBe(analysis.totalSteps);
+  });
+
+  it("assignmentCount + eliminationCount === totalSteps for mixed", () => {
+    const result = makeSolveResult([
+      assignmentMove("Naked Single"),
+      eliminationMove("Hidden Pair"),
+      eliminationMove("Pointing Pair"),
+      assignmentMove("Hidden Single"),
+      eliminationMove("X-Wing"),
+    ]);
+    const analysis = analyzeSolveResult(result);
+    expect(analysis.assignmentCount + analysis.eliminationCount).toBe(analysis.totalSteps);
+  });
+
+  it("assignmentCount + eliminationCount === totalSteps for empty", () => {
+    const result = makeSolveResult([]);
+    const analysis = analyzeSolveResult(result);
+    expect(analysis.assignmentCount + analysis.eliminationCount).toBe(analysis.totalSteps);
   });
 });

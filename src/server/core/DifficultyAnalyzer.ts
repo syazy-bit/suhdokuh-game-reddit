@@ -25,6 +25,9 @@ export interface AnalysisResult {
   difficulty: Difficulty;
   hardestTechnique: Technique | null;
   techniqueCounts: Partial<Record<Technique, number>>;
+  assignmentCount: number;
+  eliminationCount: number;
+  totalSteps: number;
 }
 
 export function createEmptyAnalysis(): AnalysisResult {
@@ -33,6 +36,9 @@ export function createEmptyAnalysis(): AnalysisResult {
     difficulty: "easy",
     hardestTechnique: null,
     techniqueCounts: {},
+    assignmentCount: 0,
+    eliminationCount: 0,
+    totalSteps: 0,
   };
 }
 
@@ -47,6 +53,8 @@ export function analyzeSolveResult(result: SolveResult): AnalysisResult {
   let score = 0;
   let hardestIdx = -1;
   let hardestTechnique: Technique | null = null;
+  let assignmentCount = 0;
+  let eliminationCount = 0;
 
   for (const move of result.moves) {
     const t = move.technique;
@@ -58,6 +66,20 @@ export function analyzeSolveResult(result: SolveResult): AnalysisResult {
       hardestIdx = idx;
       hardestTechnique = t;
     }
+
+    switch (move.type) {
+      case "assignment":
+        assignmentCount++;
+        break;
+      case "elimination":
+        eliminationCount++;
+        break;
+      default: {
+        const _exhaustive: never = move;
+        void _exhaustive;
+        throw new Error("Unhandled LogicalMove type");
+      }
+    }
   }
 
   return {
@@ -65,5 +87,8 @@ export function analyzeSolveResult(result: SolveResult): AnalysisResult {
     difficulty: difficultyFromScore(score),
     hardestTechnique,
     techniqueCounts,
+    assignmentCount,
+    eliminationCount,
+    totalSteps: result.moves.length,
   };
 }

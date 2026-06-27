@@ -9,7 +9,7 @@ import { countSolutions, difficultyCellsRemoved } from "./test-utils";
 
 function createGenerator(size: GridSize, difficulty: Difficulty): SudokuGenerator {
   const boxSize = size === 4 ? 2 : 3;
-  return new SudokuGenerator({ size, boxSize, difficulty, maxRetries: 0 });
+  return new SudokuGenerator({ size, boxSize, difficulty, matchDifficulty: false });
 }
 
 function generateValidPuzzle(size: GridSize, difficulty: Difficulty, maxAttempts = 5): GeneratedPuzzle {
@@ -394,48 +394,81 @@ describe("Performance baseline", () => {
   }
 });
 
-// ── 8. Difficulty Validation (Phase 5.3) ──────────────────────────────────────
+// ── 8. Difficulty Validation (Phase 5.3, refactored Pre-5.5) ────────────────
 
 describe("Difficulty validation", () => {
-  it("maxRetries: 0 skips validation and does not include analysis", () => {
-    const gen = new SudokuGenerator({ size: 4, boxSize: 2, difficulty: "easy", maxRetries: 0 });
+  it("matchDifficulty=false returns first puzzle with analysis (no retry loop)", () => {
+    const gen = new SudokuGenerator({ size: 4, boxSize: 2, difficulty: "easy", matchDifficulty: false });
     const result = gen.generate();
-    expect(result.analysis).toBeUndefined();
+    expect(result.analysis.score).toBeGreaterThanOrEqual(0);
   });
 
-  it("default maxRetries includes analysis on success (4×4 easy)", () => {
-    const gen = new SudokuGenerator({ size: 4, boxSize: 2, difficulty: "easy", maxRetries: 50 });
+  it("matchDifficulty=true with maxAttempts=50 succeeds for 4×4 easy", () => {
+    const gen = new SudokuGenerator({ size: 4, boxSize: 2, difficulty: "easy", maxAttempts: 50, matchDifficulty: true });
     const result = gen.generate();
-    expect(result.analysis).toBeDefined();
-    expect(result.analysis!.difficulty).toBe("easy");
-    expect(result.analysis!.score).toBeGreaterThanOrEqual(0);
+    expect(result.analysis.difficulty).toBe("easy");
+    expect(result.analysis.score).toBeGreaterThanOrEqual(0);
   });
 
-  it("default maxRetries includes analysis on success (9×9 hard)", () => {
-    const gen = new SudokuGenerator({ size: 9, boxSize: 3, difficulty: "hard", maxRetries: 50 });
+  it("matchDifficulty=true with maxAttempts=50 succeeds for 9×9 hard", () => {
+    const gen = new SudokuGenerator({ size: 9, boxSize: 3, difficulty: "hard", maxAttempts: 50, matchDifficulty: true });
     const result = gen.generate();
-    expect(result.analysis).toBeDefined();
-    expect(result.analysis!.difficulty).toBe("hard");
-    expect(result.analysis!.score).toBeGreaterThan(0);
+    expect(result.analysis.difficulty).toBe("hard");
+    expect(result.analysis.score).toBeGreaterThan(0);
   });
 
-  it("throws when retry limit exhausted — medium demand rarely matches current thresholds", () => {
-    const gen = new SudokuGenerator({ size: 4, boxSize: 2, difficulty: "medium", maxRetries: 2 });
+  it("throws when maxAttempts exhausted — medium demand rarely matches current thresholds", () => {
+    const gen = new SudokuGenerator({ size: 4, boxSize: 2, difficulty: "medium", maxAttempts: 2, matchDifficulty: true });
     expect(() => gen.generate()).toThrow(/Failed to generate/);
   });
 
-  it("error message includes size, difficulty, retry count, last score and last difficulty", () => {
+  it("error message includes size, difficulty, attempt count, last score and last difficulty", () => {
     expect.hasAssertions();
     try {
-      const gen = new SudokuGenerator({ size: 4, boxSize: 2, difficulty: "medium", maxRetries: 1 });
+      const gen = new SudokuGenerator({ size: 4, boxSize: 2, difficulty: "medium", maxAttempts: 1, matchDifficulty: true });
       gen.generate();
     } catch (e) {
       const msg = (e as Error).message;
       expect(msg).toContain("4×4");
       expect(msg).toContain("medium");
-      expect(msg).toContain("1 retries");
+      expect(msg).toContain("1 attempts");
       expect(msg).toContain("last score:");
       expect(msg).toContain("last difficulty:");
     }
+  });
+
+  it("matchDifficulty=false returns analysis immediately regardless of difficulty match", () => {
+    const gen = new SudokuGenerator({ size: 4, boxSize: 2, difficulty: "medium", matchDifficulty: false });
+    const result = gen.generate();
+    expect(result.analysis.score).toBeGreaterThanOrEqual(0);
+  });
+});
+
+// ── 9. Constructor Validation ────────────────────────────────────────────────
+
+describe("Constructor validation", () => {
+  it("rejects maxAttempts = 0", () => {
+    expect(() => new SudokuGenerator({ size: 4, boxSize: 2, difficulty: "easy", maxAttempts: 0 }))
+      .toThrow(/maxAttempts must be >= 1/);
+  });
+
+  it("rejects negative maxAttempts", () => {
+    expect(() => new SudokuGenerator({ size: 4, boxSize: 2, difficulty: "easy", maxAttempts: -1 }))
+      .toThrow(/maxAttempts must be >= 1/);
+  });
+
+  it("accepts maxAttempts = 1", () => {
+    const gen = new SudokuGenerator({ size: 4, boxSize: 2, difficulty: "easy", maxAttempts: 1 });
+    expect(gen).toBeDefined();
+  });
+
+  it("default maxAttempts (50) is accepted", () => {
+    const gen = new SudokuGenerator({ size: 4, boxSize: 2, difficulty: "easy" });
+    expect(gen).toBeDefined();
+  });
+
+  it("rejects maxAttempts = 0 even with matchDifficulty = false", () => {
+    expect(() => new SudokuGenerator({ size: 4, boxSize: 2, difficulty: "easy", maxAttempts: 0, matchDifficulty: false }))
+      .toThrow(/maxAttempts must be >= 1/);
   });
 });

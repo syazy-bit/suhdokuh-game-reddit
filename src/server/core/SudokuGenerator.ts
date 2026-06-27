@@ -10,7 +10,8 @@ export interface GeneratorConfig {
   size: GridSize;
   boxSize: number;
   difficulty: Difficulty;
-  maxRetries?: number;
+  maxAttempts?: number;
+  matchDifficulty?: boolean;
 }
 
 export interface GeneratedPuzzle {
@@ -18,20 +19,28 @@ export interface GeneratedPuzzle {
   solution: number[][];
   size: GridSize;
   cellsRemoved: number;
-  analysis?: AnalysisResult;
+  analysis: AnalysisResult;
 }
 
 export class SudokuGenerator {
   private size: GridSize;
   private boxSize: number;
   private difficulty: Difficulty;
-  private maxRetries: number;
+  private maxAttempts: number;
+  private matchDifficulty: boolean;
 
   constructor(config: GeneratorConfig) {
     this.size = config.size;
     this.boxSize = config.boxSize;
     this.difficulty = config.difficulty;
-    this.maxRetries = config.maxRetries ?? 50;
+    this.maxAttempts = config.maxAttempts ?? 50;
+    this.matchDifficulty = config.matchDifficulty ?? true;
+
+    if (this.maxAttempts < 1) {
+      throw new Error(
+        `Invalid configuration: maxAttempts must be >= 1 (got ${this.maxAttempts})`
+      );
+    }
 
     if (this.boxSize * this.boxSize !== this.size) {
       throw new Error(
@@ -45,41 +54,55 @@ export class SudokuGenerator {
    * @returns Generated puzzle and solution
    */
   public generate(): GeneratedPuzzle {
-    if (this.maxRetries === 0) {
-      const solution = this.generateSolvedBoard();
-      const puzzle = this.createPuzzleFromSolution(solution);
+    const solution = this.generateSolvedBoard();
+    const puzzle = this.createPuzzleFromSolution(solution);
+    const solveResult = solve(puzzle);
+    const analysis = analyzeSolveResult(solveResult);
+
+    if (!this.matchDifficulty) {
       return {
         puzzle,
         solution,
         size: this.size,
         cellsRemoved: this.countEmpty(puzzle),
+        analysis,
       };
     }
 
-    let lastAnalysis: AnalysisResult | undefined;
+    if (analysis.difficulty === this.difficulty) {
+      return {
+        puzzle,
+        solution,
+        size: this.size,
+        cellsRemoved: this.countEmpty(puzzle),
+        analysis,
+      };
+    }
 
-    for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
-      const solution = this.generateSolvedBoard();
-      const puzzle = this.createPuzzleFromSolution(solution);
+    let lastAnalysis = analysis;
 
-      const solveResult = solve(puzzle);
-      const analysis = analyzeSolveResult(solveResult);
-      lastAnalysis = analysis;
+    for (let attempt = 2; attempt <= this.maxAttempts; attempt++) {
+      const nextSolution = this.generateSolvedBoard();
+      const nextPuzzle = this.createPuzzleFromSolution(nextSolution);
 
-      if (analysis.difficulty === this.difficulty) {
+      const nextSolveResult = solve(nextPuzzle);
+      const nextAnalysis = analyzeSolveResult(nextSolveResult);
+      lastAnalysis = nextAnalysis;
+
+      if (nextAnalysis.difficulty === this.difficulty) {
         return {
-          puzzle,
-          solution,
+          puzzle: nextPuzzle,
+          solution: nextSolution,
           size: this.size,
-          cellsRemoved: this.countEmpty(puzzle),
-          analysis,
+          cellsRemoved: this.countEmpty(nextPuzzle),
+          analysis: nextAnalysis,
         };
       }
     }
 
     throw new Error(
-      `Failed to generate ${this.size}×${this.size} ${this.difficulty} puzzle after ${this.maxRetries} retries` +
-      ` (last score: ${lastAnalysis!.score}, last difficulty: ${lastAnalysis!.difficulty})`
+      `Failed to generate ${this.size}×${this.size} ${this.difficulty} puzzle after ${this.maxAttempts} attempts` +
+      ` (last score: ${lastAnalysis.score}, last difficulty: ${lastAnalysis.difficulty})`
     );
   }
 
