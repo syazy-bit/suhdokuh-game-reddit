@@ -16,6 +16,7 @@
     "login": "npx devvit login",
     "launch": "npm run build && npm run deploy && npx devvit publish",
     "type-check": "tsc --build",
+    "test": "vitest run",
     "validate-fallbacks": "npx tsx tools/validateFallbackPuzzles.ts"
   },
   "dependencies": {
@@ -28,6 +29,7 @@
     "concurrently": "9.1.2",
     "dotenv-cli": "8.0.0",
     "typescript": "5.8.2",
-    "vite": "6.2.4"
+    "vite": "6.2.4",
+    "vitest": "^4.1.9"
   }
 }
