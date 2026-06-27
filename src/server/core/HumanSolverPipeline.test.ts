@@ -150,7 +150,7 @@ describe("solve — solved board", () => {
     expect(result.solved).toBe(true);
     expect(result.moves).toHaveLength(0);
     expect(result.techniquesUsed).toHaveLength(0);
-    expect(result.hardestTechnique).toBe("");
+    expect(result.hardestTechnique).toBeNull();
   });
 });
 
@@ -334,7 +334,8 @@ describe("solve — hardest technique", () => {
     ];
     const result = solve(board);
     // At minimum a Hidden Single should be used
-    const hiddenIdx = ["Naked Single", "Hidden Single"].indexOf(result.hardestTechnique);
+    expect(result.hardestTechnique).not.toBeNull();
+    const hiddenIdx = ["Naked Single", "Hidden Single"].indexOf(result.hardestTechnique!);
     expect(hiddenIdx).toBeGreaterThanOrEqual(0);
   });
 
@@ -346,7 +347,7 @@ describe("solve — hardest technique", () => {
       [0, 0, 0, 0],
     ];
     const result = solve(board);
-    expect(result.hardestTechnique).toBe("");
+    expect(result.hardestTechnique).toBeNull();
   });
 });
 

@@ -1,5 +1,6 @@
 import type { CandidateMap } from "./CandidateEngine";
 import type { GridSize } from "./SudokuValidator";
+import type { Technique } from "./HumanSolverTypes";
 
 export interface HumanSolverContext {
   board: number[][];
@@ -11,14 +12,14 @@ export interface HumanSolverContext {
 export type LogicalMove =
   | {
       type: "assignment";
-      technique: "Naked Single" | "Hidden Single";
+      technique: Technique;
       row: number;
       col: number;
       value: number;
     }
   | {
       type: "elimination";
-      technique: string;
+      technique: Technique;
       patternCells: Array<{ row: number; col: number }>;
       eliminations: Array<{
         row: number;

@@ -1,0 +1,11 @@
+export const TECHNIQUES = [
+  "Naked Single",
+  "Hidden Single",
+  "Naked Pair",
+  "Hidden Pair",
+  "Pointing Pair",
+  "Claiming Pair",
+  "X-Wing",
+] as const;
+
+export type Technique = typeof TECHNIQUES[number];

@@ -11,16 +11,17 @@ import {
   type LogicalMove,
 } from "./HumanSolver";
 import type { GridSize } from "./SudokuValidator";
+import { type Technique } from "./HumanSolverTypes";
 
 export interface SolveResult {
   solved: boolean;
   finalBoard: number[][];
   moves: LogicalMove[];
-  techniquesUsed: string[];
-  hardestTechnique: string;
+  techniquesUsed: Technique[];
+  hardestTechnique: Technique | null;
 }
 
-const TECHNIQUE_PRIORITY: string[] = [
+const TECHNIQUE_PRIORITY: Technique[] = [
   "Naked Single",
   "Hidden Single",
   "Naked Pair",
@@ -30,7 +31,7 @@ const TECHNIQUE_PRIORITY: string[] = [
   "X-Wing",
 ];
 
-const FINDERS: Array<{ name: string; fn: (ctx: HumanSolverContext) => LogicalMove[] }> = [
+const FINDERS: Array<{ name: Technique; fn: (ctx: HumanSolverContext) => LogicalMove[] }> = [
   { name: "Naked Single", fn: findNakedSingles },
   { name: "Hidden Single", fn: findHiddenSingles },
   { name: "Naked Pair", fn: findNakedPairs },
@@ -112,7 +113,7 @@ export function solve(board: number[][]): SolveResult {
   const working = cloneBoard(board);
   const pendingEliminations = new Map<string, { row: number; col: number; value: number }>();
   const moves: LogicalMove[] = [];
-  const techniquesUsed = new Set<string>();
+  const techniquesUsed = new Set<Technique>();
   let hardestIdx = 0;
 
   while (true) {
@@ -122,7 +123,7 @@ export function solve(board: number[][]): SolveResult {
         finalBoard: working,
         moves,
         techniquesUsed: [...techniquesUsed],
-        hardestTechnique: hardestIdx > 0 ? TECHNIQUE_PRIORITY[hardestIdx - 1]! : "",
+        hardestTechnique: hardestIdx > 0 ? TECHNIQUE_PRIORITY[hardestIdx - 1]! : null,
       };
     }
 
@@ -133,7 +134,7 @@ export function solve(board: number[][]): SolveResult {
         finalBoard: working,
         moves,
         techniquesUsed: [...techniquesUsed],
-        hardestTechnique: hardestIdx > 0 ? TECHNIQUE_PRIORITY[hardestIdx - 1]! : "",
+        hardestTechnique: hardestIdx > 0 ? TECHNIQUE_PRIORITY[hardestIdx - 1]! : null,
       };
     }
 
