@@ -31,22 +31,45 @@ export function countSolutions(grid: number[][], size: GridSize, limit: number, 
     if (solutionCount >= limit) return;
     if (steps++ > maxSteps) { cutoff = true; return; }
 
-    for (let r = 0; r < size; r++) {
+    // MRV: find empty cell with the fewest legal candidates
+    let mrvRow = -1;
+    let mrvCol = -1;
+    let mrvCount = size + 1;
+
+    outer: for (let r = 0; r < size; r++) {
       for (let c = 0; c < size; c++) {
-        if (g[r]![c] === 0) {
-          for (let num = 1; num <= size; num++) {
-            if (isValidPlacement(g, r, c, num, size, bSize)) {
-              g[r]![c] = num;
-              solve(g);
-              g[r]![c] = 0;
-            }
+        if (g[r]![c] !== 0) continue;
+
+        let count = 0;
+        for (let num = 1; num <= size; num++) {
+          if (isValidPlacement(g, r, c, num, size, bSize)) {
+            count++;
           }
-          return;
+        }
+
+        if (count < mrvCount) {
+          mrvCount = count;
+          mrvRow = r;
+          mrvCol = c;
+          if (count <= 1) break outer;
         }
       }
     }
 
-    solutionCount++;
+    if (mrvRow === -1) {
+      solutionCount++;
+      return;
+    }
+
+    if (mrvCount === 0) return;
+
+    for (let num = 1; num <= size; num++) {
+      if (isValidPlacement(g, mrvRow, mrvCol, num, size, bSize)) {
+        g[mrvRow]![mrvCol] = num;
+        solve(g);
+        g[mrvRow]![mrvCol] = 0;
+      }
+    }
   }
 
   solve(cloneGrid(grid));
