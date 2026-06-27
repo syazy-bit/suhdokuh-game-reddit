@@ -140,30 +140,57 @@ export class SudokuGenerator {
     while (removed < targetRemoval && removed > prevRemoved && consecutiveFailures < maxConsecutiveFailures) {
       prevRemoved = removed;
 
-      if (removed > 0) {
-        this.shuffleArray(positions);
-      }
+      // Build scored candidate list (single pass, single array)
+      const candidates: Array<{
+        row: number; col: number; symRow: number; symCol: number;
+        box1: number; box2: number; score: number;
+      }> = [];
 
-      for (let i = 0; i < positions.length && removed < targetRemoval && consecutiveFailures < maxConsecutiveFailures; i++) {
-        const [row, col] = positions[i]!;
-        const symRow = this.size - 1 - row;
-        const symCol = this.size - 1 - col;
+      for (const [r, c] of positions) {
+        if (puzzle[r]![c] === 0) continue;
 
-        if (puzzle[row]![col] === 0) continue;
-
-        const box1 = getBoxIndex(row, col);
-        const box2 = getBoxIndex(symRow, symCol);
+        const symR = this.size - 1 - r;
+        const symC = this.size - 1 - c;
+        const b1 = getBoxIndex(r, c);
+        const b2 = getBoxIndex(symR, symC);
 
         if (
-          rowRemoved[row]! >= maxPerRow ||
-          colRemoved[col]! >= maxPerCol ||
-          boxRemoved[box1]! >= maxPerBox ||
-          rowRemoved[symRow]! >= maxPerRow ||
-          colRemoved[symCol]! >= maxPerCol ||
-          boxRemoved[box2]! >= maxPerBox
+          rowRemoved[r]! >= maxPerRow ||
+          colRemoved[c]! >= maxPerCol ||
+          boxRemoved[b1]! >= maxPerBox ||
+          rowRemoved[symR]! >= maxPerRow ||
+          colRemoved[symC]! >= maxPerCol ||
+          boxRemoved[b2]! >= maxPerBox
         ) {
           continue;
         }
+
+        const balanceScore = (
+          (this.size - rowRemoved[r]!) +
+          (this.size - colRemoved[c]!) +
+          (this.size - boxRemoved[b1]!) +
+          (this.size - rowRemoved[symR]!) +
+          (this.size - colRemoved[symC]!) +
+          (this.size - boxRemoved[b2]!)
+        ) / (6 * this.size);
+
+        const emptyNeighbors =
+          this.countEmptyNeighbors(puzzle, r, c) +
+          this.countEmptyNeighbors(puzzle, symR, symC);
+        const sparsityPenalty = emptyNeighbors * 0.15;
+
+        candidates.push({
+          row: r, col: c, symRow: symR, symCol: symC,
+          box1: b1, box2: b2,
+          score: balanceScore - sparsityPenalty,
+        });
+      }
+
+      candidates.sort((a, b) => b.score - a.score);
+
+      for (const { row, col, symRow, symCol, box1, box2 } of candidates) {
+        if (removed >= targetRemoval || consecutiveFailures >= maxConsecutiveFailures) break;
+        if (puzzle[row]![col] === 0) continue;
 
         const backup1 = puzzle[row]![col]!;
         const backup2 = puzzle[symRow]![symCol]!;
@@ -171,9 +198,7 @@ export class SudokuGenerator {
         puzzle[row]![col] = 0;
         puzzle[symRow]![symCol] = 0;
 
-        const isValid = this.verifyUniqueness(puzzle);
-
-        if (isValid) {
+        if (this.verifyUniqueness(puzzle)) {
           const delta = (row === symRow && col === symCol) ? 1 : 2;
 
           removed += delta;
@@ -201,6 +226,15 @@ export class SudokuGenerator {
 
   private verifyUniqueness(puzzle: number[][]): boolean {
     return hasUniqueSolution(puzzle, this.size, this.boxSize);
+  }
+
+  private countEmptyNeighbors(puzzle: number[][], row: number, col: number): number {
+    let count = 0;
+    if (row > 0 && puzzle[row - 1]![col] === 0) count++;
+    if (row < this.size - 1 && puzzle[row + 1]![col] === 0) count++;
+    if (col > 0 && puzzle[row]![col - 1] === 0) count++;
+    if (col < this.size - 1 && puzzle[row]![col + 1] === 0) count++;
+    return count;
   }
 
   /**
