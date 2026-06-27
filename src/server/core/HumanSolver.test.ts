@@ -4,6 +4,7 @@ import {
   findNakedSingles,
   findHiddenSingles,
   findNakedPairs,
+  findHiddenPairs,
   type HumanSolverContext,
 } from "./HumanSolver";
 import type { GridSize } from "./SudokuValidator";
@@ -525,6 +526,193 @@ describe("findNakedPairs — board immutability", () => {
     const ctx = createCtx(board, 4, 2);
 
     findNakedPairs(ctx);
+
+    expect(board).toEqual(snapshot);
+  });
+});
+
+// ── Zero Hidden Pairs ──────────────────────────────────────────────────
+
+describe("findHiddenPairs — zero Hidden Pairs", () => {
+  it("returns empty array for empty 4x4 board", () => {
+    const board = [
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+    ];
+    const ctx = createCtx(board, 4, 2);
+
+    const result = findHiddenPairs(ctx);
+
+    expect(result).toEqual([]);
+  });
+
+  it("returns empty array when no value appears in exactly two cells of any unit", () => {
+    const board = [
+      [1, 0, 0, 0],
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+    ];
+    const ctx = createCtx(board, 4, 2);
+
+    const result = findHiddenPairs(ctx);
+
+    expect(result).toEqual([]);
+  });
+});
+
+// ── One Hidden Pair ───────────────────────────────────────────────────
+
+describe("findHiddenPairs — one Hidden Pair", () => {
+  it("finds a Hidden Pair in a row", () => {
+    // Row 0: (0,0)[1,2,3,4], (0,1)[1,2,3,4], (0,2)[3,4], (0,3)[3,4].
+    // 1 and 2 appear only in (0,0) and (0,1) in row 0 → hidden pair {1,2}.
+    // Eliminate 3,4 from (0,0) and 3,4 from (0,1).
+    const board = [
+      [0, 0, 0, 0],
+      [0, 0, 1, 2],
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+    ];
+    const ctx = createCtx(board, 4, 2);
+
+    const result = findHiddenPairs(ctx);
+
+    expect(result.length).toBeGreaterThanOrEqual(1);
+    const move = result.find(
+      (m) => m.type === "elimination" && m.technique === "Hidden Pair"
+    )!;
+    expect(move).toBeDefined();
+    if (move.type !== "elimination") return;
+    expect(move.patternCells).toHaveLength(2);
+    expect(move.patternCells).toContainEqual({ row: 0, col: 0 });
+    expect(move.patternCells).toContainEqual({ row: 0, col: 1 });
+    expect(move.eliminations).toContainEqual({ row: 0, col: 0, value: 3 });
+    expect(move.eliminations).toContainEqual({ row: 0, col: 0, value: 4 });
+    expect(move.eliminations).toContainEqual({ row: 0, col: 1, value: 3 });
+    expect(move.eliminations).toContainEqual({ row: 0, col: 1, value: 4 });
+  });
+
+  it("finds a Hidden Pair in a column", () => {
+    // Column 0: (0,0)[1,2,3,4], (1,0)[1,2,3,4], (2,0)[3,4], (3,0)[3,4].
+    // 1 and 2 appear only in (0,0) and (1,0) in col 0 → hidden pair {1,2}.
+    // Eliminate 3,4 from (0,0) and 3,4 from (1,0).
+    const board = [
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+      [0, 1, 0, 0],
+      [0, 2, 0, 0],
+    ];
+    const ctx = createCtx(board, 4, 2);
+
+    const result = findHiddenPairs(ctx);
+
+    expect(result.length).toBeGreaterThanOrEqual(1);
+    const move = result.find(
+      (m) => m.type === "elimination" && m.technique === "Hidden Pair"
+    )!;
+    expect(move).toBeDefined();
+    if (move.type !== "elimination") return;
+    expect(move.patternCells).toHaveLength(2);
+    expect(move.patternCells).toContainEqual({ row: 0, col: 0 });
+    expect(move.patternCells).toContainEqual({ row: 1, col: 0 });
+    expect(move.eliminations).toContainEqual({ row: 0, col: 0, value: 3 });
+    expect(move.eliminations).toContainEqual({ row: 0, col: 0, value: 4 });
+    expect(move.eliminations).toContainEqual({ row: 1, col: 0, value: 3 });
+    expect(move.eliminations).toContainEqual({ row: 1, col: 0, value: 4 });
+  });
+
+  it("finds a Hidden Pair in a box", () => {
+    // Box (0,2)-(1,3): (0,2)[1,2,3,4], (0,3)[1,2,3,4], (1,2)[3,4], (1,3)[3,4].
+    // 1 and 2 appear only in (0,2) and (0,3) in that box → hidden pair {1,2}.
+    // Eliminate 3,4 from (0,2) and 3,4 from (0,3).
+    const board = [
+      [0, 0, 0, 0],
+      [1, 2, 0, 0],
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+    ];
+    const ctx = createCtx(board, 4, 2);
+
+    const result = findHiddenPairs(ctx);
+
+    expect(result.length).toBeGreaterThanOrEqual(1);
+    const move = result.find(
+      (m) => m.type === "elimination" && m.technique === "Hidden Pair"
+    )!;
+    expect(move).toBeDefined();
+    if (move.type !== "elimination") return;
+    expect(move.patternCells).toHaveLength(2);
+    expect(move.patternCells).toContainEqual({ row: 0, col: 2 });
+    expect(move.patternCells).toContainEqual({ row: 0, col: 3 });
+    expect(move.eliminations).toContainEqual({ row: 0, col: 2, value: 3 });
+    expect(move.eliminations).toContainEqual({ row: 0, col: 2, value: 4 });
+    expect(move.eliminations).toContainEqual({ row: 0, col: 3, value: 3 });
+    expect(move.eliminations).toContainEqual({ row: 0, col: 3, value: 4 });
+  });
+});
+
+// ── Hidden Pair with no eliminations ──────────────────────────────────
+
+describe("findHiddenPairs — pair with no eliminations", () => {
+  it("ignores a hidden pair whose cells already have exactly two candidates", () => {
+    // Row 1: (1,1)[3,4], (1,2)[3,4] — 3 and 4 appear only in those two cells.
+    // Both cells already have exactly {3,4} → no eliminations needed.
+    const board = [
+      [0, 0, 0, 0],
+      [1, 0, 0, 2],
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+    ];
+    const ctx = createCtx(board, 4, 2);
+
+    const result = findHiddenPairs(ctx);
+
+    expect(
+      result.filter((m) => m.type === "elimination")
+    ).toHaveLength(0);
+  });
+});
+
+// ── Duplicate prevention ─────────────────────────────────────────────
+
+describe("findHiddenPairs — duplicate prevention", () => {
+  it("returns the same pair only once when found in both row and box", () => {
+    // The hidden pair {1,2} at (0,0)(0,1) is detected by both the row 0 scan
+    // and the box (0,0)-(1,1) scan. Only one LogicalMove should be emitted.
+    const board = [
+      [0, 0, 0, 0],
+      [0, 0, 1, 2],
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+    ];
+    const ctx = createCtx(board, 4, 2);
+
+    const result = findHiddenPairs(ctx);
+
+    const hiddenPairs = result.filter(
+      (m) => m.type === "elimination" && m.technique === "Hidden Pair"
+    );
+    expect(hiddenPairs).toHaveLength(1);
+  });
+});
+
+// ── Board immutability ────────────────────────────────────────────────
+
+describe("findHiddenPairs — board immutability", () => {
+  it("does not mutate the board", () => {
+    const board = [
+      [0, 0, 0, 0],
+      [0, 0, 1, 2],
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+    ];
+    const snapshot = cloneBoard(board);
+    const ctx = createCtx(board, 4, 2);
+
+    findHiddenPairs(ctx);
 
     expect(board).toEqual(snapshot);
   });

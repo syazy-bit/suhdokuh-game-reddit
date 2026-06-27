@@ -260,3 +260,141 @@ export function findNakedPairs(ctx: HumanSolverContext): LogicalMove[] {
   }
   return moves;
 }
+
+export function findHiddenPairs(ctx: HumanSolverContext): LogicalMove[] {
+  const { board, size, boxSize, candidateMap } = ctx;
+  const pairMap = new Map<
+    string,
+    {
+      patternCells: Array<{ row: number; col: number }>;
+      eliminations: Map<string, { row: number; col: number; value: number }>;
+    }
+  >();
+
+  function processUnit(cells: Array<{ row: number; col: number }>): void {
+    // Build value → cells map from candidate lists
+    const valueCells = new Map<
+      number,
+      Array<{ row: number; col: number }>
+    >();
+
+    for (const { row, col } of cells) {
+      const list = candidateMap[row]![col]!;
+      if (list.length < 2) continue;
+      for (const v of list) {
+        const arr = valueCells.get(v) ?? [];
+        arr.push({ row, col });
+        valueCells.set(v, arr);
+      }
+    }
+
+    // Values that appear in exactly two cells
+    const twoCellValues: Array<{
+      value: number;
+      cells: Array<{ row: number; col: number }>;
+    }> = [];
+    for (const [v, vcells] of valueCells) {
+      if (vcells.length === 2) {
+        twoCellValues.push({ value: v, cells: vcells });
+      }
+    }
+
+    // Find pairs of values that share the same two cells
+    for (let i = 0; i < twoCellValues.length; i++) {
+      for (let j = i + 1; j < twoCellValues.length; j++) {
+        const { value: v1, cells: cells1 } = twoCellValues[i]!;
+        const { value: v2, cells: cells2 } = twoCellValues[j]!;
+
+        const same =
+          (cells1[0]!.row === cells2[0]!.row &&
+            cells1[0]!.col === cells2[0]!.col &&
+            cells1[1]!.row === cells2[1]!.row &&
+            cells1[1]!.col === cells2[1]!.col) ||
+          (cells1[0]!.row === cells2[1]!.row &&
+            cells1[0]!.col === cells2[1]!.col &&
+            cells1[1]!.row === cells2[0]!.row &&
+            cells1[1]!.col === cells2[0]!.col);
+
+        if (!same) continue;
+
+        const a = cells1[0]!;
+        const b = cells1[1]!;
+        const sortedVals = v1 < v2 ? `${v1},${v2}` : `${v2},${v1}`;
+        const dk = pairDedupKey(a, b, sortedVals);
+
+        let entry = pairMap.get(dk);
+        if (!entry) {
+          entry = {
+            patternCells: [
+              { row: a.row, col: a.col },
+              { row: b.row, col: b.col },
+            ],
+            eliminations: new Map(),
+          };
+          pairMap.set(dk, entry);
+        }
+
+        const hiddenValues = new Set([v1, v2]);
+
+        for (const cell of [a, b]) {
+          const list = candidateMap[cell.row]![cell.col]!;
+          for (const candidate of list) {
+            if (!hiddenValues.has(candidate)) {
+              const ek = eliminationCellKey(cell.row, cell.col, candidate);
+              if (!entry.eliminations.has(ek)) {
+                entry.eliminations.set(ek, {
+                  row: cell.row,
+                  col: cell.col,
+                  value: candidate,
+                });
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Scan rows
+  for (let row = 0; row < size; row++) {
+    const cells: Array<{ row: number; col: number }> = [];
+    for (let col = 0; col < size; col++) {
+      if (board[row]![col] === 0) cells.push({ row, col });
+    }
+    processUnit(cells);
+  }
+
+  // Scan columns
+  for (let col = 0; col < size; col++) {
+    const cells: Array<{ row: number; col: number }> = [];
+    for (let row = 0; row < size; row++) {
+      if (board[row]![col] === 0) cells.push({ row, col });
+    }
+    processUnit(cells);
+  }
+
+  // Scan boxes
+  for (let boxRow = 0; boxRow < size; boxRow += boxSize) {
+    for (let boxCol = 0; boxCol < size; boxCol += boxSize) {
+      const cells: Array<{ row: number; col: number }> = [];
+      for (let r = boxRow; r < boxRow + boxSize; r++) {
+        for (let c = boxCol; c < boxCol + boxSize; c++) {
+          if (board[r]![c] === 0) cells.push({ row: r, col: c });
+        }
+      }
+      processUnit(cells);
+    }
+  }
+
+  const moves: LogicalMove[] = [];
+  for (const { patternCells, eliminations } of pairMap.values()) {
+    if (eliminations.size === 0) continue;
+    moves.push({
+      type: "elimination",
+      technique: "Hidden Pair",
+      patternCells,
+      eliminations: [...eliminations.values()],
+    });
+  }
+  return moves;
+}
