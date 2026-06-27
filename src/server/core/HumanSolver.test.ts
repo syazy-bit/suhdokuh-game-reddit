@@ -6,6 +6,7 @@ import {
   findNakedPairs,
   findHiddenPairs,
   findPointingPairs,
+  findClaimingPairs,
   type HumanSolverContext,
 } from "./HumanSolver";
 import type { GridSize } from "./SudokuValidator";
@@ -934,6 +935,240 @@ describe("findPointingPairs — board immutability", () => {
     const ctx = createCtx(board, 4, 2);
 
     findPointingPairs(ctx);
+
+    expect(board).toEqual(snapshot);
+  });
+});
+
+// ── Zero Claiming Pairs ─────────────────────────────────────────────
+
+describe("findClaimingPairs — zero Claiming Pairs", () => {
+  it("returns empty array for empty 4x4 board", () => {
+    const board = [
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+    ];
+    const ctx = createCtx(board, 4, 2);
+
+    const result = findClaimingPairs(ctx);
+
+    expect(result).toEqual([]);
+  });
+
+  it("returns empty array when no value is confined to a single box in any row or column", () => {
+    // Row 0 fully filled; rows 1-3 empty → each value appears in all 4 cols → no confinement.
+    const board = [
+      [1, 2, 3, 4],
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+    ];
+    const ctx = createCtx(board, 4, 2);
+
+    const result = findClaimingPairs(ctx);
+
+    expect(result).toEqual([]);
+  });
+});
+
+// ── Row-based Claiming Pair ─────────────────────────────────────────
+
+describe("findClaimingPairs — row-based", () => {
+  it("finds a row-based Claiming Pair (value 1 confined to box in row 0)", () => {
+    // Row 0: givens at (0,2)=3,(0,3)=4 → 1 only in (0,0)(0,1), both in box (0,0)-(1,1).
+    // Box (0,0)-(1,1) other rows: (1,0)(1,1) have 1 as candidate → eliminate.
+    const board = [
+      [0, 0, 3, 4],
+      [0, 0, 2, 0],
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+    ];
+    const ctx = createCtx(board, 4, 2);
+
+    const result = findClaimingPairs(ctx);
+
+    expect(result.length).toBeGreaterThanOrEqual(1);
+    const move = result.find(
+      (m) =>
+        m.type === "elimination" && m.technique === "Claiming Pair"
+    )!;
+    expect(move).toBeDefined();
+    if (move.type !== "elimination") return;
+    expect(move.patternCells).toHaveLength(2);
+    expect(move.patternCells).toContainEqual({ row: 0, col: 0 });
+    expect(move.patternCells).toContainEqual({ row: 0, col: 1 });
+    expect(move.eliminations).toContainEqual({ row: 1, col: 0, value: 1 });
+    expect(move.eliminations).toContainEqual({ row: 1, col: 1, value: 1 });
+  });
+});
+
+// ── Column-based Claiming Pair ──────────────────────────────────────
+
+describe("findClaimingPairs — column-based", () => {
+  it("finds a column-based Claiming Pair (value 1 confined to box in column 0)", () => {
+    // Column 0: givens at (2,0)=2,(3,0)=3 → 1 only in (0,0)(1,0), both in box (0,0)-(1,1).
+    // Box (0,0)-(1,1) other cols: (0,1)(1,1) have 1 as candidate → eliminate.
+    const board = [
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+      [2, 0, 0, 0],
+      [3, 0, 0, 0],
+    ];
+    const ctx = createCtx(board, 4, 2);
+
+    const result = findClaimingPairs(ctx);
+
+    expect(result.length).toBeGreaterThanOrEqual(1);
+    const move = result.find(
+      (m) =>
+        m.type === "elimination" && m.technique === "Claiming Pair"
+    )!;
+    expect(move).toBeDefined();
+    if (move.type !== "elimination") return;
+    expect(move.patternCells).toHaveLength(2);
+    expect(move.patternCells).toContainEqual({ row: 0, col: 0 });
+    expect(move.patternCells).toContainEqual({ row: 1, col: 0 });
+    expect(move.eliminations).toContainEqual({ row: 0, col: 1, value: 1 });
+    expect(move.eliminations).toContainEqual({ row: 1, col: 1, value: 1 });
+  });
+});
+
+// ── Claiming Triple ────────────────────────────────────────────────
+
+describe("findClaimingPairs — Claiming Triple", () => {
+  it("finds a claiming pattern with three cells in a 9x9 row", () => {
+    // Row 0: 1 only in cols 0-2 → box (0,0)-(2,2).
+    // Block 1 from row 0 cols 3-8 via column clues in rows 3+.
+    // Box (0,0)-(2,2) rows 1-2 have 1 → 6 eliminations.
+    const board = [
+      [0, 0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 1, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 1, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 1, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 1, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 1, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0, 1],
+    ];
+    const ctx = createCtx(board, 9, 3);
+
+    const result = findClaimingPairs(ctx);
+
+    expect(result.length).toBeGreaterThanOrEqual(1);
+    const move = result.find(
+      (m) =>
+        m.type === "elimination" && m.technique === "Claiming Pair"
+    )!;
+    expect(move).toBeDefined();
+    if (move.type !== "elimination") return;
+    expect(move.patternCells).toHaveLength(3);
+    expect(move.patternCells).toContainEqual({ row: 0, col: 0 });
+    expect(move.patternCells).toContainEqual({ row: 0, col: 1 });
+    expect(move.patternCells).toContainEqual({ row: 0, col: 2 });
+    expect(move.eliminations.length).toBeGreaterThanOrEqual(6);
+  });
+});
+
+// ── Claiming Pair with no eliminations ──────────────────────────────
+
+describe("findClaimingPairs — no eliminations", () => {
+  it("ignores a claiming pair whose box has no candidates to eliminate", () => {
+    // Row 2 filled with 1-4; every column has each non-given value
+    // appearing in rows spanning two boxes → no confinement → no moves.
+    const board = [
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+      [1, 2, 3, 4],
+      [0, 0, 0, 0],
+    ];
+    const ctx = createCtx(board, 4, 2);
+
+    const resultBlocked = findClaimingPairs(ctx);
+
+    expect(
+      resultBlocked.filter((m) => m.type === "elimination")
+    ).toHaveLength(0);
+
+    // Also verify a board with real eliminations still produces moves.
+    const boardActive = [
+      [0, 0, 3, 4],
+      [0, 0, 2, 0],
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+    ];
+    const ctxActive = createCtx(boardActive, 4, 2);
+
+    const resultActive = findClaimingPairs(ctxActive);
+
+    expect(resultActive.length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+// ── Duplicate prevention ────────────────────────────────────────────
+
+describe("findClaimingPairs — duplicate prevention", () => {
+  it("returns only one LogicalMove per claiming deduction", () => {
+    const board = [
+      [0, 0, 0, 0],
+      [0, 0, 0, 1],
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+    ];
+    const ctx = createCtx(board, 4, 2);
+
+    const result = findClaimingPairs(ctx);
+
+    const claimingMoves = result.filter(
+      (m) => m.type === "elimination" && m.technique === "Claiming Pair"
+    );
+
+    // Row-0 claiming pair for value 1 exists but has 0 elims → skipped.
+    // So no moves. Use the triple board for active duplicate verification.
+    const tripleBoard = [
+      [0, 0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 1, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 1, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 1, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 1, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 1, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0, 1],
+    ];
+    const ctxTriple = createCtx(tripleBoard, 9, 3);
+
+    const resultTriple = findClaimingPairs(ctxTriple);
+    const claimingMovesTriple = resultTriple.filter(
+      (m) => m.type === "elimination" && m.technique === "Claiming Pair"
+    );
+
+    const seen = new Set<string>();
+    for (const m of claimingMovesTriple) {
+      if (m.type !== "elimination") continue;
+      const key = `${m.patternCells.map((c) => `${c.row},${c.col}`).sort().join("|")}|${m.eliminations.map((e) => `${e.row},${e.col},${e.value}`).sort().join("|")}`;
+      expect(seen.has(key)).toBe(false);
+      seen.add(key);
+    }
+  });
+});
+
+// ── Board immutability ─────────────────────────────────────────────
+
+describe("findClaimingPairs — board immutability", () => {
+  it("does not mutate the board", () => {
+    const board = [
+      [0, 0, 0, 0],
+      [0, 0, 0, 2],
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+    ];
+    const snapshot = cloneBoard(board);
+    const ctx = createCtx(board, 4, 2);
+
+    findClaimingPairs(ctx);
 
     expect(board).toEqual(snapshot);
   });

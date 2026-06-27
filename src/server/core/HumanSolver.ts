@@ -520,3 +520,145 @@ export function findPointingPairs(ctx: HumanSolverContext): LogicalMove[] {
   }
   return moves;
 }
+
+export function findClaimingPairs(ctx: HumanSolverContext): LogicalMove[] {
+  const { board, size, boxSize, candidateMap } = ctx;
+  const pairMap = new Map<
+    string,
+    {
+      patternCells: Array<{ row: number; col: number }>;
+      eliminations: Map<string, { row: number; col: number; value: number }>;
+    }
+  >();
+
+  // Scan rows
+  for (let row = 0; row < size; row++) {
+    const valueCells = new Map<
+      number,
+      Array<{ row: number; col: number }>
+    >();
+
+    for (let col = 0; col < size; col++) {
+      if (board[row]![col] !== 0) continue;
+      const list = candidateMap[row]![col]!;
+      for (const v of list) {
+        const arr = valueCells.get(v) ?? [];
+        arr.push({ row, col });
+        valueCells.set(v, arr);
+      }
+    }
+
+    for (const [v, cells] of valueCells) {
+      if (cells.length < 2) continue;
+
+      // Check if all cells share one box
+      const boxCols = new Set<number>();
+      for (const c of cells) {
+        boxCols.add(Math.floor(c.col / boxSize) * boxSize);
+      }
+      if (boxCols.size !== 1) continue;
+
+      const boxRow = Math.floor(row / boxSize) * boxSize;
+      const boxCol = boxCols.values().next().value!;
+      const eliminations = new Map<
+        string,
+        { row: number; col: number; value: number }
+      >();
+
+      for (let r = boxRow; r < boxRow + boxSize; r++) {
+        if (r === row) continue;
+        for (let c = boxCol; c < boxCol + boxSize; c++) {
+          if (board[r]![c] !== 0) continue;
+          const list = candidateMap[r]![c]!;
+          if (list.includes(v)) {
+            const ek = eliminationCellKey(r, c, v);
+            if (!eliminations.has(ek)) {
+              eliminations.set(ek, { row: r, col: c, value: v });
+            }
+          }
+        }
+      }
+
+      if (eliminations.size > 0) {
+        const dk = `claiming-row-${row}-box-${boxRow},${boxCol}-val-${v}`;
+        if (!pairMap.has(dk)) {
+          pairMap.set(dk, {
+            patternCells: cells.map((c) => ({ row: c.row, col: c.col })),
+            eliminations,
+          });
+        }
+      }
+    }
+  }
+
+  // Scan columns
+  for (let col = 0; col < size; col++) {
+    const valueCells = new Map<
+      number,
+      Array<{ row: number; col: number }>
+    >();
+
+    for (let row = 0; row < size; row++) {
+      if (board[row]![col] !== 0) continue;
+      const list = candidateMap[row]![col]!;
+      for (const v of list) {
+        const arr = valueCells.get(v) ?? [];
+        arr.push({ row, col });
+        valueCells.set(v, arr);
+      }
+    }
+
+    for (const [v, cells] of valueCells) {
+      if (cells.length < 2) continue;
+
+      // Check if all cells share one box
+      const boxRows = new Set<number>();
+      for (const c of cells) {
+        boxRows.add(Math.floor(c.row / boxSize) * boxSize);
+      }
+      if (boxRows.size !== 1) continue;
+
+      const boxRow = boxRows.values().next().value!;
+      const boxCol = Math.floor(col / boxSize) * boxSize;
+      const eliminations = new Map<
+        string,
+        { row: number; col: number; value: number }
+      >();
+
+      for (let r = boxRow; r < boxRow + boxSize; r++) {
+        for (let c = boxCol; c < boxCol + boxSize; c++) {
+          if (c === col) continue;
+          if (board[r]![c] !== 0) continue;
+          const list = candidateMap[r]![c]!;
+          if (list.includes(v)) {
+            const ek = eliminationCellKey(r, c, v);
+            if (!eliminations.has(ek)) {
+              eliminations.set(ek, { row: r, col: c, value: v });
+            }
+          }
+        }
+      }
+
+      if (eliminations.size > 0) {
+        const dk = `claiming-col-${col}-box-${boxRow},${boxCol}-val-${v}`;
+        if (!pairMap.has(dk)) {
+          pairMap.set(dk, {
+            patternCells: cells.map((c) => ({ row: c.row, col: c.col })),
+            eliminations,
+          });
+        }
+      }
+    }
+  }
+
+  const moves: LogicalMove[] = [];
+  for (const { patternCells, eliminations } of pairMap.values()) {
+    moves.push({
+      type: "elimination",
+      technique: "Claiming Pair",
+      patternCells,
+      eliminations: [...eliminations.values()],
+    });
+  }
+  return moves;
+}
