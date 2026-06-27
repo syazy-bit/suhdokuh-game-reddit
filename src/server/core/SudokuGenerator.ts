@@ -39,8 +39,8 @@ export class SudokuGenerator {
    * @returns Generated puzzle and solution
    */
   public generate(): GeneratedPuzzle {
-    const solution = this.generateSolution();
-    const puzzle = this.createPuzzle(solution);
+    const solution = this.generateSolvedBoard();
+    const puzzle = this.createPuzzleFromSolution(solution);
 
     return {
       puzzle,
@@ -50,12 +50,7 @@ export class SudokuGenerator {
     };
   }
 
-  /**
-   * Generate a complete valid Sudoku solution
-   * Uses backtracking with randomization for variety
-   * @returns Complete filled grid
-   */
-  private generateSolution(): number[][] {
+  private generateSolvedBoard(): number[][] {
     let grid: number[][] = [];
     let solved = false;
     
@@ -104,16 +99,15 @@ export class SudokuGenerator {
     }
   }
 
-  /**
-   * Create puzzle by removing cells from solution
-   * Unified approach with uniqueness validation for both 4×4 and 9×9
-   */
-  private createPuzzle(solution: number[][]): number[][] {
+  private createPuzzleFromSolution(solution: number[][]): number[][] {
     const puzzle = solution.map((row) => [...row]);
-
     const targetRemoval = difficultyTargets[this.difficulty][this.size];
-    
-    // Create shuffled list of all cell positions
+    const positions = this.buildPositionList();
+    this.removeClues(puzzle, positions, targetRemoval);
+    return puzzle;
+  }
+
+  private buildPositionList(): Array<[number, number]> {
     const positions: Array<[number, number]> = [];
     for (let r = 0; r < this.size; r++) {
       for (let c = 0; c < this.size; c++) {
@@ -121,8 +115,10 @@ export class SudokuGenerator {
       }
     }
     this.shuffleArray(positions);
+    return positions;
+  }
 
-    // Density guard: track removals per row/col/box to prevent clustering
+  private removeClues(puzzle: number[][], positions: Array<[number, number]>, targetRemoval: number): void {
     const rowRemoved = Array(this.size).fill(0);
     const colRemoved = Array(this.size).fill(0);
     const boxRemoved = Array(this.size).fill(0);
@@ -132,7 +128,6 @@ export class SudokuGenerator {
     const maxPerCol = Math.ceil(this.size * densityMultiplier);
     const maxPerBox = Math.ceil(this.size * densityMultiplier);
 
-    // Helper to compute box index
     const getBoxIndex = (r: number, c: number) =>
       Math.floor(r / this.boxSize) * this.boxSize +
       Math.floor(c / this.boxSize);
@@ -154,13 +149,11 @@ export class SudokuGenerator {
         const symRow = this.size - 1 - row;
         const symCol = this.size - 1 - col;
 
-        // Skip if already removed
         if (puzzle[row]![col] === 0) continue;
 
         const box1 = getBoxIndex(row, col);
         const box2 = getBoxIndex(symRow, symCol);
 
-        // Density guard: prevent ugly clustering
         if (
           rowRemoved[row]! >= maxPerRow ||
           colRemoved[col]! >= maxPerCol ||
@@ -172,25 +165,20 @@ export class SudokuGenerator {
           continue;
         }
 
-        // Backup both cells
         const backup1 = puzzle[row]![col]!;
         const backup2 = puzzle[symRow]![symCol]!;
 
-        // Remove both cells (symmetric removal)
         puzzle[row]![col] = 0;
         puzzle[symRow]![symCol] = 0;
 
-        // Validate uniqueness
-        const isValid = this.validatePuzzleRemoval(puzzle);
+        const isValid = this.verifyUniqueness(puzzle);
 
         if (isValid) {
-          // Count how many cells we actually removed (1 if center, 2 otherwise)
           const delta = (row === symRow && col === symCol) ? 1 : 2;
 
           removed += delta;
           consecutiveFailures = 0;
 
-          // Update density counters
           rowRemoved[row]!++;
           colRemoved[col]!++;
           boxRemoved[box1]!++;
@@ -201,7 +189,6 @@ export class SudokuGenerator {
             boxRemoved[box2]!++;
           }
         } else {
-          // Restore both cells if it breaks uniqueness
           puzzle[row]![col] = backup1;
           puzzle[symRow]![symCol] = backup2;
           consecutiveFailures++;
@@ -210,10 +197,9 @@ export class SudokuGenerator {
     }
 
     console.log(`[GENERATOR] Removed ${removed}/${targetRemoval} cells from ${this.size}×${this.size} puzzle`);
-    return puzzle;
   }
 
-  private validatePuzzleRemoval(puzzle: number[][]): boolean {
+  private verifyUniqueness(puzzle: number[][]): boolean {
     return hasUniqueSolution(puzzle, this.size, this.boxSize);
   }
 
