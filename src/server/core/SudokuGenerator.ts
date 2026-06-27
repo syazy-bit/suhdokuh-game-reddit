@@ -1,6 +1,8 @@
 import type { Difficulty } from "../../shared/types/api";
 import { isValidPlacement, countEmpty, difficultyTargets, type GridSize } from "./SudokuValidator";
 import { hasUniqueSolution } from "./SudokuSolver";
+import { solve } from "./HumanSolverPipeline";
+import { analyzeSolveResult, type AnalysisResult } from "./DifficultyAnalyzer";
 
 export type { GridSize } from "./SudokuValidator";
 
@@ -8,6 +10,7 @@ export interface GeneratorConfig {
   size: GridSize;
   boxSize: number;
   difficulty: Difficulty;
+  maxRetries?: number;
 }
 
 export interface GeneratedPuzzle {
@@ -15,17 +18,20 @@ export interface GeneratedPuzzle {
   solution: number[][];
   size: GridSize;
   cellsRemoved: number;
+  analysis?: AnalysisResult;
 }
 
 export class SudokuGenerator {
   private size: GridSize;
   private boxSize: number;
   private difficulty: Difficulty;
+  private maxRetries: number;
 
   constructor(config: GeneratorConfig) {
     this.size = config.size;
     this.boxSize = config.boxSize;
     this.difficulty = config.difficulty;
+    this.maxRetries = config.maxRetries ?? 50;
 
     if (this.boxSize * this.boxSize !== this.size) {
       throw new Error(
@@ -39,15 +45,42 @@ export class SudokuGenerator {
    * @returns Generated puzzle and solution
    */
   public generate(): GeneratedPuzzle {
-    const solution = this.generateSolvedBoard();
-    const puzzle = this.createPuzzleFromSolution(solution);
+    if (this.maxRetries === 0) {
+      const solution = this.generateSolvedBoard();
+      const puzzle = this.createPuzzleFromSolution(solution);
+      return {
+        puzzle,
+        solution,
+        size: this.size,
+        cellsRemoved: this.countEmpty(puzzle),
+      };
+    }
 
-    return {
-      puzzle,
-      solution,
-      size: this.size,
-      cellsRemoved: this.countEmpty(puzzle),
-    };
+    let lastAnalysis: AnalysisResult | undefined;
+
+    for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
+      const solution = this.generateSolvedBoard();
+      const puzzle = this.createPuzzleFromSolution(solution);
+
+      const solveResult = solve(puzzle);
+      const analysis = analyzeSolveResult(solveResult);
+      lastAnalysis = analysis;
+
+      if (analysis.difficulty === this.difficulty) {
+        return {
+          puzzle,
+          solution,
+          size: this.size,
+          cellsRemoved: this.countEmpty(puzzle),
+          analysis,
+        };
+      }
+    }
+
+    throw new Error(
+      `Failed to generate ${this.size}×${this.size} ${this.difficulty} puzzle after ${this.maxRetries} retries` +
+      ` (last score: ${lastAnalysis!.score}, last difficulty: ${lastAnalysis!.difficulty})`
+    );
   }
 
   private generateSolvedBoard(): number[][] {

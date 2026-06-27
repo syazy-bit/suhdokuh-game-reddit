@@ -9,7 +9,7 @@ import { countSolutions, difficultyCellsRemoved } from "./test-utils";
 
 function createGenerator(size: GridSize, difficulty: Difficulty): SudokuGenerator {
   const boxSize = size === 4 ? 2 : 3;
-  return new SudokuGenerator({ size, boxSize, difficulty });
+  return new SudokuGenerator({ size, boxSize, difficulty, maxRetries: 0 });
 }
 
 function generateValidPuzzle(size: GridSize, difficulty: Difficulty, maxAttempts = 5): GeneratedPuzzle {
@@ -392,4 +392,50 @@ describe("Performance baseline", () => {
       });
     }
   }
+});
+
+// ── 8. Difficulty Validation (Phase 5.3) ──────────────────────────────────────
+
+describe("Difficulty validation", () => {
+  it("maxRetries: 0 skips validation and does not include analysis", () => {
+    const gen = new SudokuGenerator({ size: 4, boxSize: 2, difficulty: "easy", maxRetries: 0 });
+    const result = gen.generate();
+    expect(result.analysis).toBeUndefined();
+  });
+
+  it("default maxRetries includes analysis on success (4×4 easy)", () => {
+    const gen = new SudokuGenerator({ size: 4, boxSize: 2, difficulty: "easy", maxRetries: 50 });
+    const result = gen.generate();
+    expect(result.analysis).toBeDefined();
+    expect(result.analysis!.difficulty).toBe("easy");
+    expect(result.analysis!.score).toBeGreaterThanOrEqual(0);
+  });
+
+  it("default maxRetries includes analysis on success (9×9 hard)", () => {
+    const gen = new SudokuGenerator({ size: 9, boxSize: 3, difficulty: "hard", maxRetries: 50 });
+    const result = gen.generate();
+    expect(result.analysis).toBeDefined();
+    expect(result.analysis!.difficulty).toBe("hard");
+    expect(result.analysis!.score).toBeGreaterThan(0);
+  });
+
+  it("throws when retry limit exhausted — medium demand rarely matches current thresholds", () => {
+    const gen = new SudokuGenerator({ size: 4, boxSize: 2, difficulty: "medium", maxRetries: 2 });
+    expect(() => gen.generate()).toThrow(/Failed to generate/);
+  });
+
+  it("error message includes size, difficulty, retry count, last score and last difficulty", () => {
+    expect.hasAssertions();
+    try {
+      const gen = new SudokuGenerator({ size: 4, boxSize: 2, difficulty: "medium", maxRetries: 1 });
+      gen.generate();
+    } catch (e) {
+      const msg = (e as Error).message;
+      expect(msg).toContain("4×4");
+      expect(msg).toContain("medium");
+      expect(msg).toContain("1 retries");
+      expect(msg).toContain("last score:");
+      expect(msg).toContain("last difficulty:");
+    }
+  });
 });
