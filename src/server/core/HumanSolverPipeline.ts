@@ -11,7 +11,7 @@ import {
   type LogicalMove,
 } from "./HumanSolver";
 import type { GridSize } from "./SudokuValidator";
-import { type Technique } from "./HumanSolverTypes";
+import { type Technique, TECHNIQUE_PRIORITY } from "./HumanSolverTypes";
 
 export interface SolveResult {
   solved: boolean;
@@ -20,16 +20,6 @@ export interface SolveResult {
   techniquesUsed: Technique[];
   hardestTechnique: Technique | null;
 }
-
-const TECHNIQUE_PRIORITY: Technique[] = [
-  "Naked Single",
-  "Hidden Single",
-  "Naked Pair",
-  "Hidden Pair",
-  "Pointing Pair",
-  "Claiming Pair",
-  "X-Wing",
-];
 
 const FINDERS: Array<{ name: Technique; fn: (ctx: HumanSolverContext) => LogicalMove[] }> = [
   { name: "Naked Single", fn: findNakedSingles },

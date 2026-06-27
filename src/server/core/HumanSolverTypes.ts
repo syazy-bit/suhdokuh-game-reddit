@@ -9,3 +9,5 @@ export const TECHNIQUES = [
 ] as const;
 
 export type Technique = typeof TECHNIQUES[number];
+
+export const TECHNIQUE_PRIORITY: readonly Technique[] = TECHNIQUES;
