@@ -98,11 +98,10 @@ export function countSolutions(grid: number[][], size: GridSize, limit: number, 
       solutionCount++;
     } else if (mrvCount > 0) {
       for (let num = 1; num <= size; num++) {
-        if (isValidPlacement(g, mrvRow, mrvCol, num, size, bSize)) {
-          g[mrvRow]![mrvCol] = num;
-          solve(g);
-          g[mrvRow]![mrvCol] = 0;
-        }
+        if (!isValidPlacement(g, mrvRow, mrvCol, num, size, bSize)) continue;
+        g[mrvRow]![mrvCol] = num;
+        solve(g);
+        g[mrvRow]![mrvCol] = 0;
       }
     }
 

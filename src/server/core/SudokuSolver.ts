@@ -86,11 +86,10 @@ export function hasUniqueSolution(
       solutionCount++;
     } else if (mrvCount > 0) {
       for (let num = 1; num <= size; num++) {
-        if (isValidPlacement(g, mrvRow, mrvCol, num, size, boxSize)) {
-          g[mrvRow]![mrvCol] = num;
-          solve(g);
-          g[mrvRow]![mrvCol] = 0;
-        }
+        if (!isValidPlacement(g, mrvRow, mrvCol, num, size, boxSize)) continue;
+        g[mrvRow]![mrvCol] = num;
+        solve(g);
+        g[mrvRow]![mrvCol] = 0;
       }
     }
 
