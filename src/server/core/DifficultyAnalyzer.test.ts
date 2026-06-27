@@ -39,12 +39,12 @@ function makeSolveResult(moves: LogicalMove[]): SolveResult {
 // ── Difficulty model ──
 
 describe("DIFFICULTIES", () => {
-  it("contains exactly easy, medium, hard", () => {
-    expect(DIFFICULTIES).toEqual(["easy", "medium", "hard"]);
+  it("contains exactly easy, medium, hard, expert", () => {
+    expect(DIFFICULTIES).toEqual(["easy", "medium", "hard", "expert"]);
   });
 
-  it("has 3 entries matching the public game difficulties", () => {
-    expect(DIFFICULTIES).toHaveLength(3);
+  it("has 4 entries matching the public game difficulties", () => {
+    expect(DIFFICULTIES).toHaveLength(4);
   });
 });
 
@@ -83,14 +83,15 @@ describe("TECHNIQUE_WEIGHTS", () => {
 // ── Threshold constants ──
 
 describe("DIFFICULTY_THRESHOLDS", () => {
-  it("has entries for easy, medium, and hard", () => {
+  it("has entries for easy, medium, hard, expert", () => {
     expect(DIFFICULTY_THRESHOLDS).toHaveProperty("easy");
     expect(DIFFICULTY_THRESHOLDS).toHaveProperty("medium");
     expect(DIFFICULTY_THRESHOLDS).toHaveProperty("hard");
+    expect(DIFFICULTY_THRESHOLDS).toHaveProperty("expert");
   });
 
-  it("has exactly 3 difficulty entries", () => {
-    expect(Object.keys(DIFFICULTY_THRESHOLDS)).toHaveLength(3);
+  it("has exactly 4 difficulty entries", () => {
+    expect(Object.keys(DIFFICULTY_THRESHOLDS)).toHaveLength(4);
   });
 
   it("has non-negative thresholds", () => {
@@ -100,9 +101,10 @@ describe("DIFFICULTY_THRESHOLDS", () => {
     }
   });
 
-  it("has increasing thresholds: easy < medium < hard", () => {
+  it("has increasing thresholds: easy < medium < hard < expert", () => {
     expect(DIFFICULTY_THRESHOLDS.easy).toBeLessThan(DIFFICULTY_THRESHOLDS.medium);
     expect(DIFFICULTY_THRESHOLDS.medium).toBeLessThan(DIFFICULTY_THRESHOLDS.hard);
+    expect(DIFFICULTY_THRESHOLDS.hard).toBeLessThan(DIFFICULTY_THRESHOLDS.expert);
   });
 });
 
@@ -207,10 +209,16 @@ describe("difficultyFromScore", () => {
     expect(difficultyFromScore(52)).toBe("medium");
   });
 
-  it("returns hard for scores above the medium threshold", () => {
+  it("returns hard for scores between medium and hard thresholds", () => {
     expect(difficultyFromScore(53)).toBe("hard");
     expect(difficultyFromScore(60)).toBe("hard");
-    expect(difficultyFromScore(100)).toBe("hard");
+    expect(difficultyFromScore(75)).toBe("hard");
+  });
+
+  it("returns expert for scores above the hard threshold", () => {
+    expect(difficultyFromScore(76)).toBe("expert");
+    expect(difficultyFromScore(100)).toBe("expert");
+    expect(difficultyFromScore(200)).toBe("expert");
   });
 });
 

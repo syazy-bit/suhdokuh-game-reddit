@@ -472,3 +472,28 @@ describe("Constructor validation", () => {
       .toThrow(/maxAttempts must be >= 1/);
   });
 });
+
+// ── 10. Expert Configuration ──────────────────────────────────────────────────
+
+describe("Expert configuration", () => {
+  it("accepts expert difficulty in generator config", () => {
+    const gen = new SudokuGenerator({ size: 9, boxSize: 3, difficulty: "expert", matchDifficulty: false });
+    expect(gen).toBeDefined();
+  });
+
+  it("generates a puzzle with expert config (matchDifficulty=false)", () => {
+    const gen = new SudokuGenerator({ size: 9, boxSize: 3, difficulty: "expert", matchDifficulty: false });
+    const result = gen.generate();
+    expect(result.puzzle).toBeDefined();
+    expect(result.solution).toBeDefined();
+    expect(result.analysis).toBeDefined();
+  });
+
+  it("generated expert puzzle analysis exists", () => {
+    const gen = new SudokuGenerator({ size: 9, boxSize: 3, difficulty: "expert", matchDifficulty: false });
+    const result = gen.generate();
+    // Expert techniques are not yet implemented, so the score will likely
+    // fall in the easy/medium/hard range. The analysis is still returned.
+    expect(result.analysis.score).toBeGreaterThan(0);
+  });
+});

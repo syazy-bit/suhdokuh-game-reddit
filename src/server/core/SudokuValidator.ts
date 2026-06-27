@@ -71,4 +71,6 @@ export const difficultyTargets: Record<Difficulty, Record<GridSize, number>> = {
   easy:   { 4: 6, 9: 30 },
   medium: { 4: 8, 9: 45 },
   hard:   { 4: 10, 9: 50 },
+  // TODO: calibrate expert targets — may only be reachable for 9×9
+  expert: { 4: 12, 9: 55 },
 };

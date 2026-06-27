@@ -43,7 +43,7 @@ function extractObject(source: string, varName: string): string {
   return source.slice(start, end);
 }
 
-type Difficulty = "easy" | "medium" | "hard";
+type Difficulty = "easy" | "medium" | "hard" | "expert";
 type PuzzleEntry = { puzzle: number[][]; solution: number[][] };
 type Library = Record<Difficulty, PuzzleEntry[]>;
 

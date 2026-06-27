@@ -2,7 +2,7 @@ import { SudokuGenerator, type GridSize } from "./SudokuGenerator";
 import { DIFFICULTY_THRESHOLDS, type AnalysisResult, type Difficulty } from "./DifficultyAnalyzer";
 import type { Technique } from "./HumanSolverTypes";
 
-export const DIFFICULTY_LABELS: Difficulty[] = ["easy", "medium", "hard"];
+export const DIFFICULTY_LABELS: Difficulty[] = ["easy", "medium", "hard", "expert"];
 export const GRID_SIZES: GridSize[] = [4, 9];
 
 export interface BenchmarkConfig {
@@ -201,101 +201,96 @@ export function recommendThresholds(
   stats: Record<string, PerDifficultyStats>,
   currentThresholds: Record<Difficulty, number>
 ): ThresholdRecommendation {
-  const sortedKeys4 = GRID_SIZES[0]!;
-  const sortedKeys9 = GRID_SIZES[1]!;
-
-  const easy4 = stats[perSizeLabel(sortedKeys4, "easy")];
-  const medium4 = stats[perSizeLabel(sortedKeys4, "medium")];
-  const hard4 = stats[perSizeLabel(sortedKeys4, "hard")];
-  const easy9 = stats[perSizeLabel(sortedKeys9, "easy")];
-  const medium9 = stats[perSizeLabel(sortedKeys9, "medium")];
-  const hard9 = stats[perSizeLabel(sortedKeys9, "hard")];
-
-  const lines: string[] = [];
   let distributionsOverlap = false;
   const perSizeDetails: string[] = [];
 
-  const analyzeSize = (label: string, easy: PerDifficultyStats | undefined, medium: PerDifficultyStats | undefined, hard: PerDifficultyStats | undefined) => {
+  const difficultyLabels = DIFFICULTY_LABELS;
+
+  for (const size of GRID_SIZES) {
     const details: string[] = [];
+    const label = `${size}\u00D7${size}`;
     details.push(`--- ${label} ---`);
 
-    if (easy && easy.sampleSize > 0) {
-      details.push(`  Easy:   median=${easy.medianScore.toFixed(1)}  p10=${easy.p10Score.toFixed(1)}  p90=${easy.p90Score.toFixed(1)}  min=${easy.minScore}  max=${easy.maxScore}`);
-    }
-    if (medium && medium.sampleSize > 0) {
-      details.push(`  Medium: median=${medium.medianScore.toFixed(1)}  p10=${medium.p10Score.toFixed(1)}  p90=${medium.p90Score.toFixed(1)}  min=${medium.minScore}  max=${medium.maxScore}`);
-    }
-    if (hard && hard.sampleSize > 0) {
-      details.push(`  Hard:   median=${hard.medianScore.toFixed(1)}  p10=${hard.p10Score.toFixed(1)}  p90=${hard.p90Score.toFixed(1)}  min=${hard.minScore}  max=${hard.maxScore}`);
-    }
-
-    // Check overlap
-    if (easy && medium && easy.sampleSize > 0 && medium.sampleSize > 0) {
-      if (easy.p90Score >= medium.p10Score) {
-        details.push("  WARNING: Easy and Medium distributions overlap.");
-        distributionsOverlap = true;
+    // Collect available per-difficulty stats for this size
+    const tierStats: Array<{ label: string; stats: PerDifficultyStats }> = [];
+    for (const d of difficultyLabels) {
+      const key = perSizeLabel(size, d);
+      const s = stats[key];
+      if (s && s.sampleSize > 0) {
+        tierStats.push({ label: d.charAt(0).toUpperCase() + d.slice(1), stats: s });
+        details.push(`  ${d}: median=${s.medianScore.toFixed(1)}  p10=${s.p10Score.toFixed(1)}  p90=${s.p90Score.toFixed(1)}  min=${s.minScore}  max=${s.maxScore}`);
       }
     }
-    if (medium && hard && medium.sampleSize > 0 && hard.sampleSize > 0) {
-      if (medium.p90Score >= hard.p10Score) {
-        details.push("  WARNING: Medium and Hard distributions overlap.");
+
+    // Check adjacent pairs for overlap
+    for (let i = 0; i < tierStats.length - 1; i++) {
+      const lower = tierStats[i]!;
+      const upper = tierStats[i + 1]!;
+      if (lower.stats.p90Score >= upper.stats.p10Score) {
+        details.push(`  WARNING: ${lower.label} and ${upper.label} distributions overlap.`);
         distributionsOverlap = true;
       }
     }
 
     perSizeDetails.push(details.join("\n"));
-  };
+  }
 
-  analyzeSize("4×4", easy4, medium4, hard4);
-  analyzeSize("9×9", easy9, medium9, hard9);
+  // Build threshold recommendation from 9×9 data (primary calibration target)
+  const nineByNineTiers: Array<{ difficulty: Difficulty; stats: PerDifficultyStats | undefined }> = [];
+  for (const d of difficultyLabels) {
+    nineByNineTiers.push({ difficulty: d, stats: stats[perSizeLabel(9, d)] });
+  }
 
-  lines.push(perSizeDetails.join("\n\n"));
-
-  // Determine if thresholds should change
-  const hasFullData = easy9 && medium9 && hard9 && easy9.sampleSize > 0 && medium9.sampleSize > 0 && hard9.sampleSize > 0;
+  const hasFullData = nineByNineTiers.every((t) => t.stats && t.stats.sampleSize > 0);
 
   let recommended: Record<Difficulty, number> | null = null;
   let reasoning: string;
 
   if (hasFullData) {
-    // Analyze 9×9 for threshold gaps
-    // The medium/hard boundary should be between medium max and hard min (or close)
-    const medium9p90 = medium9.p90Score;
-    const hard9p10 = hard9.p10Score;
-    const easy9p90 = easy9.p90Score;
-    const medium9p10 = medium9.p10Score;
+    const lines: string[] = [];
+    let allGood = true;
+    const newThresholds: Record<string, number> = {};
 
-    // Check if current thresholds separate the distributions well
-    const easyMediumOk = currentThresholds.easy >= easy9p90 && currentThresholds.easy < medium9p10;
-    const mediumHardOk = currentThresholds.medium >= medium9p90 && currentThresholds.medium < hard9p10;
+    for (let i = 0; i < nineByNineTiers.length - 1; i++) {
+      const lower = nineByNineTiers[i]!;
+      const upper = nineByNineTiers[i + 1]!;
+      const ts = lower.stats!;
+      const us = upper.stats!;
+      const boundary = currentThresholds[lower.difficulty];
+      const ok = boundary >= ts.p90Score && boundary < us.p10Score;
 
-    if (easyMediumOk && mediumHardOk) {
-      reasoning = `Current thresholds adequately separate 9×9 difficulty distributions.\nEasy/Medium boundary (${currentThresholds.easy}) sits between 9×9 Easy p90 (${easy9p90.toFixed(1)}) and 9×9 Medium p10 (${medium9p10.toFixed(1)}).\nMedium/Hard boundary (${currentThresholds.medium}) sits between 9×9 Medium p90 (${medium9p90.toFixed(1)}) and 9×9 Hard p10 (${hard9p10.toFixed(1)}).\nNo changes recommended.`;
-    } else {
-      // Suggest improved boundaries
-      const newEasy = Math.max(easy9p90, 1);
-      const newMedium = Math.max(medium9p90, newEasy + 1);
-
-      if (newEasy !== currentThresholds.easy || newMedium !== currentThresholds.medium) {
-        recommended = { easy: Math.ceil(newEasy), medium: Math.ceil(newMedium), hard: 60 };
-        reasoning = `Current thresholds (easy=${currentThresholds.easy}, medium=${currentThresholds.medium}) ` +
-          `do not align with 9×9 empirical distributions.\n` +
-          `Recommended: easy=${recommended.easy} (between Easy p90=${easy9p90.toFixed(1)} and Medium p10=${medium9p10.toFixed(1)}), ` +
-          `medium=${recommended.medium} (between Medium p90=${medium9p90.toFixed(1)} and Hard p10=${hard9p10.toFixed(1)}).`;
+      if (!ok) {
+        allGood = false;
+        const recommendedBoundary = Math.ceil(Math.max(ts.p90Score, 1));
+        newThresholds[lower.difficulty] = recommendedBoundary;
+        lines.push(
+          `  ${lower.difficulty}/${upper.difficulty}: current=${boundary}, recommended=${recommendedBoundary}` +
+          ` (between ${lower.difficulty} p90=${ts.p90Score.toFixed(1)} and ${upper.difficulty} p10=${us.p10Score.toFixed(1)})`
+        );
       } else {
-        reasoning = `Recommended thresholds match current values. No changes needed.`;
+        lines.push(`  ${lower.difficulty}/${upper.difficulty}: current=${boundary} — OK`);
+        newThresholds[lower.difficulty] = boundary;
       }
+    }
+
+    // Keep the highest threshold unchanged (expert boundary or hard in 3-tier)
+    const lastTier = nineByNineTiers[nineByNineTiers.length - 1]!;
+    newThresholds[lastTier.difficulty] = currentThresholds[lastTier.difficulty];
+
+    if (allGood) {
+      reasoning = "Current thresholds adequately separate 9×9 difficulty distributions.\n" + lines.join("\n") + "\nNo changes recommended.";
+    } else {
+      recommended = newThresholds as Record<Difficulty, number>;
+      reasoning = "Current thresholds do not align with 9×9 empirical distributions.\n" + lines.join("\n");
     }
   } else {
     reasoning = "Insufficient benchmark data to recommend threshold changes.";
   }
 
-  lines.unshift(`Overlap detected: ${distributionsOverlap}`);
-
   return {
     current: { ...currentThresholds },
     recommended,
-    reasoning: reasoning,
+    reasoning,
     distributionsOverlap,
     perSizeAnalysis: perSizeDetails.join("\n\n"),
   };

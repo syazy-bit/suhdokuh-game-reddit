@@ -21,7 +21,7 @@ interface GameState {
 }
 
 type GameMode = "4x4" | "9x9";
-type Difficulty = "easy" | "medium" | "hard";
+type Difficulty = "easy" | "medium" | "hard" | "expert";
 
 interface PuzzleData {
   puzzle: number[][];
@@ -51,6 +51,7 @@ interface Move {
 
 // Fallback puzzle libraries (for when API fails) — bucketed by difficulty
 const puzzleLibrary4x4: Record<Difficulty, PuzzleData[]> = {
+  expert: [],
   easy: [
     {
       puzzle: [
@@ -144,6 +145,7 @@ const puzzleLibrary4x4: Record<Difficulty, PuzzleData[]> = {
 };
 
 const puzzleLibrary9x9: Record<Difficulty, PuzzleData[]> = {
+  expert: [],
   easy: [
     {
       puzzle: [

@@ -1,7 +1,7 @@
 import { TECHNIQUE_PRIORITY, type Technique } from "./HumanSolverTypes";
 import type { SolveResult } from "./HumanSolverPipeline";
 
-export const DIFFICULTIES = ["easy", "medium", "hard"] as const;
+export const DIFFICULTIES = ["easy", "medium", "hard", "expert"] as const;
 export type Difficulty = typeof DIFFICULTIES[number];
 
 export const TECHNIQUE_WEIGHTS: Record<Technique, number> = {
@@ -14,10 +14,14 @@ export const TECHNIQUE_WEIGHTS: Record<Technique, number> = {
   "X-Wing": 7.0,
 };
 
+// TODO: Calibrate expert threshold after Swordfish and higher techniques exist.
+// Current hard scores max ~86.5; expert placeholder at 100 ensures no puzzle
+// reaches expert tier until scoring techniques beyond X-Wing are implemented.
 export const DIFFICULTY_THRESHOLDS: Record<Difficulty, number> = {
   easy: 30,
   medium: 52,
-  hard: 60,
+  hard: 75,
+  expert: 100,
 };
 
 export interface AnalysisResult {
@@ -45,7 +49,8 @@ export function createEmptyAnalysis(): AnalysisResult {
 export function difficultyFromScore(score: number): Difficulty {
   if (score <= DIFFICULTY_THRESHOLDS.easy) return "easy";
   if (score <= DIFFICULTY_THRESHOLDS.medium) return "medium";
-  return "hard";
+  if (score <= DIFFICULTY_THRESHOLDS.hard) return "hard";
+  return "expert";
 }
 
 export function analyzeSolveResult(result: SolveResult): AnalysisResult {

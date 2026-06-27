@@ -214,7 +214,7 @@ describe("createBenchmarkEntry", () => {
 // ── recommendThresholds tests ───────────────────────────────────────────────
 
 describe("recommendThresholds", () => {
-  const currentThresholds = { easy: 30, medium: 52, hard: 60 };
+  const currentThresholds: Record<string, number> = { easy: 30, medium: 52, hard: 75, expert: 100 };
 
   function makeStats(
     median: number,
@@ -246,6 +246,7 @@ describe("recommendThresholds", () => {
       "9×9 easy": makeStats(15, 5, 35, 8, 32),
       "9×9 medium": makeStats(35, 28, 50, 30, 45),
       "9×9 hard": makeStats(60, 40, 90, 45, 80),
+      "9×9 expert": makeStats(110, 90, 150, 95, 140),
     };
     const result = recommendThresholds(stats, currentThresholds);
     // Easy p90=32 >= Medium p10=30 → overlap
@@ -253,29 +254,36 @@ describe("recommendThresholds", () => {
   });
 
   it("recommends no changes if current thresholds separate distributions well", () => {
-    // With thresholds at easy=30, medium=52:
-    // Easy: P90=28 < 30, Medium: p10=33 > 30, p90=49 < 52, Hard: p10=55 > 52
+    // With thresholds at easy=30, medium=52, hard=75, expert=100:
+    // Easy:   P90=28 < 30
+    // Medium: p10=35 > 30, p90=49 < 52
+    // Hard:   p10=55 > 52, p90=73 < 75
+    // Expert: p10=78 > 75
     const stats: Record<string, PerDifficultyStats> = {
       "4×4 easy": makeStats(6, 4, 8, 5, 7, 100),
       "4×4 medium": makeStats(8, 6, 10, 7, 9, 100),
       "4×4 hard": makeStats(10, 8, 14, 9, 12, 100),
+      "4×4 expert": makeStats(12, 10, 16, 11, 14, 100),
       "9×9 easy": makeStats(20, 10, 30, 12, 28, 100),
       "9×9 medium": makeStats(42, 33, 51, 35, 49, 100),
-      "9×9 hard": makeStats(60, 55, 85, 57, 78, 100),
+      "9×9 hard": makeStats(62, 53, 75, 55, 73, 100),
+      "9×9 expert": makeStats(85, 76, 120, 78, 110, 100),
     };
     const result = recommendThresholds(stats, currentThresholds);
     expect(result.recommended).toBeNull();
   });
 
   it("suggests adjusted thresholds when distributions shifted", () => {
-    // Easy P90=35 > 30 → needs easy threshold increase
+    // Easy P90=48 > 30 → easy threshold needs to increase
     const stats: Record<string, PerDifficultyStats> = {
       "4×4 easy": makeStats(6, 4, 8, 5, 7),
       "4×4 medium": makeStats(8, 6, 10, 7, 9),
       "4×4 hard": makeStats(10, 8, 14, 9, 12),
+      "4×4 expert": makeStats(12, 10, 16, 11, 14),
       "9×9 easy": makeStats(40, 25, 55, 28, 48),
-      "9×9 medium": makeStats(55, 42, 70, 45, 65),
-      "9×9 hard": makeStats(75, 60, 100, 65, 90),
+      "9×9 medium": makeStats(58, 45, 70, 48, 65),
+      "9×9 hard": makeStats(78, 65, 95, 68, 88),
+      "9×9 expert": makeStats(105, 90, 140, 95, 130),
     };
     const result = recommendThresholds(stats, currentThresholds);
     // Easy P90=48 > 30 → needs adjustment
@@ -288,7 +296,6 @@ describe("recommendThresholds", () => {
   it("handles missing size data gracefully", () => {
     const stats: Record<string, PerDifficultyStats> = {
       "9×9 easy": makeStats(8, 4, 12, 5, 10),
-      // missing medium and hard
     };
     const result = recommendThresholds(stats, currentThresholds);
     expect(result.recommended).toBeNull();
@@ -296,14 +303,16 @@ describe("recommendThresholds", () => {
   });
 
   it("does not recommend change when current thresholds already reflect data", () => {
-    // Easy: max < 30, Medium: 31-51, Hard: > 52
+    // All tiers cleanly separated by current thresholds
     const stats: Record<string, PerDifficultyStats> = {
       "4×4 easy": makeStats(6, 4, 8, 5, 7),
       "4×4 medium": makeStats(8, 6, 10, 7, 9),
       "4×4 hard": makeStats(10, 8, 14, 9, 12),
+      "4×4 expert": makeStats(12, 10, 16, 11, 14),
       "9×9 easy": makeStats(15, 5, 28, 8, 25),
       "9×9 medium": makeStats(40, 32, 52, 34, 48),
-      "9×9 hard": makeStats(60, 53, 85, 55, 78),
+      "9×9 hard": makeStats(62, 53, 75, 55, 70),
+      "9×9 expert": makeStats(85, 76, 120, 78, 110),
     };
     const result = recommendThresholds(stats, currentThresholds);
     expect(result.recommended).toBeNull();

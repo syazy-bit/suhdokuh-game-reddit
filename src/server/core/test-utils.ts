@@ -103,4 +103,6 @@ export const difficultyCellsRemoved: Record<Difficulty, Record<GridSize, { min: 
   easy:   { 4: { min: 4, max: 8 }, 9: { min: 25, max: 38 } },
   medium: { 4: { min: 6, max: 10 }, 9: { min: 38, max: 50 } },
   hard:   { 4: { min: 8, max: 12 }, 9: { min: 42, max: 55 } },
+  // TODO: calibrate after expert techniques are implemented
+  expert: { 4: { min: 10, max: 14 }, 9: { min: 48, max: 60 } },
 };

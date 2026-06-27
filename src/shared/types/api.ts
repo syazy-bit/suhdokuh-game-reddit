@@ -8,7 +8,7 @@ export type InitResponse = {
 
 export type GameMode = "4x4" | "9x9";
 
-export type Difficulty = "easy" | "medium" | "hard";
+export type Difficulty = "easy" | "medium" | "hard" | "expert";
 
 export type LeaderboardEntry = {
   username: string;
@@ -56,8 +56,8 @@ export type PlayerStats = {
   totalWins: number;
   totalPlayTime: number;
   records: {
-    "4x4": { easy: number | null; medium: number | null; hard: number | null };
-    "9x9": { easy: number | null; medium: number | null; hard: number | null };
+    "4x4": { easy: number | null; medium: number | null; hard: number | null; expert: number | null };
+    "9x9": { easy: number | null; medium: number | null; hard: number | null; expert: number | null };
   };
   progress: {
     "4x4": number;
@@ -65,6 +65,7 @@ export type PlayerStats = {
     easy: number;
     medium: number;
     hard: number;
+    expert: number;
   };
 };
 

@@ -70,7 +70,7 @@ const MAX_TIME = 86_400;
 // Valid mode literals – used to prevent Redis key injection.
 const VALID_MODES = new Set<string>(["4x4", "9x9"]);
 // Valid difficulty literals
-const VALID_DIFFICULTIES = new Set<string>(["easy", "medium", "hard"]);
+const VALID_DIFFICULTIES = new Set<string>(["easy", "medium", "hard", "expert"]);
 
 /**
  * Sanitise a raw leaderboard array read from Redis.
@@ -390,8 +390,8 @@ router.get<
       totalWins: 0,
       totalPlayTime: 0,
       records: {
-        "4x4": { easy: null, medium: null, hard: null },
-        "9x9": { easy: null, medium: null, hard: null },
+        "4x4": { easy: null, medium: null, hard: null, expert: null },
+        "9x9": { easy: null, medium: null, hard: null, expert: null },
       },
       progress: {
         "4x4": 0,
@@ -399,6 +399,7 @@ router.get<
         easy: 0,
         medium: 0,
         hard: 0,
+        expert: 0,
       },
     };
 
@@ -411,6 +412,7 @@ router.get<
 
 // Fallback puzzle libraries for when API fails — bucketed by difficulty
 const fallbackPuzzles4x4: Record<Difficulty, { puzzle: number[][]; solution: number[][] }[]> = {
+  expert: [],
   easy: [
     {
       puzzle: [
@@ -504,6 +506,7 @@ const fallbackPuzzles4x4: Record<Difficulty, { puzzle: number[][]; solution: num
 };
 
 const fallbackPuzzles9x9: Record<Difficulty, { puzzle: number[][]; solution: number[][] }[]> = {
+  expert: [],
   easy: [
     {
       puzzle: [
