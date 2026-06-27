@@ -3,6 +3,7 @@ import { buildCandidateMap } from "./CandidateEngine";
 import {
   findNakedSingles,
   findHiddenSingles,
+  findNakedPairs,
   type HumanSolverContext,
 } from "./HumanSolver";
 import type { GridSize } from "./SudokuValidator";
@@ -341,6 +342,189 @@ describe("findHiddenSingles — board immutability", () => {
     const ctx = createCtx(board, 9, 3);
 
     findHiddenSingles(ctx);
+
+    expect(board).toEqual(snapshot);
+  });
+});
+
+// ── Zero Naked Pairs ───────────────────────────────────────────────────
+
+describe("findNakedPairs — zero Naked Pairs", () => {
+  it("returns empty array for empty 4x4 board", () => {
+    const board = [
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+    ];
+    const ctx = createCtx(board, 4, 2);
+
+    const result = findNakedPairs(ctx);
+
+    expect(result).toEqual([]);
+  });
+
+  it("returns empty array when no cell has exactly two candidates", () => {
+    const board = [
+      [1, 0, 0, 0],
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+    ];
+    const ctx = createCtx(board, 4, 2);
+
+    const result = findNakedPairs(ctx);
+
+    expect(result).toEqual([]);
+  });
+});
+
+// ── One Naked Pair ─────────────────────────────────────────────────────
+
+describe("findNakedPairs — one Naked Pair", () => {
+  it("finds a Naked Pair in a row", () => {
+    // Row 0: (0,0)[2,3], (0,1)[2,3] form a Naked Pair.
+    // (0,2)[2,4] — 2 should be eliminated.
+    const board = [
+      [0, 0, 0, 1],
+      [4, 0, 3, 0],
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+    ];
+    const ctx = createCtx(board, 4, 2);
+
+    const result = findNakedPairs(ctx);
+
+    expect(result.length).toBeGreaterThanOrEqual(1);
+    const move = result.find(
+      (m) =>
+        m.type === "elimination" && m.technique === "Naked Pair"
+    )!;
+    expect(move).toBeDefined();
+    if (move.type !== "elimination") return;
+    expect(move.patternCells).toHaveLength(2);
+    expect(move.eliminations).toContainEqual({
+      row: 0,
+      col: 2,
+      value: 2,
+    });
+  });
+
+  it("finds a Naked Pair in a column", () => {
+    // Column 0: (0,0)[2,3], (1,0)[2,3] form a Naked Pair.
+    // (2,0)[2,4] — 2 should be eliminated.
+    const board = [
+      [0, 0, 0, 0],
+      [0, 4, 0, 0],
+      [0, 0, 3, 0],
+      [1, 0, 4, 0],
+    ];
+    const ctx = createCtx(board, 4, 2);
+
+    const result = findNakedPairs(ctx);
+
+    expect(result.length).toBeGreaterThanOrEqual(1);
+    const move = result.find(
+      (m) =>
+        m.type === "elimination" && m.technique === "Naked Pair"
+    )!;
+    expect(move).toBeDefined();
+    if (move.type !== "elimination") return;
+    expect(move.eliminations).toContainEqual({
+      row: 2,
+      col: 0,
+      value: 2,
+    });
+  });
+
+  it("finds a Naked Pair in a box", () => {
+    // Box (0,0)-(1,1): (0,0)[2,3], (0,1)[2,3] form a Naked Pair.
+    // (1,1)[1,2] — 2 should be eliminated.
+    const board = [
+      [0, 0, 0, 1],
+      [4, 0, 3, 0],
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+    ];
+    const ctx = createCtx(board, 4, 2);
+
+    const result = findNakedPairs(ctx);
+
+    expect(result.length).toBeGreaterThanOrEqual(1);
+    const move = result.find(
+      (m) =>
+        m.type === "elimination" && m.technique === "Naked Pair"
+    )!;
+    expect(move).toBeDefined();
+    if (move.type !== "elimination") return;
+    expect(move.eliminations).toContainEqual({
+      row: 1,
+      col: 1,
+      value: 2,
+    });
+  });
+});
+
+// ── Naked Pair with no eliminations ────────────────────────────────────
+
+describe("findNakedPairs — pair with no eliminations", () => {
+  it("ignores a pair that eliminates nothing", () => {
+    // Row 0: [1, 0, 0, 2] — cells (0,1)[3,4] and (0,2)[3,4] form a
+    // Naked Pair, but no other empty cells exist in the row to eliminate.
+    const board = [
+      [1, 0, 0, 2],
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+    ];
+    const ctx = createCtx(board, 4, 2);
+
+    const result = findNakedPairs(ctx);
+
+    expect(
+      result.filter((m) => m.type === "elimination")
+    ).toHaveLength(0);
+  });
+});
+
+// ── Duplicate prevention ──────────────────────────────────────────────
+
+describe("findNakedPairs — duplicate prevention", () => {
+  it("returns the same pair only once when found in both row and box", () => {
+    // Row 0 and box (0,0)-(1,1) both contain the same Naked Pair {2,3}
+    // at (0,0) and (0,1).  Only one LogicalMove should be emitted, with
+    // eliminations accumulated from both scans.
+    const board = [
+      [0, 0, 0, 1],
+      [4, 0, 3, 0],
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+    ];
+    const ctx = createCtx(board, 4, 2);
+
+    const result = findNakedPairs(ctx);
+
+    const nakedPairs = result.filter(
+      (m) => m.type === "elimination" && m.technique === "Naked Pair"
+    );
+    expect(nakedPairs).toHaveLength(1);
+  });
+});
+
+// ── Board immutability ────────────────────────────────────────────────
+
+describe("findNakedPairs — board immutability", () => {
+  it("does not mutate the board", () => {
+    const board = [
+      [0, 0, 0, 1],
+      [4, 0, 3, 0],
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+    ];
+    const snapshot = cloneBoard(board);
+    const ctx = createCtx(board, 4, 2);
+
+    findNakedPairs(ctx);
 
     expect(board).toEqual(snapshot);
   });
