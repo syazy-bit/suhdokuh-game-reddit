@@ -990,12 +990,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function highlightSelected(): void {
     const cells = document.querySelectorAll<HTMLDivElement>(".cell");
-    cells.forEach((cell) => {
-      cell.classList.remove("selected", "related");
-      cell.setAttribute("aria-selected", "false");
-    });
 
     if (!state.selected) {
+      cells.forEach((cell) => {
+        cell.classList.remove("selected", "same-row", "same-column", "same-box", "same-number");
+        cell.setAttribute("aria-selected", "false");
+      });
       updateActiveDescendant();
       return;
     }
@@ -1006,8 +1006,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const selectedCol = state.selected.c;
     const selectedBoxRow = Math.floor(selectedRow / boxSize);
     const selectedBoxCol = Math.floor(selectedCol / boxSize);
+    const selectedValue = state.grid[selectedRow]?.[selectedCol] ?? 0;
 
     cells.forEach((cell, index) => {
+      cell.classList.remove("selected", "same-row", "same-column", "same-box", "same-number");
+      cell.setAttribute("aria-selected", "false");
+
       const row = Math.floor(index / size);
       const col = index % size;
       const isSelected = row === selectedRow && col === selectedCol;
@@ -1016,12 +1020,17 @@ document.addEventListener("DOMContentLoaded", () => {
       const isSameBox =
         Math.floor(row / boxSize) === selectedBoxRow &&
         Math.floor(col / boxSize) === selectedBoxCol;
+      const cellValue = state.grid[row]?.[col] ?? 0;
+      const isSameNumber = selectedValue !== 0 && cellValue === selectedValue && !isSelected;
 
       if (isSelected) {
         cell.classList.add("selected");
         cell.setAttribute("aria-selected", "true");
-      } else if (isSameRow || isSameColumn || isSameBox) {
-        cell.classList.add("related");
+      } else {
+        if (isSameRow) cell.classList.add("same-row");
+        if (isSameColumn) cell.classList.add("same-column");
+        if (isSameBox) cell.classList.add("same-box");
+        if (isSameNumber) cell.classList.add("same-number");
       }
     });
 

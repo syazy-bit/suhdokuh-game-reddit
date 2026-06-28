@@ -225,25 +225,48 @@ h2 {
   color: var(--text-dark);
 }
 
-/* Cells in the selected cell's row, column, or box */
-.cell.related {
+/* Hover feedback (lowest visual state) */
+.cell:hover {
+  background-color: #f2f8ff;
+}
+
+.cell.locked:hover {
+  background-color: var(--bg-light);
+}
+
+/* Context highlighting — same row, column, or box */
+.cell.same-row,
+.cell.same-column,
+.cell.same-box {
   background-color: #eaf3fc;
 }
 
-/* Keep clue cells distinct while showing their relationship to selection */
-.cell.locked.related {
+.cell.locked.same-row,
+.cell.locked.same-column,
+.cell.locked.same-box {
   background-color: #dce8f3;
 }
 
-/* Selected cell highlight */
+/* Matching numbers — slightly stronger than row/col/box */
+.cell.same-number {
+  background-color: #d4e8f7;
+}
+
+.cell.locked.same-number {
+  background-color: #cce0f0;
+}
+
+/* Conflict highlighting wins over context but yields to selected */
+.cell.conflict {
+  background-color: #ffebee;
+  color: var(--error);
+  font-weight: 700;
+}
+
+/* Selected cell highlight (highest visual state) */
 .cell.selected {
   background-color: #b8d8f8;
   box-shadow: inset 0 0 0 3px var(--primary);
-}
-
-/* Hover feedback for editable cells only */
-.cell:not(.locked):not(.selected):hover {
-  background-color: #f2f8ff;
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -254,16 +277,19 @@ h2 {
       color 150ms ease-out;
   }
 
-  .cell.related {
-    transition: background-color 100ms ease-out;
-  }
-
   .cell.selected {
     transition:
       background-color 150ms ease-out,
       border-color 150ms ease-out,
       color 150ms ease-out,
       box-shadow 150ms ease-out;
+  }
+
+  .cell.same-row,
+  .cell.same-column,
+  .cell.same-box,
+  .cell.same-number {
+    transition: background-color 100ms ease-out;
   }
 
   .cell.conflict {
