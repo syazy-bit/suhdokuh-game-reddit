@@ -4,6 +4,7 @@ import {
   SubmitScoreRequest,
   SubmitScoreResponse,
   LeaderboardEntry,
+  CurrentPlayerInfo,
   GameMode,
   Difficulty,
   PuzzleRequest,
@@ -176,6 +177,47 @@ async function getOrCreateLeaderboardData(
   }
 }
 
+/**
+ * One-time migration from legacy JSON leaderboard storage to the Redis Sorted Set.
+ *
+ * Checks if the sorted set for the given (mode, difficulty) already exists.
+ * If it does, migration has already happened — do nothing.
+ * If it does not and legacy JSON data exists, batch-insert the
+ * deduplicated entries into the sorted set, then remove the legacy keys.
+ *
+ * After migration the sorted set is the single source of truth.
+ */
+async function migrateLegacyIfNeeded(
+  mode: GameMode,
+  difficulty: Difficulty,
+): Promise<void> {
+  const scoresKey = `leaderboard:${mode}:${difficulty}:scores`;
+
+  // Already migrated — nothing to do
+  const card = await redis.zCard(scoresKey);
+  if (card > 0) return;
+
+  // Collect legacy entries using the existing helper that handles the
+  // medium-difficulty legacy key (leaderboard:{mode}) migration.
+  const legacyEntries = await getOrCreateLeaderboardData(mode, difficulty);
+  if (legacyEntries.length === 0) return;
+
+  await redis.zAdd(
+    scoresKey,
+    ...legacyEntries.map((e) => ({ member: e.username, score: e.time })),
+  );
+
+  console.log(
+    `[MIGRATION] Migrated ${legacyEntries.length} entries from JSON to sorted set for ${mode}:${difficulty}`,
+  );
+
+  // Remove legacy JSON keys so they are never read again.
+  await redis.del(`leaderboard:${mode}:${difficulty}`);
+  if (difficulty === "medium") {
+    await redis.del(`leaderboard:${mode}`).catch(() => {});
+  }
+}
+
 router.post<{ postId: string }, SubmitScoreResponse, SubmitScoreRequest>(
   "/api/submit-score",
   async (req, res): Promise<void> => {
@@ -277,15 +319,16 @@ router.post<{ postId: string }, SubmitScoreResponse, SubmitScoreRequest>(
         console.warn("[STATS] Failed to update player stats (non-fatal):", statsError);
       }
 
-      // ── 6. Load (and migrate if needed) existing leaderboard ─────────
-      let entries: LeaderboardEntry[] = await getOrCreateLeaderboardData(mode, difficulty);
+      // ── 6. Ensure the sorted set exists (one-time legacy migration) ───
+      await migrateLegacyIfNeeded(mode, difficulty);
 
-      // ── 7. Deduplicate: keep only the user's personal best ───────────
-      const existingEntry = entries.find((e) => e.username === username);
+      // ── 7. Check for existing personal best via the sorted set ────────
+      const scoresKey = `leaderboard:${mode}:${difficulty}:scores`;
+      const existingScore = await redis.zScore(scoresKey, username);
 
-      // If they already have a faster (or equal) time, keep it and ignore this slower submission.
-      if (existingEntry && existingEntry.time <= time) {
-        console.log(`[SCORE] ${username} submitted ${time}s for ${mode}, but their personal best (${existingEntry.time}s) is faster.`);
+      // If they already have a faster (or equal) time, reject this submission.
+      if (existingScore !== undefined && existingScore <= time) {
+        console.log(`[SCORE] ${username} submitted ${time}s for ${mode}, but their personal best (${existingScore}s) is faster.`);
         res.json({
           type: "submit-score",
           status: "success",
@@ -294,22 +337,8 @@ router.post<{ postId: string }, SubmitScoreResponse, SubmitScoreRequest>(
         return;
       }
 
-      // Otherwise, they beat their old score (or it's their first time).
-      // Remove the old entry and insert the new one.
-      entries = entries.filter((e) => e.username !== username);
-      entries.push({
-        username,
-        mode,
-        difficulty,
-        time,
-        timestamp: Date.now(),
-      });
-
-      // ── 8. Sort ascending (fastest first) and cap at 50 entries ──────
-      entries.sort((a, b) => a.time - b.time);
-      entries = entries.slice(0, 50);
-
-      await redis.set(`leaderboard:${mode}:${difficulty}`, JSON.stringify(entries));
+      // ── 8. Store the score in the sorted set (single source of truth) ─
+      await redis.zAdd(scoresKey, { member: username, score: time });
 
       console.log(
         `[SCORE] ${username} submitted ${time}s for ${mode}`,
@@ -351,12 +380,64 @@ router.get<
       return;
     }
 
-    const entries: LeaderboardEntry[] = await getOrCreateLeaderboardData(mode, difficulty);
+    // Ensure the sorted set exists (one-time legacy migration)
+    await migrateLegacyIfNeeded(mode, difficulty);
 
-    // Return top entries
+    const scoresKey = `leaderboard:${mode}:${difficulty}:scores`;
+
+    // ── Read the displayed Top N directly from the sorted set ───────────
+    // zRange with by:'rank' returns members ordered by score ascending
+    // (fastest first), which matches the leaderboard sort order.
+    const topMembers = await redis.zRange(scoresKey, 0, limit - 1, {
+      by: "rank",
+    });
+
+    const entries: LeaderboardEntry[] = topMembers.map((m) => ({
+      username: m.member,
+      mode,
+      difficulty,
+      time: m.score,
+      timestamp: Date.now(),
+    }));
+
+    // ── Compute current player info — also from the sorted set ──────────
+    // Both the displayed leaderboard and the player rank originate from the
+    // exact same datastore, so they can never diverge.
+    let currentPlayer: CurrentPlayerInfo | undefined;
+    const username = await reddit.getCurrentUsername();
+    if (username) {
+      // zRank returns 0-based index (lowest score = fastest = rank 0).
+      let globalRank: number | null = null;
+      try {
+        const rank = await redis.zRank(scoresKey, username);
+        globalRank = rank !== undefined ? rank + 1 : null;
+      } catch {
+        // Non-fatal — rank remains null
+      }
+
+      const inTop50 = globalRank !== null && globalRank <= 50;
+
+      // Look up personal best from stats
+      let personalBest: number | null = null;
+      try {
+        const rawStats = await redis.get(`stats:${username}`);
+        if (rawStats) {
+          const stats = JSON.parse(rawStats) as PlayerStats;
+          personalBest =
+            stats.records[mode as keyof typeof stats.records]?.[difficulty as keyof typeof stats.records["4x4"]] ??
+            null;
+        }
+      } catch {
+        // Non-fatal — personalBest stays null
+      }
+
+      currentPlayer = { username, globalRank, personalBest, inTop50 };
+    }
+
     res.json({
       type: "leaderboard",
-      entries: entries.slice(0, limit),
+      entries,
+      ...(currentPlayer ? { currentPlayer } : {}),
     });
   } catch (error) {
     console.error(`Error fetching leaderboard: ${error}`);

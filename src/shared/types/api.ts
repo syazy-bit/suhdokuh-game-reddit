@@ -32,9 +32,17 @@ export type SubmitScoreResponse = {
   message: string;
 };
 
+export type CurrentPlayerInfo = {
+  username: string;
+  globalRank: number | null;
+  personalBest: number | null;
+  inTop50: boolean;
+};
+
 export type LeaderboardResponse = {
   type: "leaderboard";
   entries: LeaderboardEntry[];
+  currentPlayer?: CurrentPlayerInfo;
 };
 
 

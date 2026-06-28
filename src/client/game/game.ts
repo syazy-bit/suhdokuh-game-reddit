@@ -1,6 +1,7 @@
-import type { PlayerStats } from "../../shared/types/api";
+import type { PlayerStats, LeaderboardEntry, CurrentPlayerInfo, LeaderboardResponse } from "../../shared/types/api";
 
 const DEFAULT_HINTS = 3;
+const MEDALS = ["🥇", "🥈", "🥉"];
 
 // Type definitions for type-safe implementation
 interface Cell {
@@ -770,14 +771,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
   /**
    * Build a skeleton table that reserves the leaderboard layout during loading.
-   * Three rows of muted, breathing blocks match the real table structure.
+   * Uses shimmer animation instead of opacity breathing for a modern look.
+   * Fixed row heights prevent layout shift when real data replaces the skeleton.
    */
-  function getLeaderboardSkeleton(): string {
+  function renderLeaderboardSkeleton(): string {
     const rows = Array.from({ length: 3 }, () => `
-          <tr>
-            <td><div class="skeleton-block skeleton-breathe" style="height:1em;width:24px;margin:0 auto;"></div></td>
-            <td><div class="skeleton-block skeleton-breathe" style="height:1em;width:60%;"></div></td>
-            <td><div class="skeleton-block skeleton-breathe" style="height:1em;width:50px;margin-left:auto;"></div></td>
+          <tr class="skeleton-row">
+            <td><div class="skeleton-block skeleton-shimmer" style="width:24px;margin:0 auto;"></div></td>
+            <td><div class="skeleton-block skeleton-shimmer" style="width:60%;"></div></td>
+            <td><div class="skeleton-block skeleton-shimmer" style="width:50px;margin-left:auto;"></div></td>
           </tr>`).join("");
     return `
       <table class="leaderboard-table" aria-hidden="true">
@@ -789,10 +791,99 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   /**
-   * Load and display leaderboard
+   * Render the leaderboard table rows with medals, highlighting, and "You" badge.
+   * Pure renderer — no ranking logic, no client-side computation.
+   */
+  function renderLeaderboardTable(entries: LeaderboardEntry[], currentUsername: string): string {
+    const rows = entries.map((entry, index) => {
+      const rank = index + 1;
+      const rankDisplay = rank <= 3 ? MEDALS[rank - 1] : `${rank}`;
+      const rankAria = rank <= 3
+        ? `Rank ${rank}: ${["Gold", "Silver", "Bronze"][rank - 1]} medal`
+        : `Rank ${rank}`;
+
+      const isCurrentUser = entry.username === currentUsername;
+      const rowClass = isCurrentUser ? ' class="leaderboard-current-user"' : "";
+      const rowAria = isCurrentUser ? ` aria-label="Your entry: ${rankAria} — ${formatTime(entry.time)}"` : "";
+
+      const youBadge = isCurrentUser ? '<span class="you-badge" aria-label="This is you">⭐ You</span>' : "";
+      const usernameDisplay = `${youBadge}<span class="leaderboard-username">${escapeHtml(entry.username)}</span>`;
+
+      const rankCell = rank <= 3
+        ? `<span aria-hidden="true" class="leaderboard-medal">${rankDisplay}</span><span class="sr-only">${rankAria}</span>`
+        : `${rankDisplay}`;
+
+      return `<tr${rowClass}${rowAria}>
+            <td>${rankCell}</td>
+            <td>${usernameDisplay}</td>
+            <td>${formatTime(entry.time)}</td>
+          </tr>`;
+    });
+
+    return `<table class="leaderboard-table">
+        <thead>
+          <tr><th>#</th><th>Player</th><th>Time</th></tr>
+        </thead>
+        <tbody>${rows.join("")}</tbody>
+      </table>`;
+  }
+
+  /**
+   * Render the personal best card below the leaderboard table.
+   * Supports three states: Top 50, outside Top 50, never played.
+   * Modular design — additional badges (flawless, streaks, etc.) can be
+   * appended to the badge-container without restructuring.
+   */
+  function renderPersonalBestCard(currentPlayer: CurrentPlayerInfo): string {
+    const { personalBest, globalRank, inTop50 } = currentPlayer;
+
+    if (personalBest === null) {
+      return `<div class="personal-best-card pb-empty">
+          <span class="pb-label">You haven't solved this puzzle yet</span>
+        </div>`;
+    }
+
+    const rankText = globalRank !== null
+      ? `— <span class="pb-rank">${inTop50 ? "" : "Global "}Rank #${globalRank.toLocaleString()}</span>`
+      : "";
+
+    return `<div class="personal-best-card">
+        <span class="pb-label">Your best:</span>
+        <span class="pb-time">${formatTime(personalBest)}</span>
+        ${rankText}
+        <div class="badge-container">
+          ${inTop50 ? '<span class="badge-item">🏆 Top 50</span>' : ""}
+        </div>
+      </div>`;
+  }
+
+  /**
+   * Render the polished empty state when no leaderboard entries exist.
+   */
+  function renderEmptyState(): string {
+    return `<div class="empty-state">
+        <div class="empty-state-icon" aria-hidden="true">🏆</div>
+        <p class="empty-state-title">No times recorded yet</p>
+        <p class="empty-state-description">Be the first to solve this puzzle and claim the top spot!</p>
+      </div>`;
+  }
+
+  /**
+   * Render the unavailable state when the leaderboard cannot be fetched.
+   */
+  function renderUnavailableState(): string {
+    return `<div class="unavailable-state">
+        <p>Leaderboard temporarily unavailable. Please try again later.</p>
+      </div>`;
+  }
+
+  /**
+   * Load and display leaderboard with personal best and player highlight.
+   * Pure renderer — the server computes all rank data.
+   * Uses small modular rendering helpers composed together.
    */
   async function loadLeaderboard(): Promise<void> {
-    leaderboard.innerHTML = getLeaderboardSkeleton();
+    leaderboard.innerHTML = renderLeaderboardSkeleton();
     leaderboard.setAttribute("aria-busy", "true");
 
     try {
@@ -800,35 +891,31 @@ document.addEventListener("DOMContentLoaded", () => {
         `/api/leaderboard?mode=${state.mode}&difficulty=${state.difficulty}&limit=10`,
       );
       if (!response.ok) {
-        leaderboard.innerHTML =
-          '<p class="unavailable-state">Leaderboard currently unavailable.</p>';
+        leaderboard.innerHTML = renderUnavailableState();
         return;
       }
 
-      const data = await response.json();
+      const data = (await response.json()) as LeaderboardResponse;
       const entries = data.entries || [];
+      const currentPlayer = data.currentPlayer;
 
       updateLeaderboardTitle();
 
       if (entries.length === 0) {
-        leaderboard.innerHTML =
-          '<p class="empty-state">This puzzle awaits its first solution.</p>';
+        leaderboard.innerHTML = renderEmptyState();
         return;
       }
 
-      let html =
-        '<table class="leaderboard-table"><thead><tr><th>#</th><th>Player</th><th>Time</th></tr></thead><tbody>';
-      entries.forEach((entry: any, index: number) => {
-        html += `<tr><td>${index + 1}</td><td>${escapeHtml(
-          entry.username,
-        )}</td><td>${formatTime(entry.time)}</td></tr>`;
-      });
-      html += "</tbody></table>";
+      let html = renderLeaderboardTable(entries, state.username);
+
+      if (currentPlayer) {
+        html += renderPersonalBestCard(currentPlayer);
+      }
 
       leaderboard.innerHTML = html;
     } catch (error) {
       console.error("Error loading leaderboard:", error);
-      leaderboard.innerHTML = '<p class="unavailable-state">Leaderboard currently unavailable.</p>';
+      leaderboard.innerHTML = renderUnavailableState();
     } finally {
       leaderboard.removeAttribute("aria-busy");
     }
