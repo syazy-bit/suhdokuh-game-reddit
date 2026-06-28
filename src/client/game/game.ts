@@ -438,6 +438,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const instructionsEl = document.getElementById(
     "instructions",
   ) as HTMLParagraphElement | null;
+  const difficultyLabelEl = document.getElementById(
+    "difficulty-label",
+  ) as HTMLSpanElement | null;
   const timerEl = document.getElementById("timer") as HTMLSpanElement | null;
     const leaderboardEl = document.getElementById(
       "leaderboard",
@@ -733,6 +736,13 @@ document.addEventListener("DOMContentLoaded", () => {
         state.difficulty.charAt(0).toUpperCase() + state.difficulty.slice(1);
       leaderboardTitle.textContent =
         `🏆 ${modeDisplay} ${difficultyDisplay} Leaderboard`;
+    }
+  }
+
+  function updateDifficultyDisplay(): void {
+    if (difficultyLabelEl) {
+      const display = state.difficulty.charAt(0).toUpperCase() + state.difficulty.slice(1);
+      difficultyLabelEl.textContent = `Difficulty: ${display}`;
     }
   }
 
@@ -1562,6 +1572,8 @@ document.addEventListener("DOMContentLoaded", () => {
       updateMessage("");
     }
 
+    updateDifficultyDisplay();
+
     if (timer) {
       timer.textContent = "0:00";
     }
@@ -1644,6 +1656,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   async function changeDifficulty(newDifficulty: Difficulty): Promise<void> {
     state.difficulty = newDifficulty;
+    updateDifficultyDisplay();
     stopTimer();
     await resetPuzzle();
     await loadLeaderboard();
@@ -1993,6 +2006,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Then initialize the game
     await changeGameMode("4x4");
+    updateDifficultyDisplay();
     updateLeaderboardTitle();
     await loadLeaderboard();
   })();

@@ -34,13 +34,16 @@
 
     <p class="instructions" id="instructions">Click a cell, then use number buttons or keyboard (1-4) to fill</p>
 
+    <div class="status-bar" role="status" aria-live="polite">
+      <span class="status-difficulty" id="difficulty-label">Difficulty: Medium</span>
+      <div class="status-timer">
+        <span class="timer-icon" aria-hidden="true">⏱</span>
+        <span id="timer">0:00</span>
+      </div>
+    </div>
+
     <div id="grid" class="grid" role="grid" tabindex="0" aria-label="Sudoku board"></div>
     <div id="message" class="message" aria-live="polite"></div>
-
-    <!-- Timer display -->
-    <div class="timer-display">
-      <span id="timer">0:00</span>
-    </div>
 
     <div id="numbers" class="numbers"></div>
 
