@@ -1136,6 +1136,15 @@ h2 {
   text-align: center;
 }
 
+/* Subtitle */
+.completion-subtitle {
+  font-size: 1.1em;
+  font-weight: 500;
+  color: #666;
+  margin: -12px 0 20px;
+  text-align: center;
+}
+
 /* Decorative divider */
 .completion-divider {
   display: flex;
@@ -1205,6 +1214,10 @@ h2 {
   background: #eaf8ee;
 }
 
+.icon-grid {
+  background: #eaf1fb;
+}
+
 .completion-stat-label {
   font-size: 1em;
   color: #222;
@@ -1225,6 +1238,10 @@ h2 {
 
 #completion-hints {
   color: #17863d;
+}
+
+#completion-grid-size {
+  color: #3a7bd5;
 }
 
 /* Action buttons */

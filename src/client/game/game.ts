@@ -492,6 +492,12 @@ document.addEventListener("DOMContentLoaded", () => {
   const completionHints = document.getElementById(
     "completion-hints",
   ) as HTMLSpanElement | null;
+  const completionSubtitle = document.getElementById(
+    "completion-subtitle",
+  ) as HTMLParagraphElement | null;
+  const completionGridSize = document.getElementById(
+    "completion-grid-size",
+  ) as HTMLSpanElement | null;
   const completionNewBtn = document.getElementById(
     "completion-new-btn",
   ) as HTMLButtonElement | null;
@@ -683,23 +689,29 @@ document.addEventListener("DOMContentLoaded", () => {
   function showCompletionDialog(): void {
     if (!completionDialog) return;
 
+    const modeDisplay = state.mode === "4x4" ? "4×4" : "9×9";
+    const difficultyDisplay =
+      state.difficulty.charAt(0).toUpperCase() + state.difficulty.slice(1);
+
+    if (completionSubtitle) {
+      completionSubtitle.textContent = `${modeDisplay} • ${difficultyDisplay}`;
+    }
     if (completionTime) {
       completionTime.textContent = formatPlayTime(state.elapsedTime);
     }
     if (completionDifficulty) {
-      const modeDisplay = state.mode === "4x4" ? "4×4" : "9×9";
-      const difficultyDisplay =
-        state.difficulty.charAt(0).toUpperCase() + state.difficulty.slice(1);
-      completionDifficulty.textContent = `${difficultyDisplay} • ${modeDisplay}`;
+      completionDifficulty.textContent = difficultyDisplay;
+    }
+    if (completionGridSize) {
+      completionGridSize.textContent = modeDisplay;
     }
     if (completionHints) {
       const used = DEFAULT_HINTS - state.hintsRemaining;
-      completionHints.textContent = used > 0
-        ? `Used ${used} Hint${used === 1 ? "" : "s"}`
-        : "Perfect (No Hints)";
+      completionHints.textContent = `${used} / ${DEFAULT_HINTS}`;
     }
 
     completionDialog.showModal();
+    completionNewBtn?.focus();
   }
 
   /**
