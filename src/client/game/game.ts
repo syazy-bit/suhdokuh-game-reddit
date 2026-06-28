@@ -1429,6 +1429,7 @@ document.addEventListener("DOMContentLoaded", () => {
         showCompletionDialog();
       }, 1500);
     } else {
+      lastPlacedCell = { r: move.row, c: move.col };
       renderGrid();
       highlightSelected();
     }
@@ -1495,6 +1496,7 @@ document.addEventListener("DOMContentLoaded", () => {
       startTimer();
     }
 
+    lastPlacedCell = { r: move.row, c: move.col };
     renderGrid();
     highlightSelected();
     updateUndoButton();
