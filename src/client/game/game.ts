@@ -1,5 +1,7 @@
 import type { PlayerStats } from "../../shared/types/api";
 
+const DEFAULT_HINTS = 3;
+
 // Type definitions for type-safe implementation
 interface Cell {
   r: number;
@@ -17,7 +19,7 @@ interface GameState {
   startTime: number | null;
   elapsedTime: number;
   username: string; // Store the Reddit username
-  hintUsed: boolean;
+  hintsRemaining: number;
 }
 
 type GameMode = "4x4" | "9x9";
@@ -539,7 +541,7 @@ document.addEventListener("DOMContentLoaded", () => {
     startTime: null,
     elapsedTime: 0,
     username: "Anonymous Player",
-    hintUsed: false,
+    hintsRemaining: DEFAULT_HINTS,
   };
 
   let puzzle: number[][] = [];
@@ -684,8 +686,9 @@ document.addEventListener("DOMContentLoaded", () => {
       completionDifficulty.textContent = `${difficultyDisplay} • ${modeDisplay}`;
     }
     if (completionHints) {
-      completionHints.textContent = state.hintUsed
-        ? "Used 1 Hint"
+      const used = DEFAULT_HINTS - state.hintsRemaining;
+      completionHints.textContent = used > 0
+        ? `Used ${used} Hint${used === 1 ? "" : "s"}`
         : "Perfect (No Hints)";
     }
 
@@ -1015,57 +1018,8 @@ document.addEventListener("DOMContentLoaded", () => {
     updateActiveDescendant();
   }
 
-  /**
-   * Use a hint: place the correct value from the solution into the selected cell.
-   * Only one hint is available per puzzle.
-   *
-   * Reuses the normal placement pipeline (placeNumber) so that rendering,
-   * timer, undo, conflict detection, and win detection all work identically
-   * to a manual move.
-   */
   function useHint(): void {
-    if (state.hintUsed) {
-      updateMessage("Hint already used for this puzzle.");
-      return;
-    }
-
-    if (state.gameWon) return;
-
-    if (!state.selected) {
-      updateMessage("No cell selected.");
-      return;
-    }
-
-    const { r, c } = state.selected;
-
-    const puzzleCell = puzzle[r]?.[c];
-    if (puzzleCell !== 0) {
-      updateMessage("Cannot use a hint on a locked cell.");
-      return;
-    }
-
-    const currentValue = state.grid[r]?.[c];
-    if (currentValue && currentValue !== 0) {
-      updateMessage("Select an empty editable cell.");
-      return;
-    }
-
-    state.hintUsed = true;
-
-    const correctValue = solution[r]?.[c];
-    if (!correctValue) return;
-
-    // Temporarily disable notes mode so placeNumber uses the normal value
-    // placement path instead of toggling notes.
-    const wasNotesMode = state.notesMode;
-    state.notesMode = false;
-
-    lastHintedCell = { r, c };
-    placeNumber(correctValue);
-
-    state.notesMode = wasNotesMode;
-
-    updateHintButton();
+    // Will be implemented in Phase 6.2.2.
   }
 
   /**
@@ -1426,14 +1380,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function updateHintButton(): void {
     if (!hintBtn) return;
-    if (state.hintUsed) {
+    if (state.hintsRemaining === 0) {
       hintBtn.disabled = true;
-      hintBtn.textContent = "💡 Hint Used";
-      hintBtn.setAttribute("aria-label", "Hint already used");
+      hintBtn.textContent = "💡 ×0";
+      hintBtn.setAttribute("aria-label", "No hints remaining");
     } else {
       hintBtn.disabled = false;
-      hintBtn.textContent = "💡 Hint (1)";
-      hintBtn.setAttribute("aria-label", "Hint. One remaining.");
+      hintBtn.textContent = `💡 ×${state.hintsRemaining}`;
+      hintBtn.setAttribute(
+        "aria-label",
+        `${state.hintsRemaining} hint${state.hintsRemaining === 1 ? "" : "s"} remaining`,
+      );
     }
   }
 
@@ -1540,7 +1497,7 @@ document.addEventListener("DOMContentLoaded", () => {
     state.notesMode = false;
     state.selected = null;
     state.gameWon = false;
-    state.hintUsed = false;
+    state.hintsRemaining = DEFAULT_HINTS;
     state.startTime = null;
     state.elapsedTime = 0;
     stopTimer();
