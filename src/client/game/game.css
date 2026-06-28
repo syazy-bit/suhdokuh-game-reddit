@@ -10,8 +10,8 @@
   --primary: #d93900;
   --primary-light: #ff5722;
   --primary-dark: #b82e00;
-  --success: #0cce6b;
-  --error: #ff4500;
+  --success: #007a41;
+  --error: #c23300;
   --border: #ccc;
   --bg-light: #f5f5f5;
   --text-dark: #000;
@@ -20,7 +20,7 @@
   --box-border: 2px solid #333;
   --badge-bg: #fff8e1;
   --badge-border: #ffe082;
-  --badge-text: #f57c00;
+  --badge-text: #ad5c00;
   --highlight-bg: #fff3e0;
   --highlight-border: #ffb74d;
   --medal-gold: #ffd700;
@@ -28,7 +28,7 @@
   --medal-bronze: #cd7f32;
   --skeleton-base: #e2e8f0;
   --skeleton-shimmer: #f0f4f8;
-  --text-muted: #888;
+  --text-muted: #757575;
 }
 
 .app {
@@ -905,7 +905,7 @@ h2 {
   width: 100%;
   text-align: center;
   font-size: 0.8em;
-  color: #999;
+  color: var(--text-muted);
   padding: 16px;
   border-top: 1px solid var(--border);
   margin-top: 20px;
@@ -977,20 +977,39 @@ h2 {
   }
 }
 
-/* Help modal overlay */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background-color: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: 16px;
+/* ── Help & Statistics Dialogs ────────────────────────────────────── */
+
+#help-dialog,
+#stats-dialog {
+  padding: 0;
+  border: none;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  width: min(92vw, 480px);
+  margin: auto;
 }
 
-.modal-overlay.hidden {
-  display: none;
+#help-dialog::backdrop,
+#stats-dialog::backdrop {
+  background-color: rgba(0, 0, 0, 0.5);
+  animation: backdrop-fade-in 200ms ease-out;
+}
+
+#help-dialog[open],
+#stats-dialog[open] {
+  animation: dialog-fade-in 200ms ease-out;
+}
+
+@keyframes dialog-fade-in {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .modal-content {
@@ -1015,7 +1034,7 @@ h2 {
   border: none;
   background: none;
   cursor: pointer;
-  color: #999;
+  color: var(--text-muted);
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -1154,7 +1173,7 @@ h2 {
 }
 
 .stats-record-null {
-  color: #999;
+  color: var(--text-muted);
   font-weight: 400;
 }
 
@@ -1221,7 +1240,7 @@ h2 {
   border-radius: 50%;
   cursor: pointer;
   font-size: 1.5em;
-  color: #999;
+  color: var(--text-muted);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1496,7 +1515,7 @@ h2 {
 
 .completion-btn-ghost {
   background: #fff;
-  color: #999;
+  color: var(--text-muted);
   border: 2px solid #ddd;
 }
 

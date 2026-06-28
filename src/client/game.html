@@ -34,7 +34,7 @@
 
     <p class="instructions" id="instructions">Click a cell, then use number buttons or keyboard (1-4) to fill</p>
 
-    <div class="status-bar" role="status" aria-live="polite">
+    <div class="status-bar">
       <span class="status-difficulty" id="difficulty-label">Difficulty: Medium</span>
       <div class="status-timer">
         <span class="timer-icon" aria-hidden="true">⏱</span>
@@ -44,6 +44,8 @@
 
     <div id="grid" class="grid" role="grid" tabindex="0" aria-label="Sudoku board"></div>
     <div id="message" class="message" aria-live="polite"></div>
+
+    <div id="sr-announcer" class="sr-only" aria-live="polite"></div>
 
     <div id="numbers" class="numbers"></div>
 
@@ -89,12 +91,12 @@
     </footer>
   </div>
 
-  <!-- Help Modal -->
-  <div id="help-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="help-modal-title">
+  <!-- Help Dialog -->
+  <dialog id="help-dialog" aria-labelledby="help-dialog-title">
     <div class="modal-content">
       <button id="close-modal-btn" class="close-btn" aria-label="Close Help">&times;</button>
 
-      <h2 id="help-modal-title">📖 How to Play</h2>
+      <h2 id="help-dialog-title">📖 How to Play</h2>
       <p>Fill every empty cell. Each number may appear only once in:</p>
       <ul>
         <li>Every row</li>
@@ -133,16 +135,16 @@
 
       <p class="modal-version">Suhdokuh v0.0.33</p>
     </div>
-  </div>
+  </dialog>
 
-  <!-- Statistics Modal -->
-  <div id="stats-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="stats-modal-title">
+  <!-- Statistics Dialog -->
+  <dialog id="stats-dialog" aria-labelledby="stats-dialog-title">
     <div class="modal-content">
       <button id="close-stats-btn" class="close-btn" aria-label="Close Statistics">&times;</button>
-      <h2 id="stats-modal-title">📊 Player Statistics</h2>
+      <h2 id="stats-dialog-title">📊 Player Statistics</h2>
       <div id="stats-accordion" class="accordion"></div>
     </div>
-  </div>
+  </dialog>
 
   <!-- Completion Dialog -->
   <dialog id="completion-dialog" aria-labelledby="completion-dialog-title">

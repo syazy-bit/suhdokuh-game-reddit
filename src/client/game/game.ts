@@ -466,18 +466,18 @@ document.addEventListener("DOMContentLoaded", () => {
   const helpBtn = document.getElementById(
     "help-btn",
   ) as HTMLButtonElement | null;
-  const helpModal = document.getElementById(
-    "help-modal",
-  ) as HTMLDivElement | null;
+  const helpDialog = document.getElementById(
+    "help-dialog",
+  ) as HTMLDialogElement | null;
   const closeModalBtn = document.getElementById(
     "close-modal-btn",
   ) as HTMLButtonElement | null;
   const statsBtn = document.getElementById(
     "stats-btn",
   ) as HTMLButtonElement | null;
-  const statsModal = document.getElementById(
-    "stats-modal",
-  ) as HTMLDivElement | null;
+  const statsDialog = document.getElementById(
+    "stats-dialog",
+  ) as HTMLDialogElement | null;
   const closeStatsBtn = document.getElementById(
     "close-stats-btn",
   ) as HTMLButtonElement | null;
@@ -513,6 +513,9 @@ document.addEventListener("DOMContentLoaded", () => {
   ) as HTMLButtonElement | null;
   const completionBadgeContainer = document.getElementById(
     "completion-badge-container",
+  ) as HTMLDivElement | null;
+  const srAnnouncer = document.getElementById(
+    "sr-announcer",
   ) as HTMLDivElement | null;
 
   // Validate all required elements exist
@@ -569,8 +572,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const moveHistory: Move[] = [];
   const redoHistory: Move[] = [];
   let renderEffect: CellRenderEffect | null = null;
-  let isHelpOpen = false;
-  let isStatsOpen = false;
   let notesBtn: HTMLButtonElement | null = null;
   let previousFocusedElement: HTMLElement | null = null;
 
@@ -683,6 +684,18 @@ document.addEventListener("DOMContentLoaded", () => {
     if (timerInterval !== null) {
       clearInterval(timerInterval);
       timerInterval = null;
+    }
+  }
+
+  /**
+   * Announce a message to screen readers via the dedicated live region.
+   */
+  function announceToSR(message: string): void {
+    if (srAnnouncer) {
+      srAnnouncer.textContent = "";
+      requestAnimationFrame(() => {
+        srAnnouncer.textContent = message;
+      });
     }
   }
 
@@ -1381,10 +1394,14 @@ document.addEventListener("DOMContentLoaded", () => {
     // startTimer() is a no-op if the timer is already running.
     startTimer();
 
+    const isConflict = !isValidMove(r, c, num);
     renderEffect = {
       cell: { r, c },
-      type: isValidMove(r, c, num) ? "success" : "conflict",
+      type: isConflict ? "conflict" : "success",
     };
+    if (isConflict) {
+      announceToSR("Conflict detected.");
+    }
     renderGrid();
     updateUndoButton();
     updateRedoButton();
@@ -1823,9 +1840,8 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function closeHelp(): void {
-    isHelpOpen = false;
-    if (helpModal) {
-      helpModal.classList.add("hidden");
+    if (helpDialog) {
+      helpDialog.close();
     }
     if (previousFocusedElement) {
       previousFocusedElement.focus();
@@ -1833,25 +1849,29 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  if (helpBtn && helpModal) {
+  if (helpBtn && helpDialog) {
     helpBtn.addEventListener("click", () => {
       previousFocusedElement = document.activeElement as HTMLElement | null;
-      isHelpOpen = true;
-      helpModal.classList.remove("hidden");
+      helpDialog.showModal();
       if (closeModalBtn) {
         closeModalBtn.focus();
       }
     });
   }
 
-  if (closeModalBtn && helpModal) {
+  if (closeModalBtn && helpDialog) {
     closeModalBtn.addEventListener("click", closeHelp);
   }
 
-  if (helpModal) {
-    helpModal.addEventListener("click", (e) => {
-      if (e.target === helpModal) {
-        closeHelp();
+  // Click backdrop to close Help dialog
+  if (helpDialog) {
+    helpDialog.addEventListener("click", (event) => {
+      if (event.target === helpDialog) {
+        helpDialog.close();
+        if (previousFocusedElement) {
+          previousFocusedElement.focus();
+          previousFocusedElement = null;
+        }
       }
     });
   }
@@ -1859,9 +1879,8 @@ document.addEventListener("DOMContentLoaded", () => {
   // ── Statistics Modal ────────────────────────────────────────────────
 
   function closeStats(): void {
-    isStatsOpen = false;
-    if (statsModal) {
-      statsModal.classList.add("hidden");
+    if (statsDialog) {
+      statsDialog.close();
     }
     if (previousFocusedElement) {
       previousFocusedElement.focus();
@@ -1969,11 +1988,10 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  if (statsBtn && statsModal) {
+  if (statsBtn && statsDialog) {
     statsBtn.addEventListener("click", async () => {
       previousFocusedElement = document.activeElement as HTMLElement | null;
-      isStatsOpen = true;
-      statsModal.classList.remove("hidden");
+      statsDialog.showModal();
 
       // Show a calm placeholder while the (fast) query resolves.
       const accordion = document.getElementById("stats-accordion");
@@ -1996,8 +2014,21 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  if (closeStatsBtn && statsModal) {
+  if (closeStatsBtn && statsDialog) {
     closeStatsBtn.addEventListener("click", closeStats);
+  }
+
+  // Click backdrop to close Statistics dialog
+  if (statsDialog) {
+    statsDialog.addEventListener("click", (event) => {
+      if (event.target === statsDialog) {
+        statsDialog.close();
+        if (previousFocusedElement) {
+          previousFocusedElement.focus();
+          previousFocusedElement = null;
+        }
+      }
+    });
   }
 
   // ── Completion Dialog Buttons ──────────────────────────────────────
@@ -2031,14 +2062,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  if (statsModal) {
-    statsModal.addEventListener("click", (e) => {
-      if (e.target === statsModal) {
-        closeStats();
-      }
-    });
-  }
-
   // ── Accordion focus management ───────────────────────────────────────
   // Clicking an accordion header should not focus the button after
   // rendering — the close button retains focus.
@@ -2065,21 +2088,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Handle keyboard input
   document.addEventListener("keydown", (e) => {
+    const target = e.target as HTMLElement;
     const key = e.key;
 
-    // Help or Stats modal is open — only Escape is allowed
-    if (isHelpOpen) {
-      if (key === "Escape") {
-        closeHelp();
-      }
-      return;
-    }
-    if (isStatsOpen) {
-      if (key === "Escape") {
-        closeStats();
-      }
-      return;
-    }
+    // Ignore events from interactive elements — let native behavior handle them
+    const isInteractive =
+      target.tagName === "SELECT" ||
+      target.tagName === "BUTTON" ||
+      target.tagName === "INPUT" ||
+      target.tagName === "TEXTAREA" ||
+      target.isContentEditable;
+
+    if (isInteractive) return;
+
+    // Inside an open dialog — skip gameplay keys
+    if (target.closest("dialog")) return;
 
     const maxNumbers = state.mode === "4x4" ? 4 : 9;
 
@@ -2111,7 +2134,6 @@ document.addEventListener("DOMContentLoaded", () => {
       const num = parseInt(key, 10);
       if (num <= maxNumbers) {
         placeNumber(num);
-        // Timer is started inside placeNumber() on the first valid placement.
       }
     } else if (key === "Backspace" || key === "Delete") {
       clearCell();
@@ -2123,9 +2145,9 @@ document.addEventListener("DOMContentLoaded", () => {
       useHint();
     } else if (key === "Escape") {
       state.selected = null;
-    highlightSelected();
-    renderEffect = null;
-  }
+      highlightSelected();
+      renderEffect = null;
+    }
   });
 
   // Initial setup
