@@ -8,6 +8,7 @@ import {
   findPointingPairs,
   findClaimingPairs,
   findXWings,
+  findSwordfish,
   type HumanSolverContext,
 } from "./HumanSolver";
 import type { GridSize } from "./SudokuValidator";
@@ -1353,5 +1354,287 @@ describe("findXWings — board immutability", () => {
     findXWings(ctx);
 
     expect(board).toEqual(snapshot);
+  });
+});
+
+// ── Zero Swordfish ──────────────────────────────────────────────────
+
+describe("findSwordfish — zero Swordfish", () => {
+  it("returns empty array for empty 4x4 board", () => {
+    const board = [
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+    ];
+    const ctx = createCtx(board, 4, 2);
+
+    const result = findSwordfish(ctx);
+
+    expect(result).toEqual([]);
+  });
+
+  it("returns empty array when no value appears in 2-3 columns across 3 rows", () => {
+    const board = [
+      [0, 0, 1, 2],
+      [0, 0, 3, 4],
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+    ];
+    const ctx = createCtx(board, 4, 2);
+
+    const result = findSwordfish(ctx);
+
+    expect(result).toEqual([]);
+  });
+});
+
+// ── Row-based Swordfish ────────────────────────────────────────────
+
+describe("findSwordfish — row-based", () => {
+  it("finds a row-based Swordfish in 4x4", () => {
+    // Rows 0,1,2 each have a candidate value in exactly 2 cols; union = {0,1,2}
+    const board = [
+      [0, 0, 1, 2],
+      [0, 1, 0, 2],
+      [1, 0, 0, 2],
+      [0, 0, 0, 0],
+    ];
+    const ctx = createCtx(board, 4, 2);
+
+    const result = findSwordfish(ctx);
+
+    expect(result.length).toBeGreaterThanOrEqual(1);
+    const move = result.find(
+      (m) => m.type === "elimination" && m.technique === "Swordfish"
+    )!;
+    expect(move).toBeDefined();
+    if (move.type !== "elimination") return;
+
+    // Pattern cells: only rows×col intersections where the candidate actually appears
+    // Row 0 has v in cols {0,1}; Row 1 in {0,2}; Row 2 in {1,2} → 6 cells
+    expect(move.patternCells).toHaveLength(6);
+    expect(move.patternCells).toContainEqual({ row: 0, col: 0 });
+    expect(move.patternCells).toContainEqual({ row: 0, col: 1 });
+    expect(move.patternCells).toContainEqual({ row: 1, col: 0 });
+    expect(move.patternCells).toContainEqual({ row: 1, col: 2 });
+    expect(move.patternCells).toContainEqual({ row: 2, col: 1 });
+    expect(move.patternCells).toContainEqual({ row: 2, col: 2 });
+    // Given cells at pattern intersections are NOT included
+    expect(move.patternCells).not.toContainEqual({ row: 0, col: 2 });
+    expect(move.patternCells).not.toContainEqual({ row: 1, col: 1 });
+    expect(move.patternCells).not.toContainEqual({ row: 2, col: 0 });
+
+    // Eliminations from row 3 in cols {0,1,2} (should have exactly 3)
+    expect(move.eliminations).toHaveLength(3);
+    for (const e of move.eliminations) {
+      expect(e.row).toBe(3);
+      expect([0, 1, 2]).toContain(e.col);
+    }
+  });
+});
+
+// ── Column-based Swordfish ─────────────────────────────────────────
+
+describe("findSwordfish — column-based", () => {
+  it("finds a column-based Swordfish for value 4 in 4x4", () => {
+    // Cols 0,1,2 each have 4 in exactly 2 rows; union = {0,2,3}
+    const board = [
+      [0, 0, 1, 3],
+      [1, 2, 3, 0],
+      [0, 1, 0, 3],
+      [1, 0, 0, 0],
+    ];
+    const ctx = createCtx(board, 4, 2);
+
+    const result = findSwordfish(ctx);
+
+    const move = result.find(
+      (m) =>
+        m.type === "elimination" &&
+        m.technique === "Swordfish" &&
+        m.patternCells.some((c) => c.row === 0 && c.col === 0)
+    )!;
+    expect(move).toBeDefined();
+    if (move.type !== "elimination") return;
+
+    // Column-based Swordfish, pattern rows {0,2,3}, pattern cols {0,1,2}
+    // Col 0 has v in rows {0,2}; Col 1 in {0,3}; Col 2 in {2,3} → 6 cells
+    expect(move.patternCells).toHaveLength(6);
+    // Eliminations: 4 from pattern rows in non-pattern col 3
+    expect(move.eliminations).toContainEqual({ row: 3, col: 3, value: 4 });
+  });
+});
+
+// ── patternCells correctness ──────────────────────────────────────
+
+describe("findSwordfish — patternCells correctness", () => {
+  it("includes only empty cells that contain the candidate value", () => {
+    const board = [
+      [0, 0, 1, 2],
+      [0, 1, 0, 2],
+      [1, 0, 0, 2],
+      [0, 0, 0, 0],
+    ];
+    const ctx = createCtx(board, 4, 2);
+
+    const result = findSwordfish(ctx);
+
+    for (const move of result) {
+      if (move.type !== "elimination") continue;
+      const v = move.eliminations[0]!.value;
+      for (const cell of move.patternCells) {
+        expect(board[cell.row]![cell.col]!).toBe(0);
+        expect(ctx.candidateMap[cell.row]![cell.col]!).toContain(v);
+      }
+    }
+  });
+});
+
+// ── Swordfish with no eliminations ─────────────────────────────────
+
+describe("findSwordfish — no eliminations", () => {
+  it("ignores a Swordfish where pattern columns have no candidates to eliminate", () => {
+    // Rows 0,1,2 have 4 in cols {0,1,2} but row 3 is fully blocked from 4 in those cols
+    const board = [
+      [0, 0, 0, 1],
+      [0, 0, 0, 2],
+      [0, 0, 0, 3],
+      [1, 2, 3, 0],
+    ];
+    const ctx = createCtx(board, 4, 2);
+
+    const resultBlocked = findSwordfish(ctx);
+
+    expect(
+      resultBlocked.filter((m) => m.type === "elimination")
+    ).toHaveLength(0);
+
+    // Verify a board with real eliminations still produces moves
+    const boardActive = [
+      [0, 0, 1, 2],
+      [0, 1, 0, 2],
+      [1, 0, 0, 2],
+      [0, 0, 0, 0],
+    ];
+    const ctxActive = createCtx(boardActive, 4, 2);
+    const resultActive = findSwordfish(ctxActive);
+
+    expect(resultActive.length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+// ── Duplicate prevention ──────────────────────────────────────────
+
+describe("findSwordfish — duplicate prevention", () => {
+  it("returns only one LogicalMove per Swordfish", () => {
+    const board = [
+      [0, 0, 1, 2],
+      [0, 1, 0, 2],
+      [1, 0, 0, 2],
+      [0, 0, 0, 0],
+    ];
+    const ctx = createCtx(board, 4, 2);
+
+    const result = findSwordfish(ctx);
+
+    const swordfishMoves = result.filter(
+      (m) => m.type === "elimination" && m.technique === "Swordfish"
+    );
+
+    const seen = new Set<string>();
+    for (const m of swordfishMoves) {
+      if (m.type !== "elimination") continue;
+      const key = `${m.patternCells.map((c) => `${c.row},${c.col}`).sort().join("|")}|${m.eliminations.map((e) => `${e.row},${e.col},${e.value}`).sort().join("|")}`;
+      expect(seen.has(key)).toBe(false);
+      seen.add(key);
+    }
+  });
+});
+
+// ── Invalid 3×2 rectangle (must NOT detect) ───────────────────────
+
+describe("findSwordfish — invalid 3×2 rectangle", () => {
+  it("does not detect a 3×2 rectangle as Swordfish", () => {
+    // Rows 0,1,2 all have 4 in only cols {0,1} → union = {0,1}, size < 3
+    const board = [
+      [0, 0, 1, 2],
+      [0, 0, 1, 3],
+      [0, 0, 2, 3],
+      [1, 2, 3, 0],
+    ];
+    const ctx = createCtx(board, 4, 2);
+
+    const result = findSwordfish(ctx);
+
+    expect(
+      result.filter((m) => m.type === "elimination" && m.technique === "Swordfish")
+    ).toHaveLength(0);
+  });
+});
+
+// ── Multiple Swordfish on one board ───────────────────────────────
+
+describe("findSwordfish — multiple Swordfish on one board", () => {
+  it("finds multiple distinct Swordfish patterns on the same board", () => {
+    // This board produces row-based Swordfish for values 3 AND 4
+    // (both values are candidates in the same pattern cells and neither
+    //  is placed as a given, so both form the pattern)
+    const board = [
+      [0, 0, 1, 2],
+      [0, 1, 0, 2],
+      [1, 0, 0, 2],
+      [0, 0, 0, 0],
+    ];
+    const ctx = createCtx(board, 4, 2);
+
+    const result = findSwordfish(ctx);
+
+    const swordfishMoves = result.filter(
+      (m) => m.type === "elimination" && m.technique === "Swordfish"
+    );
+    expect(swordfishMoves.length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+// ── Board immutability ────────────────────────────────────────────
+
+describe("findSwordfish — board immutability", () => {
+  it("does not mutate the board", () => {
+    const board = [
+      [0, 0, 1, 2],
+      [0, 1, 0, 2],
+      [1, 0, 0, 2],
+      [0, 0, 0, 0],
+    ];
+    const snapshot = cloneBoard(board);
+    const ctx = createCtx(board, 4, 2);
+
+    findSwordfish(ctx);
+
+    expect(board).toEqual(snapshot);
+  });
+});
+
+// ── CandidateMap immutability ────────────────────────────────────
+
+describe("findSwordfish — CandidateMap immutability", () => {
+  it("does not mutate the CandidateMap", () => {
+    const board = [
+      [0, 0, 1, 2],
+      [0, 1, 0, 2],
+      [1, 0, 0, 2],
+      [0, 0, 0, 0],
+    ];
+    const ctx = createCtx(board, 4, 2);
+    const snapshot = ctx.candidateMap.map((row) => row.map((col) => [...col]));
+
+    findSwordfish(ctx);
+
+    for (let r = 0; r < 4; r++) {
+      for (let c = 0; c < 4; c++) {
+        expect(ctx.candidateMap[r]![c]!).toEqual(snapshot[r]![c]!);
+      }
+    }
   });
 });

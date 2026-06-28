@@ -7,6 +7,7 @@ import {
   findPointingPairs,
   findClaimingPairs,
   findXWings,
+  findSwordfish,
   type HumanSolverContext,
   type LogicalMove,
 } from "./HumanSolver";
@@ -29,6 +30,7 @@ const FINDERS: Array<{ name: Technique; fn: (ctx: HumanSolverContext) => Logical
   { name: "Pointing Pair", fn: findPointingPairs },
   { name: "Claiming Pair", fn: findClaimingPairs },
   { name: "X-Wing", fn: findXWings },
+  { name: "Swordfish", fn: findSwordfish },
 ];
 
 function cloneBoard(board: number[][]): number[][] {

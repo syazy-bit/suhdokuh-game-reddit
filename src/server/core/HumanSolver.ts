@@ -832,3 +832,189 @@ export function findXWings(ctx: HumanSolverContext): LogicalMove[] {
   }
   return moves;
 }
+
+export function findSwordfish(ctx: HumanSolverContext): LogicalMove[] {
+  const { board, size, candidateMap } = ctx;
+  const swordfishMap = new Map<
+    string,
+    {
+      patternCells: Array<{ row: number; col: number }>;
+      eliminations: Map<string, { row: number; col: number; value: number }>;
+    }
+  >();
+
+  // Row-based Swordfish
+  for (let v = 1; v <= size; v++) {
+    const rowCols = new Map<number, number[]>();
+
+    for (let row = 0; row < size; row++) {
+      const cols: number[] = [];
+      for (let col = 0; col < size; col++) {
+        if (board[row]![col] !== 0) continue;
+        const list = candidateMap[row]![col]!;
+        if (list.includes(v)) {
+          cols.push(col);
+        }
+      }
+      if (cols.length >= 2 && cols.length <= 3) {
+        rowCols.set(row, cols);
+      }
+    }
+
+    const candidateRows = [...rowCols.keys()];
+    for (let i = 0; i < candidateRows.length; i++) {
+      for (let j = i + 1; j < candidateRows.length; j++) {
+        for (let k = j + 1; k < candidateRows.length; k++) {
+          const r1 = candidateRows[i]!;
+          const r2 = candidateRows[j]!;
+          const r3 = candidateRows[k]!;
+          const cols1 = rowCols.get(r1)!;
+          const cols2 = rowCols.get(r2)!;
+          const cols3 = rowCols.get(r3)!;
+
+          const union = new Set<number>();
+          for (const c of cols1) union.add(c);
+          for (const c of cols2) union.add(c);
+          for (const c of cols3) union.add(c);
+
+          if (union.size !== 3) continue;
+          const patternCols = [...union];
+
+          const eliminations = new Map<
+            string,
+            { row: number; col: number; value: number }
+          >();
+
+          for (const c of patternCols) {
+            for (let row = 0; row < size; row++) {
+              if (row === r1 || row === r2 || row === r3) continue;
+              if (board[row]![c] !== 0) continue;
+              const list = candidateMap[row]![c]!;
+              if (list.includes(v)) {
+                const ek = eliminationCellKey(row, c, v);
+                if (!eliminations.has(ek)) {
+                  eliminations.set(ek, { row, col: c, value: v });
+                }
+              }
+            }
+          }
+
+          if (eliminations.size > 0) {
+            const patternCells: Array<{ row: number; col: number }> = [];
+            for (const r of [r1, r2, r3]) {
+              const rowCandidateCols = rowCols.get(r)!;
+              for (const c of rowCandidateCols) {
+                patternCells.push({ row: r, col: c });
+              }
+            }
+            patternCells.sort((a, b) => a.row - b.row || a.col - b.col);
+            const dk = `swordfish-v${v}-${patternCells.map((c) => `${c.row},${c.col}`).join("-")}`;
+            const existing = swordfishMap.get(dk);
+            if (existing) {
+              for (const [ek, e] of eliminations) {
+                if (!existing.eliminations.has(ek)) {
+                  existing.eliminations.set(ek, e);
+                }
+              }
+            } else {
+              swordfishMap.set(dk, { patternCells, eliminations });
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Column-based Swordfish
+  for (let v = 1; v <= size; v++) {
+    const colRows = new Map<number, number[]>();
+
+    for (let col = 0; col < size; col++) {
+      const rows: number[] = [];
+      for (let row = 0; row < size; row++) {
+        if (board[row]![col] !== 0) continue;
+        const list = candidateMap[row]![col]!;
+        if (list.includes(v)) {
+          rows.push(row);
+        }
+      }
+      if (rows.length >= 2 && rows.length <= 3) {
+        colRows.set(col, rows);
+      }
+    }
+
+    const candidateCols = [...colRows.keys()];
+    for (let i = 0; i < candidateCols.length; i++) {
+      for (let j = i + 1; j < candidateCols.length; j++) {
+        for (let k = j + 1; k < candidateCols.length; k++) {
+          const c1 = candidateCols[i]!;
+          const c2 = candidateCols[j]!;
+          const c3 = candidateCols[k]!;
+          const rows1 = colRows.get(c1)!;
+          const rows2 = colRows.get(c2)!;
+          const rows3 = colRows.get(c3)!;
+
+          const union = new Set<number>();
+          for (const r of rows1) union.add(r);
+          for (const r of rows2) union.add(r);
+          for (const r of rows3) union.add(r);
+
+          if (union.size !== 3) continue;
+          const patternRows = [...union];
+
+          const eliminations = new Map<
+            string,
+            { row: number; col: number; value: number }
+          >();
+
+          for (const r of patternRows) {
+            for (let col = 0; col < size; col++) {
+              if (col === c1 || col === c2 || col === c3) continue;
+              if (board[r]![col] !== 0) continue;
+              const list = candidateMap[r]![col]!;
+              if (list.includes(v)) {
+                const ek = eliminationCellKey(r, col, v);
+                if (!eliminations.has(ek)) {
+                  eliminations.set(ek, { row: r, col, value: v });
+                }
+              }
+            }
+          }
+
+          if (eliminations.size > 0) {
+            const patternCells: Array<{ row: number; col: number }> = [];
+            for (const c of [c1, c2, c3]) {
+              const colCandidateRows = colRows.get(c)!;
+              for (const r of colCandidateRows) {
+                patternCells.push({ row: r, col: c });
+              }
+            }
+            patternCells.sort((a, b) => a.row - b.row || a.col - b.col);
+            const dk = `swordfish-v${v}-${patternCells.map((c) => `${c.row},${c.col}`).join("-")}`;
+            const existing = swordfishMap.get(dk);
+            if (existing) {
+              for (const [ek, e] of eliminations) {
+                if (!existing.eliminations.has(ek)) {
+                  existing.eliminations.set(ek, e);
+                }
+              }
+            } else {
+              swordfishMap.set(dk, { patternCells, eliminations });
+            }
+          }
+        }
+      }
+    }
+  }
+
+  const moves: LogicalMove[] = [];
+  for (const { patternCells, eliminations } of swordfishMap.values()) {
+    moves.push({
+      type: "elimination",
+      technique: "Swordfish",
+      patternCells,
+      eliminations: [...eliminations.values()],
+    });
+  }
+  return moves;
+}

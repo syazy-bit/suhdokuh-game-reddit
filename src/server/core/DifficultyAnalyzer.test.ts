@@ -59,10 +59,11 @@ describe("TECHNIQUE_WEIGHTS", () => {
     expect(TECHNIQUE_WEIGHTS).toHaveProperty("Pointing Pair");
     expect(TECHNIQUE_WEIGHTS).toHaveProperty("Claiming Pair");
     expect(TECHNIQUE_WEIGHTS).toHaveProperty("X-Wing");
+    expect(TECHNIQUE_WEIGHTS).toHaveProperty("Swordfish");
   });
 
-  it("has exactly 7 technique entries", () => {
-    expect(Object.keys(TECHNIQUE_WEIGHTS)).toHaveLength(7);
+  it("has exactly 8 technique entries", () => {
+    expect(Object.keys(TECHNIQUE_WEIGHTS)).toHaveLength(8);
   });
 
   it("has positive numeric weights", () => {

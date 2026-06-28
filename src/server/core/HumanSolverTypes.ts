@@ -6,6 +6,7 @@ export const TECHNIQUES = [
   "Pointing Pair",
   "Claiming Pair",
   "X-Wing",
+  "Swordfish",
 ] as const;
 
 export type Technique = typeof TECHNIQUES[number];
