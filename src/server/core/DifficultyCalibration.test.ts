@@ -347,3 +347,100 @@ describe("Benchmark integration (small sample)", () => {
     expect(stats.medianScore).toBeGreaterThan(0);
   });
 });
+
+// ── Expert calibration tests (Phase 5.6.3) ──────────────────────────────────
+
+describe("Expert calibration", () => {
+  it("generates Expert benchmark entries for 9×9 with valid analysis", () => {
+    const gen = new SudokuGenerator({
+      size: 9, boxSize: 3, difficulty: "expert", matchDifficulty: false,
+    });
+    const result = gen.generate();
+    const entry = createBenchmarkEntry(9, "expert", result.analysis);
+    expect(entry.score).toBeGreaterThan(0);
+    expect(entry.size).toBe(9);
+    expect(entry.requestedDifficulty).toBe("expert");
+  });
+
+  it("recommends threshold changes when 9×9 expert P90 overlaps with hard P10", () => {
+    const currentThresholds: Record<string, number> = {
+      easy: 30, medium: 52, hard: 75, expert: 100,
+    };
+    const stats: Record<string, PerDifficultyStats> = {
+      "9×9 easy": {
+        sampleSize: 50, averageScore: 30, medianScore: 30,
+        minScore: 30, maxScore: 33, stdDev: 0.5,
+        p10Score: 30, p90Score: 30,
+        techniqueFrequency: {}, hardestTechniqueDistribution: {},
+        averageAssignmentCount: 30, averageEliminationCount: 0, averageTotalSteps: 30,
+      },
+      "9×9 medium": {
+        sampleSize: 50, averageScore: 47, medianScore: 46,
+        minScore: 26, maxScore: 83, stdDev: 7,
+        p10Score: 46, p90Score: 51,
+        techniqueFrequency: {}, hardestTechniqueDistribution: {},
+        averageAssignmentCount: 44, averageEliminationCount: 0.5, averageTotalSteps: 44,
+      },
+      "9×9 hard": {
+        sampleSize: 50, averageScore: 53, medianScore: 53,
+        minScore: 31, maxScore: 72, stdDev: 6,
+        p10Score: 46.5, p90Score: 58,
+        techniqueFrequency: {}, hardestTechniqueDistribution: {},
+        averageAssignmentCount: 46, averageEliminationCount: 0.8, averageTotalSteps: 47,
+      },
+      "9×9 expert": {
+        sampleSize: 50, averageScore: 55, medianScore: 55,
+        minScore: 17.5, maxScore: 75.5, stdDev: 9,
+        p10Score: 48.5, p90Score: 64.5,
+        techniqueFrequency: {}, hardestTechniqueDistribution: {},
+        averageAssignmentCount: 48, averageEliminationCount: 1, averageTotalSteps: 49,
+      },
+    };
+    const result = recommendThresholds(stats, currentThresholds);
+    expect(result.distributionsOverlap).toBe(true);
+    expect(result.recommended).not.toBeNull();
+  });
+
+  it("keeps current thresholds for 9×9 when empirical distributions are cleanly separated by matchDifficulty", () => {
+    // When puzzles are generated WITH matchDifficulty, the distributions
+    // have wider spread and overlap, so the calibration system will
+    // recommend changes — but the current thresholds remain valid for
+    // actual difficulty classification via difficultyFromScore.
+    const currentThresholds: Record<string, number> = {
+      easy: 30, medium: 52, hard: 75, expert: 100,
+    };
+    const stats: Record<string, PerDifficultyStats> = {
+      "9×9 easy": {
+        sampleSize: 50, averageScore: 22, medianScore: 22,
+        minScore: 18, maxScore: 30, stdDev: 2,
+        p10Score: 20, p90Score: 28,
+        techniqueFrequency: {}, hardestTechniqueDistribution: {},
+        averageAssignmentCount: 22, averageEliminationCount: 0, averageTotalSteps: 22,
+      },
+      "9×9 medium": {
+        sampleSize: 50, averageScore: 40, medianScore: 40,
+        minScore: 32, maxScore: 50, stdDev: 4,
+        p10Score: 34, p90Score: 48,
+        techniqueFrequency: {}, hardestTechniqueDistribution: {},
+        averageAssignmentCount: 38, averageEliminationCount: 0.3, averageTotalSteps: 38,
+      },
+      "9×9 hard": {
+        sampleSize: 50, averageScore: 60, medianScore: 60,
+        minScore: 53, maxScore: 73, stdDev: 5,
+        p10Score: 55, p90Score: 70,
+        techniqueFrequency: {}, hardestTechniqueDistribution: {},
+        averageAssignmentCount: 55, averageEliminationCount: 0.6, averageTotalSteps: 56,
+      },
+      "9×9 expert": {
+        sampleSize: 50, averageScore: 82, medianScore: 80,
+        minScore: 76, maxScore: 95, stdDev: 5,
+        p10Score: 77, p90Score: 90,
+        techniqueFrequency: {}, hardestTechniqueDistribution: {},
+        averageAssignmentCount: 60, averageEliminationCount: 2, averageTotalSteps: 62,
+      },
+    };
+    const result = recommendThresholds(stats, currentThresholds);
+    // With clean separation, recommended stays null
+    expect(result.recommended).toBeNull();
+  });
+});

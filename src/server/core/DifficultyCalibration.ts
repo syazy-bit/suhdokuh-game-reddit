@@ -1,5 +1,5 @@
 import { SudokuGenerator, type GridSize } from "./SudokuGenerator";
-import { DIFFICULTY_THRESHOLDS, type AnalysisResult, type Difficulty } from "./DifficultyAnalyzer";
+import { DIFFICULTY_THRESHOLDS, TECHNIQUE_WEIGHTS, type AnalysisResult, type Difficulty } from "./DifficultyAnalyzer";
 import type { Technique } from "./HumanSolverTypes";
 
 export const DIFFICULTY_LABELS: Difficulty[] = ["easy", "medium", "hard", "expert"];
@@ -320,13 +320,19 @@ export function formatBenchmarkReport(report: BenchmarkReport): string {
     lines.push(`  Avg assignments:       ${stats.averageAssignmentCount.toFixed(2)}`);
     lines.push(`  Avg eliminations:      ${stats.averageEliminationCount.toFixed(2)}`);
     lines.push(`  Avg total steps:       ${stats.averageTotalSteps.toFixed(2)}`);
-    lines.push(`  Technique frequency:`);
+    lines.push(`  Technique frequency (avg uses × weight = avg score contribution):`);
     const sortedTechs = Object.entries(stats.techniqueFrequency)
       .sort(([, a], [, b]) => b - a);
+    let totalAvgScore = 0;
     for (const [tech, count] of sortedTechs) {
       const avg = (count as number) / stats.sampleSize;
-      lines.push(`    ${tech}: ${avg.toFixed(2)} avg uses per puzzle`);
+      const weight = TECHNIQUE_WEIGHTS[tech as keyof typeof TECHNIQUE_WEIGHTS] ?? 0;
+      const contrib = avg * weight;
+      totalAvgScore += contrib;
+      lines.push(`    ${tech}: ${avg.toFixed(2)} × ${weight.toFixed(1)} = ${contrib.toFixed(2)}`);
     }
+    lines.push(`    ─────────────────────────────`);
+    lines.push(`    Total from techniques: ${totalAvgScore.toFixed(2)} (average score: ${stats.averageScore.toFixed(2)})`);
     lines.push(`  Hardest technique distribution:`);
     const sortedHardest = Object.entries(stats.hardestTechniqueDistribution)
       .sort(([, a], [, b]) => b - a);

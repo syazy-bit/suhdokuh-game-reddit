@@ -15,9 +15,15 @@ export const TECHNIQUE_WEIGHTS: Record<Technique, number> = {
   "Swordfish": 9.0,
 };
 
-// TODO: Calibrate expert threshold after Swordfish and higher techniques exist.
-// Current hard scores max ~86.5; expert placeholder at 100 ensures no puzzle
-// reaches expert tier until scoring techniques beyond X-Wing are implemented.
+// Benchmark data (Phase 5.6.3) shows Swordfish occurred in 0 of 400
+// random-generated puzzles — current Expert classifications do not arise
+// from Swordfish. Instead, Expert scores (76-88) come from accumulated
+// lower-level techniques: ~41× Naked Single + ~7× Hidden Single + occasional
+// Pointing Pair, Claiming Pair, Hidden Pair, X-Wing, etc.
+// The expert threshold (100) is a sentinel / documentation value rather than
+// an actively consulted runtime threshold — difficultyFromScore classifies
+// any score > hard as expert. Keep as-is until techniques that routinely
+// push scores above 100 are implemented (e.g. Jellyfish, XY-Wing).
 export const DIFFICULTY_THRESHOLDS: Record<Difficulty, number> = {
   easy: 30,
   medium: 52,

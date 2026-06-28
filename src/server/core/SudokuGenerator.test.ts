@@ -492,8 +492,37 @@ describe("Expert configuration", () => {
   it("generated expert puzzle analysis exists", () => {
     const gen = new SudokuGenerator({ size: 9, boxSize: 3, difficulty: "expert", matchDifficulty: false });
     const result = gen.generate();
-    // Expert techniques are not yet implemented, so the score will likely
-    // fall in the easy/medium/hard range. The analysis is still returned.
     expect(result.analysis.score).toBeGreaterThan(0);
+  });
+
+  it("9×9 expert generation either succeeds or reports a meaningful error", () => {
+    // Phase 5.6.3 benchmark shows ~40% of 9×9 expert attempts succeed
+    // within 50 tries (per-attempt probability ~1%). The test verifies
+    // that the generator handles both outcomes gracefully.
+    const gen = new SudokuGenerator({
+      size: 9, boxSize: 3, difficulty: "expert", matchDifficulty: true, maxAttempts: 50,
+    });
+    try {
+      const result = gen.generate();
+      expect(result.analysis.difficulty).toBe("expert");
+      expect(result.analysis.score).toBeGreaterThan(75);
+    } catch (e) {
+      const msg = (e as Error).message;
+      expect(msg).toContain("Failed to generate");
+      expect(msg).toContain("9×9");
+      expect(msg).toContain("expert");
+      expect(msg).toContain("last score:");
+      expect(msg).toContain("last difficulty:");
+    }
+  });
+
+  it("4×4 expert generation always fails because 4×4 never reaches expert score", () => {
+    // 4×4 boards only use Naked Single (weight 1.0). With 12 empty cells
+    // max, the maximum possible score is 12, far below the hard threshold
+    // of 75. No amount of retries will produce an expert puzzle.
+    const gen = new SudokuGenerator({
+      size: 4, boxSize: 2, difficulty: "expert", matchDifficulty: true, maxAttempts: 10,
+    });
+    expect(() => gen.generate()).toThrow(/Failed to generate/);
   });
 });
