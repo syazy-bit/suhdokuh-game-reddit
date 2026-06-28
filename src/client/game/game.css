@@ -332,6 +332,26 @@ h2 {
     animation: victory-bg 400ms ease-out;
     animation-delay: var(--victory-delay, 0ms);
   }
+
+  @keyframes value-shake {
+    0%, 100% { transform: translateX(0); }
+    25%      { transform: translateX(-4px); }
+    50%      { transform: translateX(4px); }
+    75%      { transform: translateX(-2px); }
+  }
+
+  .value-shake {
+    animation: value-shake 230ms ease-in-out;
+  }
+
+  @keyframes value-success {
+    0%, 100% { transform: scale(1); }
+    50%      { transform: scale(1.05); }
+  }
+
+  .value-success {
+    animation: value-success 230ms ease-in-out;
+  }
 }
 
 /* Notes grid inside cells */

@@ -49,6 +49,11 @@ interface Move {
   clearedNotes: ClearedNote[];
 }
 
+interface CellRenderEffect {
+  cell: { r: number; c: number };
+  type: "place" | "hint" | "conflict" | "success";
+}
+
 
 
 // Fallback puzzle libraries (for when API fails) — bucketed by difficulty
@@ -553,8 +558,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let winResetTimeout: number | null = null;
   const moveHistory: Move[] = [];
   const redoHistory: Move[] = [];
-  let lastPlacedCell: { r: number; c: number } | null = null;
-  let lastHintedCell: { r: number; c: number } | null = null;
+  let renderEffect: CellRenderEffect | null = null;
   let isHelpOpen = false;
   let isStatsOpen = false;
   let notesBtn: HTMLButtonElement | null = null;
@@ -901,11 +905,18 @@ document.addEventListener("DOMContentLoaded", () => {
             const valueSpan = document.createElement("span");
             valueSpan.className = "value";
             valueSpan.textContent = value.toString();
-            if (lastHintedCell?.r === r && lastHintedCell?.c === c) {
-              valueSpan.classList.add("value-pop");
-              cell.classList.add("hint-flash");
-            } else if (lastPlacedCell?.r === r && lastPlacedCell?.c === c) {
-              valueSpan.classList.add("value-pop");
+            const effect = renderEffect;
+            if (effect && effect.cell.r === r && effect.cell.c === c) {
+              if (effect.type === "hint") {
+                valueSpan.classList.add("value-pop");
+                cell.classList.add("hint-flash");
+              } else if (effect.type === "place") {
+                valueSpan.classList.add("value-pop");
+              } else if (effect.type === "conflict") {
+                valueSpan.classList.add("value-shake");
+              } else if (effect.type === "success") {
+                valueSpan.classList.add("value-success");
+              }
             }
             cell.appendChild(valueSpan);
           } else {
@@ -973,8 +984,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     highlightSelected();
-    lastPlacedCell = null;
-    lastHintedCell = null;
+    renderEffect = null;
   }
 
   /**
@@ -1071,7 +1081,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const correctValue = solution[r]?.[c];
     if (!correctValue) return;
 
-    lastHintedCell = { r, c };
+    renderEffect = { cell: { r, c }, type: "hint" };
     placeNumber(correctValue);
 
     state.hintsRemaining--;
@@ -1266,7 +1276,10 @@ document.addEventListener("DOMContentLoaded", () => {
     // startTimer() is a no-op if the timer is already running.
     startTimer();
 
-    lastPlacedCell = { r, c };
+    renderEffect = {
+      cell: { r, c },
+      type: isValidMove(r, c, num) ? "success" : "conflict",
+    };
     renderGrid();
     updateUndoButton();
     updateRedoButton();
@@ -1429,7 +1442,7 @@ document.addEventListener("DOMContentLoaded", () => {
         showCompletionDialog();
       }, 1500);
     } else {
-      lastPlacedCell = { r: move.row, c: move.col };
+      renderEffect = { cell: { r: move.row, c: move.col }, type: "place" };
       renderGrid();
       highlightSelected();
     }
@@ -1496,7 +1509,7 @@ document.addEventListener("DOMContentLoaded", () => {
       startTimer();
     }
 
-    lastPlacedCell = { r: move.row, c: move.col };
+    renderEffect = { cell: { r: move.row, c: move.col }, type: "place" };
     renderGrid();
     highlightSelected();
     updateUndoButton();
@@ -2006,7 +2019,7 @@ document.addEventListener("DOMContentLoaded", () => {
     } else if (key === "Escape") {
       state.selected = null;
     highlightSelected();
-    lastPlacedCell = null;
+    renderEffect = null;
   }
   });
 
