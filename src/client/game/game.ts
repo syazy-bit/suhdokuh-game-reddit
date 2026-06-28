@@ -510,6 +510,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const completionDismissBtn = document.getElementById(
     "completion-dismiss-btn",
   ) as HTMLButtonElement | null;
+  const completionBadgeContainer = document.getElementById(
+    "completion-badge-container",
+  ) as HTMLDivElement | null;
 
   // Validate all required elements exist
   if (!gridEl || !numbersEl || !messageEl || !modeSelect || !leaderboardEl) {
@@ -705,9 +708,12 @@ document.addEventListener("DOMContentLoaded", () => {
     if (completionGridSize) {
       completionGridSize.textContent = modeDisplay;
     }
+    const usedHints = DEFAULT_HINTS - state.hintsRemaining;
     if (completionHints) {
-      const used = DEFAULT_HINTS - state.hintsRemaining;
-      completionHints.textContent = `${used} / ${DEFAULT_HINTS}`;
+      completionHints.textContent = `${usedHints} / ${DEFAULT_HINTS}`;
+    }
+    if (completionBadgeContainer) {
+      completionBadgeContainer.classList.toggle("visible", usedHints === 0);
     }
 
     completionDialog.showModal();

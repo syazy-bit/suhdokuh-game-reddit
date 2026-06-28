@@ -18,6 +18,9 @@
   --player-ink: #1a4b82;
   --cell-border: 1px solid #d4d4d4;
   --box-border: 2px solid #333;
+  --badge-bg: #fff8e1;
+  --badge-border: #ffe082;
+  --badge-text: #f57c00;
 }
 
 .app {
@@ -1145,6 +1148,71 @@ h2 {
   text-align: center;
 }
 
+/* Badge container */
+.completion-badge-container {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  min-height: 36px;
+  margin: 0 0 20px;
+  opacity: 0;
+  visibility: hidden;
+}
+
+.completion-badge-container.visible {
+  opacity: 1;
+  visibility: visible;
+}
+
+.completion-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  background: var(--badge-bg);
+  border: 1px solid var(--badge-border);
+  color: var(--badge-text);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.badge-icon {
+  line-height: 1;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Trophy pulse — subtle scale bump */
+  #completion-dialog[open] .completion-trophy {
+    animation: trophy-pulse 280ms ease-out;
+  }
+
+  @keyframes trophy-pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.04); }
+    100% { transform: scale(1); }
+  }
+
+  /* Badge pop-in */
+  @keyframes badge-pop {
+    0% {
+      transform: scale(0.92);
+      opacity: 0;
+    }
+    100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+
+  #completion-dialog[open]
+  .completion-badge-container.visible
+  .completion-badge {
+    animation: badge-pop 260ms cubic-bezier(0.2, 0, 0.2, 1);
+  }
+}
+
 /* Decorative divider */
 .completion-divider {
   display: flex;
@@ -1302,6 +1370,16 @@ h2 {
   }
 
   #completion-dialog::backdrop {
+    animation: none;
+  }
+
+  #completion-dialog[open] .completion-trophy {
+    animation: none;
+  }
+
+  #completion-dialog[open]
+  .completion-badge-container.visible
+  .completion-badge {
     animation: none;
   }
 }
