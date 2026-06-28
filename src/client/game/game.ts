@@ -1019,7 +1019,47 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function useHint(): void {
-    // Will be implemented in Phase 6.2.2.
+    if (state.gameWon) return;
+
+    if (!state.selected) {
+      message.className = "message error";
+      message.textContent = "Select an empty cell first.";
+      return;
+    }
+
+    const { r, c } = state.selected;
+
+    const puzzleCell = puzzle[r]?.[c];
+    if (puzzleCell !== 0) {
+      message.className = "message error";
+      message.textContent = "Hints can only be used on editable cells.";
+      return;
+    }
+
+    const currentValue = state.grid[r]?.[c];
+    if (currentValue && currentValue !== 0) {
+      message.className = "message error";
+      message.textContent = "This cell is already filled.";
+      return;
+    }
+
+    if (state.hintsRemaining <= 0) {
+      message.className = "message error";
+      message.textContent = "No hints remaining.";
+      return;
+    }
+
+    const correctValue = solution[r]?.[c];
+    if (!correctValue) return;
+
+    lastHintedCell = { r, c };
+    placeNumber(correctValue);
+
+    state.hintsRemaining--;
+    updateHintButton();
+
+    message.className = "message success";
+    message.textContent = `💡 Hint used. ${state.hintsRemaining} hint${state.hintsRemaining === 1 ? "" : "s"} remaining.`;
   }
 
   /**
