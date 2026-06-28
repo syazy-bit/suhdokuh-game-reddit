@@ -220,7 +220,7 @@ h2 {
 /* Locked cells (pre-filled) */
 .cell.locked {
   background-color: var(--bg-light);
-  cursor: pointer;
+  cursor: default;
   font-weight: 700;
   color: var(--text-dark);
 }
@@ -237,13 +237,21 @@ h2 {
 
 /* Selected cell highlight */
 .cell.selected {
-  background-color: #cfe5fb;
+  background-color: #b8d8f8;
   box-shadow: inset 0 0 0 3px var(--primary);
+}
+
+/* Hover feedback for editable cells only */
+.cell:not(.locked):not(.selected):hover {
+  background-color: #f2f8ff;
 }
 
 @media (prefers-reduced-motion: no-preference) {
   .cell {
-    transition: background-color 150ms ease-out;
+    transition:
+      background-color 150ms ease-out,
+      border-color 150ms ease-out,
+      color 150ms ease-out;
   }
 
   .cell.related {
@@ -251,7 +259,11 @@ h2 {
   }
 
   .cell.selected {
-    transition: background-color 60ms ease-out;
+    transition:
+      background-color 150ms ease-out,
+      border-color 150ms ease-out,
+      color 150ms ease-out,
+      box-shadow 150ms ease-out;
   }
 
   .cell.conflict {
