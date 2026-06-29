@@ -1101,6 +1101,10 @@ document.addEventListener("DOMContentLoaded", () => {
           if (isBoxBottom) cell.classList.add("box-bottom");
         }
 
+        // Remove outer-edge borders — grid container border handles those
+        if (c === size - 1) cell.classList.add("edge-right");
+        if (r === size - 1) cell.classList.add("edge-bottom");
+
         grid.appendChild(cell);
       }
     }

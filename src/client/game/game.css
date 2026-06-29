@@ -186,7 +186,8 @@ h2 {
   display: flex;
   align-items: center;
   justify-content: center;
-  border: var(--cell-border);
+  border-right: var(--cell-border);
+  border-bottom: var(--cell-border);
   font-weight: 500;
   cursor: pointer;
   background-color: #fff;
@@ -219,6 +220,15 @@ h2 {
 .cell.box-bottom {
   border-bottom-width: 2px;
   border-bottom-color: #333;
+}
+
+/* Remove outer-edge borders — grid container border handles those */
+.cell.edge-right {
+  border-right: none;
+}
+
+.cell.edge-bottom {
+  border-bottom: none;
 }
 
 /* Locked cells (pre-filled) */
