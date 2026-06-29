@@ -21,8 +21,6 @@
   --badge-bg: #fff8e1;
   --badge-border: #ffe082;
   --badge-text: #ad5c00;
-  --highlight-bg: #fff3e0;
-  --highlight-border: #ffb74d;
   --medal-gold: #ffd700;
   --medal-silver: #c0c0c0;
   --medal-bronze: #cd7f32;
@@ -727,27 +725,21 @@ h2 {
 
 /* Current player row highlight */
 .leaderboard-current-user {
-  background-color: var(--highlight-bg);
-  outline: 2px solid var(--highlight-border);
-  outline-offset: -2px;
+  background-color: #eef6ff;
+  outline: 1px solid #90caf9;
+  outline-offset: -1px;
 }
 
 .leaderboard-current-user:hover {
-  background-color: #ffe0b2;
+  background-color: #e3f2fd;
 }
 
-.you-badge {
-  display: inline-block;
-  background-color: var(--primary);
-  color: #fff;
-  font-size: 0.75em;
-  font-weight: 700;
-  padding: 1px 6px;
-  border-radius: 4px;
-  margin-right: 4px;
-  text-transform: uppercase;
-  line-height: 1.4;
-  vertical-align: middle;
+.leaderboard-current-user .leaderboard-username {
+  font-weight: 600;
+}
+
+.leaderboard-current-user td:last-child {
+  font-weight: 600;
 }
 
 .leaderboard-username {
@@ -765,10 +757,10 @@ h2 {
   line-height: 1;
 }
 
-/* Personal best card */
+/* Personal best card — achievement card layout */
 .personal-best-card {
   margin-top: 12px;
-  padding: 12px 16px;
+  padding: 16px 16px;
   background-color: var(--bg-light);
   border-radius: 8px;
   text-align: center;
@@ -776,23 +768,35 @@ h2 {
   border: 1px solid var(--border);
 }
 
-.pb-label {
+.pb-title {
   font-weight: 600;
   color: var(--text-dark);
+  margin-bottom: 8px;
 }
 
 .pb-time {
+  display: block;
+  font-size: 1.8rem;
   font-weight: 700;
   color: var(--primary);
   font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+  margin-bottom: 4px;
 }
 
 .pb-rank {
-  color: #555;
+  display: block;
+  font-size: 0.9em;
+  color: var(--text-muted);
+  font-weight: 500;
+  margin-bottom: 8px;
 }
 
 .pb-empty {
   color: var(--text-muted);
+}
+
+.pb-message {
   font-style: italic;
 }
 
@@ -801,7 +805,7 @@ h2 {
   flex-wrap: wrap;
   gap: 6px;
   justify-content: center;
-  margin-top: 4px;
+  margin-top: 8px;
 }
 
 .badge-item {

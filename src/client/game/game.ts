@@ -823,8 +823,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const rowClass = isCurrentUser ? ' class="leaderboard-current-user"' : "";
       const rowAria = isCurrentUser ? ` aria-label="Your entry: ${rankAria} — ${formatTime(entry.time)}"` : "";
 
-      const youBadge = isCurrentUser ? '<span class="you-badge" aria-label="This is you">⭐ You</span>' : "";
-      const usernameDisplay = `${youBadge}<span class="leaderboard-username">${escapeHtml(entry.username)}</span>`;
+      const usernameDisplay = `<span class="leaderboard-username">${escapeHtml(entry.username)}</span>`;
 
       const rankCell = rank <= 3
         ? `<span aria-hidden="true" class="leaderboard-medal">${rankDisplay}</span><span class="sr-only">${rankAria}</span>`
@@ -856,20 +855,27 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (personalBest === null) {
       return `<div class="personal-best-card pb-empty">
-          <span class="pb-label">You haven't solved this puzzle yet</span>
+          <div class="pb-title">🏆 Personal Best</div>
+          <div class="pb-message">Complete this puzzle to record your fastest time.</div>
         </div>`;
     }
 
-    const rankText = globalRank !== null
-      ? `— <span class="pb-rank">${inTop50 ? "" : "Global "}Rank #${globalRank.toLocaleString()}</span>`
-      : "";
+    let rankText = "";
+    if (globalRank !== null) {
+      if (globalRank <= 3) {
+        const medals = ["🥇", "🥈", "🥉"];
+        rankText = `<div class="pb-rank" aria-label="Global Rank ${globalRank}"><span aria-hidden="true">${medals[globalRank - 1]} </span>Global #${globalRank.toLocaleString()}</div>`;
+      } else {
+        rankText = `<div class="pb-rank">Global #${globalRank.toLocaleString()}</div>`;
+      }
+    }
 
     return `<div class="personal-best-card">
-        <span class="pb-label">Your best:</span>
-        <span class="pb-time">${formatTime(personalBest)}</span>
+        <div class="pb-title">🏆 Personal Best</div>
+        <div class="pb-time">${formatTime(personalBest)}</div>
         ${rankText}
         <div class="badge-container">
-          ${inTop50 ? '<span class="badge-item">🏆 Top 50</span>' : ""}
+          ${inTop50 ? '<span class="badge-item">🏆 Top 50 Player</span>' : ""}
         </div>
       </div>`;
   }
