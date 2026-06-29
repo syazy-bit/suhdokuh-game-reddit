@@ -662,9 +662,10 @@ h2 {
 
 .leaderboard {
   min-height: 100px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+}
+
+.personal-best-section {
+  width: 100%;
 }
 
 .leaderboard-table {

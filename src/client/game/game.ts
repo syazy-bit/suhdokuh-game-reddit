@@ -454,6 +454,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const leaderboardTitleEl = document.getElementById(
       "leaderboard-title",
     ) as HTMLHeadingElement | null;
+    const personalBestSectionEl = document.getElementById(
+      "personal-best-section",
+    ) as HTMLDivElement | null;
   const undoBtn = document.getElementById(
     "undo-btn",
   ) as HTMLButtonElement | null;
@@ -519,7 +522,7 @@ document.addEventListener("DOMContentLoaded", () => {
   ) as HTMLDivElement | null;
 
   // Validate all required elements exist
-  if (!gridEl || !numbersEl || !messageEl || !modeSelect || !leaderboardEl) {
+  if (!gridEl || !numbersEl || !messageEl || !modeSelect || !leaderboardEl || !personalBestSectionEl) {
     console.error("Required DOM elements not found");
     return;
   }
@@ -533,6 +536,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const timer = timerEl as HTMLSpanElement;
   const leaderboard = leaderboardEl as HTMLDivElement;
   const leaderboardTitle = leaderboardTitleEl as HTMLHeadingElement;
+  const personalBestSection = personalBestSectionEl as HTMLDivElement;
 
   // Fetch Reddit username from server
   async function getRedditUsername(): Promise<string> {
@@ -898,6 +902,7 @@ document.addEventListener("DOMContentLoaded", () => {
   async function loadLeaderboard(): Promise<void> {
     leaderboard.innerHTML = renderLeaderboardSkeleton();
     leaderboard.setAttribute("aria-busy", "true");
+    personalBestSection.innerHTML = "";
 
     try {
       const response = await fetch(
@@ -919,16 +924,15 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      let html = renderLeaderboardTable(entries, state.username);
+      leaderboard.innerHTML = renderLeaderboardTable(entries, state.username);
 
-      if (currentPlayer) {
-        html += renderPersonalBestCard(currentPlayer);
-      }
-
-      leaderboard.innerHTML = html;
+      personalBestSection.innerHTML = currentPlayer
+        ? renderPersonalBestCard(currentPlayer)
+        : "";
     } catch (error) {
       console.error("Error loading leaderboard:", error);
       leaderboard.innerHTML = renderUnavailableState();
+      personalBestSection.innerHTML = "";
     } finally {
       leaderboard.removeAttribute("aria-busy");
     }
