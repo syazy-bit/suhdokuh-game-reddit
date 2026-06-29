@@ -4,6 +4,16 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>
+    (function() {
+      try {
+        var theme = JSON.parse(localStorage.getItem("suhdokuh.theme") || "null");
+        if (theme === "midnight" || theme === "forest" || theme === "ocean" || theme === "lavender") {
+          document.documentElement.dataset.theme = theme;
+        }
+      } catch (e) {}
+    })();
+  </script>
   <link rel="stylesheet" href="game/game.css" />
   <title>Suhdokuh - Sudoku on Reddit</title>
 </head>
@@ -12,6 +22,7 @@
   <div class="container">
     <div class="title-row">
       <h1>🧩 Suhdokuh</h1>
+      <button id="appearance-btn" class="help-btn" aria-label="Change Theme">◐</button>
       <button id="help-btn" class="help-btn" aria-label="Help and Rules">❓</button>
       <button id="stats-btn" class="help-btn" aria-label="View Statistics">📊</button>
     </div>
@@ -147,6 +158,15 @@
     </div>
   </dialog>
 
+  <!-- Appearance Dialog -->
+  <dialog id="appearance-dialog" aria-labelledby="appearance-dialog-title">
+    <div class="modal-content">
+      <button id="close-appearance-btn" class="close-btn" aria-label="Close Appearance">&times;</button>
+      <h2 id="appearance-dialog-title">Appearance</h2>
+      <div id="theme-list" class="theme-list" role="radiogroup" aria-label="Select theme"></div>
+    </div>
+  </dialog>
+
   <!-- Completion Dialog -->
   <dialog id="completion-dialog" aria-labelledby="completion-dialog-title">
     <div class="completion-content">
@@ -182,7 +202,7 @@
         <div class="completion-stat">
           <div class="completion-stat-left">
             <span class="completion-stat-icon icon-time">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#D34E15" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="12" cy="12" r="10"/>
                 <polyline points="12 6 12 12 16 14"/>
               </svg>
@@ -194,7 +214,7 @@
         <div class="completion-stat">
           <div class="completion-stat-left">
             <span class="completion-stat-icon icon-difficulty">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#544699" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <line x1="4" y1="21" x2="4" y2="14"/>
                 <line x1="9" y1="21" x2="9" y2="10"/>
                 <line x1="14" y1="21" x2="14" y2="6"/>
@@ -208,7 +228,7 @@
         <div class="completion-stat">
           <div class="completion-stat-left">
             <span class="completion-stat-icon icon-grid">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3A7BD5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <rect x="3" y="3" width="7" height="7"/>
                 <rect x="14" y="3" width="7" height="7"/>
                 <rect x="3" y="14" width="7" height="7"/>
@@ -222,7 +242,7 @@
         <div class="completion-stat">
           <div class="completion-stat-left">
             <span class="completion-stat-icon icon-hints">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#17863D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M9 18h6"/>
                 <path d="M10 22h4"/>
                 <path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/>

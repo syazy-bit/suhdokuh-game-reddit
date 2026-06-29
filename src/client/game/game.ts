@@ -3,6 +3,14 @@ import type { PlayerStats, LeaderboardEntry, CurrentPlayerInfo, LeaderboardRespo
 const DEFAULT_HINTS = 3;
 const MEDALS = ["🥇", "🥈", "🥉"];
 
+const THEMES = [
+  { id: "classic", label: "Classic" },
+  { id: "midnight", label: "Midnight" },
+  { id: "forest", label: "Forest" },
+  { id: "ocean", label: "Ocean" },
+  { id: "lavender", label: "Lavender" },
+] as const;
+
 // Type definitions for type-safe implementation
 interface Cell {
   r: number;
@@ -466,6 +474,18 @@ document.addEventListener("DOMContentLoaded", () => {
   const hintBtn = document.getElementById(
     "hint-btn",
   ) as HTMLButtonElement | null;
+  const appearanceBtn = document.getElementById(
+    "appearance-btn",
+  ) as HTMLButtonElement | null;
+  const appearanceDialog = document.getElementById(
+    "appearance-dialog",
+  ) as HTMLDialogElement | null;
+  const closeAppearanceBtn = document.getElementById(
+    "close-appearance-btn",
+  ) as HTMLButtonElement | null;
+  const themeListEl = document.getElementById(
+    "theme-list",
+  ) as HTMLDivElement | null;
   const helpBtn = document.getElementById(
     "help-btn",
   ) as HTMLButtonElement | null;
@@ -1887,6 +1907,95 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  // ── Theme System ─────────────────────────────────────────────────────
+
+  /**
+   * Apply a theme by setting data-theme on the document element
+   * and persisting to localStorage.
+   */
+  function applyTheme(themeId: string): void {
+    document.documentElement.dataset.theme = themeId;
+    try {
+      localStorage.setItem("suhdokuh.theme", JSON.stringify(themeId));
+    } catch {
+      // Storage unavailable — continue without persistence.
+    }
+  }
+
+  /**
+   * Render the theme picker list inside the appearance dialog.
+   */
+  function renderThemeList(): void {
+    if (!themeListEl) return;
+    const currentTheme = document.documentElement.dataset.theme || "classic";
+    themeListEl.innerHTML = THEMES.map(
+      (t) => `
+        <button class="theme-option" role="radio" aria-checked="${t.id === currentTheme}" aria-current="${t.id === currentTheme}" data-theme-id="${t.id}">
+          <span class="theme-check" aria-hidden="true">✓</span>
+          ${t.label}
+        </button>`,
+    ).join("");
+
+    // Attach click listeners to each theme option
+    const options = themeListEl.querySelectorAll<HTMLButtonElement>(".theme-option");
+    options.forEach((opt) => {
+      opt.addEventListener("click", () => {
+        const themeId = opt.dataset.themeId;
+        if (!themeId) return;
+
+        // Update the DOM
+        applyTheme(themeId);
+
+        // Update aria/visual state on all options
+        options.forEach((o) => {
+          const isCurrent = o.dataset.themeId === themeId;
+          o.setAttribute("aria-checked", String(isCurrent));
+          o.setAttribute("aria-current", String(isCurrent));
+        });
+      });
+    });
+  }
+
+  // ── Appearance Dialog ────────────────────────────────────────────────
+
+  function closeAppearance(): void {
+    if (appearanceDialog) {
+      appearanceDialog.close();
+    }
+    if (previousFocusedElement) {
+      previousFocusedElement.focus();
+      previousFocusedElement = null;
+    }
+  }
+
+  if (appearanceBtn && appearanceDialog) {
+    appearanceBtn.addEventListener("click", () => {
+      previousFocusedElement = document.activeElement as HTMLElement | null;
+      renderThemeList();
+      appearanceDialog.showModal();
+      if (closeAppearanceBtn) {
+        closeAppearanceBtn.focus();
+      }
+    });
+  }
+
+  if (closeAppearanceBtn && appearanceDialog) {
+    closeAppearanceBtn.addEventListener("click", closeAppearance);
+  }
+
+  // Click backdrop to close Appearance dialog
+  if (appearanceDialog) {
+    appearanceDialog.addEventListener("click", (event) => {
+      if (event.target === appearanceDialog) {
+        appearanceDialog.close();
+        if (previousFocusedElement) {
+          previousFocusedElement.focus();
+          previousFocusedElement = null;
+        }
+      }
+    });
+  }
+
   // ── Statistics Modal ────────────────────────────────────────────────
 
   function closeStats(): void {
@@ -2163,6 +2272,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Initial setup
   (async () => {
+    // Load saved theme (with validation)
+    let savedTheme = "classic";
+    try {
+      const stored = localStorage.getItem("suhdokuh.theme");
+      if (stored) {
+        const parsed: unknown = JSON.parse(stored);
+        if (typeof parsed === "string" && THEMES.some((t) => t.id === parsed)) {
+          savedTheme = parsed;
+        }
+      }
+    } catch {
+      // Storage unavailable — use default.
+    }
+    applyTheme(savedTheme);
+
     // Fetch Reddit username first
     state.username = await getRedditUsername();
 
