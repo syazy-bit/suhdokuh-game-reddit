@@ -37,9 +37,14 @@
 
       <label for="difficulty-select">Difficulty:</label>
       <select id="difficulty-select">
-        <option value="easy">Easy</option>
-        <option value="medium" selected>Medium</option>
-        <option value="hard">Hard</option>
+        <!-- 4×4 difficulties (shown when mode = 4×4) -->
+        <option value="beginner" data-mode="4x4">Beginner</option>
+        <option value="advanced" data-mode="4x4" selected>Advanced</option>
+        <!-- 9×9 difficulties (shown when mode = 9×9) -->
+        <option value="easy" data-mode="9x9">Easy</option>
+        <option value="medium" data-mode="9x9" selected>Medium</option>
+        <option value="hard" data-mode="9x9">Hard</option>
+        <option value="expert" data-mode="9x9">Expert</option>
       </select>
     </div>
 
@@ -121,7 +126,7 @@
       <p>Uses numbers 1&ndash;4. Fast and beginner friendly.</p>
       <h3>9&times;9 Sudoku</h3>
       <p>Uses numbers 1&ndash;9. Classic Sudoku experience.</p>
-      <p>Choose <strong>Easy</strong>, <strong>Medium</strong>, or <strong>Hard</strong> difficulty for either mode.</p>
+      <p>Choose <strong>Beginner</strong> or <strong>Advanced</strong> for 4&times;4, or <strong>Easy</strong> through <strong>Expert</strong> for 9&times;9.</p>
 
       <h2>🎮 Controls</h2>
       <ul>

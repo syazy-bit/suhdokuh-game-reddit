@@ -1,4 +1,4 @@
-import type { Difficulty } from "../../shared/types/api";
+import type { AnyDifficulty } from "../../shared/types/api";
 import { isValidPlacement, countEmpty, difficultyTargets, type GridSize } from "./SudokuValidator";
 import { hasUniqueSolution } from "./SudokuSolver";
 import { solve } from "./HumanSolverPipeline";
@@ -9,7 +9,7 @@ export type { GridSize } from "./SudokuValidator";
 export interface GeneratorConfig {
   size: GridSize;
   boxSize: number;
-  difficulty: Difficulty;
+  difficulty: AnyDifficulty;
   maxAttempts?: number;
   matchDifficulty?: boolean;
 }
@@ -25,7 +25,7 @@ export interface GeneratedPuzzle {
 export class SudokuGenerator {
   private size: GridSize;
   private boxSize: number;
-  private difficulty: Difficulty;
+  private difficulty: AnyDifficulty;
   private maxAttempts: number;
   private matchDifficulty: boolean;
 

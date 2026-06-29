@@ -1,5 +1,3 @@
-import type { Difficulty } from "../../shared/types/api";
-
 export type GridSize = 4 | 9;
 
 export function isValidPlacement(
@@ -67,10 +65,11 @@ export function countEmpty(grid: number[][], size: GridSize): number {
   return count;
 }
 
-export const difficultyTargets: Record<Difficulty, Record<GridSize, number>> = {
-  easy:   { 4: 6, 9: 30 },
-  medium: { 4: 8, 9: 45 },
-  hard:   { 4: 10, 9: 50 },
-  // TODO: calibrate expert targets — may only be reachable for 9×9
-  expert: { 4: 12, 9: 55 },
-};
+export const difficultyTargets = {
+  easy:     { 4: 6, 9: 30 },
+  medium:   { 4: 8, 9: 45 },
+  hard:     { 4: 10, 9: 50 },
+  expert:   { 4: 12, 9: 55 },
+  beginner: { 4: 6, 9: 0 },
+  advanced: { 4: 8, 9: 0 },
+} as const satisfies Record<string, Record<GridSize, number>>;

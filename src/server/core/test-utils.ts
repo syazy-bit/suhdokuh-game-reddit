@@ -1,4 +1,3 @@
-import type { Difficulty } from "../../shared/types/api";
 import { cloneGrid, type GridSize } from "./SudokuValidator";
 import { getCandidates, getCandidateCount } from "./CandidateEngine";
 
@@ -99,10 +98,11 @@ export function countSolutions(grid: number[][], size: GridSize, limit: number, 
   return cutoff ? -1 : solutionCount;
 }
 
-export const difficultyCellsRemoved: Record<Difficulty, Record<GridSize, { min: number; max: number }>> = {
-  easy:   { 4: { min: 4, max: 8 }, 9: { min: 25, max: 38 } },
-  medium: { 4: { min: 6, max: 10 }, 9: { min: 38, max: 50 } },
-  hard:   { 4: { min: 8, max: 12 }, 9: { min: 42, max: 55 } },
-  // TODO: calibrate after expert techniques are implemented
-  expert: { 4: { min: 10, max: 14 }, 9: { min: 48, max: 60 } },
-};
+export const difficultyCellsRemoved = {
+  easy:     { 4: { min: 4, max: 8 }, 9: { min: 25, max: 38 } },
+  medium:   { 4: { min: 6, max: 10 }, 9: { min: 38, max: 50 } },
+  hard:     { 4: { min: 8, max: 12 }, 9: { min: 42, max: 55 } },
+  expert:   { 4: { min: 10, max: 14 }, 9: { min: 48, max: 60 } },
+  beginner: { 4: { min: 4, max: 8 }, 9: { min: 0, max: 0 } },
+  advanced: { 4: { min: 6, max: 10 }, 9: { min: 0, max: 0 } },
+} as const satisfies Record<string, Record<GridSize, { min: number; max: number }>>;

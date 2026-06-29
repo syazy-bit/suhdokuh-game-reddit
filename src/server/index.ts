@@ -6,7 +6,7 @@ import {
   LeaderboardEntry,
   CurrentPlayerInfo,
   GameMode,
-  Difficulty,
+  AnyDifficulty,
   PuzzleRequest,
   PuzzleResponse,
   PlayerStats,
@@ -70,8 +70,14 @@ const MAX_TIME = 86_400;
 
 // Valid mode literals – used to prevent Redis key injection.
 const VALID_MODES = new Set<string>(["4x4", "9x9"]);
-// Valid difficulty literals
-const VALID_DIFFICULTIES = new Set<string>(["easy", "medium", "hard", "expert"]);
+// Valid difficulty literals per mode
+const VALID_DIFFICULTIES_9X9 = new Set<string>(["easy", "medium", "hard", "expert"]);
+const VALID_DIFFICULTIES_4X4 = new Set<string>(["beginner", "advanced"]);
+
+function isValidDifficulty(mode: string, difficulty: string): boolean {
+  if (mode === "4x4") return VALID_DIFFICULTIES_4X4.has(difficulty);
+  return VALID_DIFFICULTIES_9X9.has(difficulty);
+}
 
 /**
  * Sanitise a raw leaderboard array read from Redis.
@@ -126,12 +132,12 @@ function sanitiseLeaderboard(raw: unknown): LeaderboardEntry[] {
  */
 async function getOrCreateLeaderboardData(
   mode: GameMode,
-  difficulty: Difficulty,
+  difficulty: AnyDifficulty,
 ): Promise<LeaderboardEntry[]> {
   const leaderboardKey = `leaderboard:${mode}:${difficulty}`;
 
-  // ── Non-medium difficulties: always authoritative ────────────────────
-  if (difficulty !== "medium") {
+  // ── 4×4 difficulties or non-medium 9×9: always authoritative ────────
+  if (mode === "4x4" || difficulty !== "medium") {
     const raw = await redis.get(leaderboardKey);
     if (!raw) return [];
     try {
@@ -142,7 +148,7 @@ async function getOrCreateLeaderboardData(
     }
   }
 
-  // ── Medium: try new key first ────────────────────────────────────────
+  // ── 9×9 Medium: try new key first ──────────────────────────────────
   const raw = await redis.get(leaderboardKey);
   if (raw) {
     try {
@@ -189,7 +195,7 @@ async function getOrCreateLeaderboardData(
  */
 async function migrateLegacyIfNeeded(
   mode: GameMode,
-  difficulty: Difficulty,
+  difficulty: AnyDifficulty,
 ): Promise<void> {
   const scoresKey = `leaderboard:${mode}:${difficulty}:scores`;
 
@@ -256,11 +262,11 @@ router.post<{ postId: string }, SubmitScoreResponse, SubmitScoreRequest>(
       }
 
       // ── 3. Validate difficulty ────────────────────────────────────────
-      if (!difficulty || !VALID_DIFFICULTIES.has(difficulty)) {
+      if (!difficulty || !isValidDifficulty(mode, difficulty)) {
         res.status(400).json({
           type: "submit-score",
           status: "error",
-          message: "Invalid difficulty",
+          message: `Invalid difficulty "${difficulty}" for mode "${mode}"`,
         });
         return;
       }
@@ -292,15 +298,18 @@ router.post<{ postId: string }, SubmitScoreResponse, SubmitScoreRequest>(
               totalWins: 0,
               totalPlayTime: 0,
               records: {
-                "4x4": { easy: null, medium: null, hard: null },
-                "9x9": { easy: null, medium: null, hard: null },
+                "4x4": { beginner: null, advanced: null },
+                "9x9": { easy: null, medium: null, hard: null, expert: null },
               },
               progress: {
                 "4x4": 0,
                 "9x9": 0,
+                beginner: 0,
+                advanced: 0,
                 easy: 0,
                 medium: 0,
                 hard: 0,
+                expert: 0,
               },
             };
 
@@ -309,9 +318,10 @@ router.post<{ postId: string }, SubmitScoreResponse, SubmitScoreRequest>(
         stats.progress[mode as keyof typeof stats.progress]++;
         stats.progress[difficulty as keyof typeof stats.progress]++;
 
-        const currentRecord = stats.records[mode as keyof typeof stats.records]?.[difficulty as keyof typeof stats.records["4x4"]];
+        const modeRecords = stats.records[mode as keyof typeof stats.records] as Record<string, number | null>;
+        const currentRecord = modeRecords[difficulty] ?? null;
         if (currentRecord === null || time < currentRecord) {
-          (stats.records[mode as keyof typeof stats.records] as Record<string, number | null>)[difficulty] = time;
+          modeRecords[difficulty] = time;
         }
 
         await redis.set(statsKey, JSON.stringify(stats));
@@ -367,7 +377,7 @@ router.get<
 
   try {
     const mode = (req.query.mode as GameMode) || "4x4";
-    const difficulty = (req.query.difficulty as Difficulty) || "medium";
+    const difficulty = (req.query.difficulty as string) || "beginner";
     const limit = Math.min(parseInt(req.query.limit as string) || 10, 50);
 
     if (!VALID_MODES.has(mode)) {
@@ -375,13 +385,13 @@ router.get<
       return;
     }
 
-    if (!VALID_DIFFICULTIES.has(difficulty)) {
-      res.status(400).json({ status: "error", message: "Invalid difficulty" });
+    if (!isValidDifficulty(mode, difficulty)) {
+      res.status(400).json({ status: "error", message: "Invalid difficulty for mode" });
       return;
     }
 
     // Ensure the sorted set exists (one-time legacy migration)
-    await migrateLegacyIfNeeded(mode, difficulty);
+    await migrateLegacyIfNeeded(mode, difficulty as AnyDifficulty);
 
     const scoresKey = `leaderboard:${mode}:${difficulty}:scores`;
 
@@ -395,7 +405,7 @@ router.get<
     const entries: LeaderboardEntry[] = topMembers.map((m) => ({
       username: m.member,
       mode,
-      difficulty,
+      difficulty: difficulty as AnyDifficulty,
       time: m.score,
       timestamp: Date.now(),
     }));
@@ -423,9 +433,8 @@ router.get<
         const rawStats = await redis.get(`stats:${username}`);
         if (rawStats) {
           const stats = JSON.parse(rawStats) as PlayerStats;
-          personalBest =
-            stats.records[mode as keyof typeof stats.records]?.[difficulty as keyof typeof stats.records["4x4"]] ??
-            null;
+          const modeRecords = stats.records[mode as keyof typeof stats.records] as Record<string, number | null> | undefined;
+          personalBest = modeRecords?.[difficulty] ?? null;
         }
       } catch {
         // Non-fatal — personalBest stays null
@@ -471,12 +480,14 @@ router.get<
       totalWins: 0,
       totalPlayTime: 0,
       records: {
-        "4x4": { easy: null, medium: null, hard: null, expert: null },
+        "4x4": { beginner: null, advanced: null },
         "9x9": { easy: null, medium: null, hard: null, expert: null },
       },
       progress: {
         "4x4": 0,
         "9x9": 0,
+        beginner: 0,
+        advanced: 0,
         easy: 0,
         medium: 0,
         hard: 0,
@@ -492,9 +503,8 @@ router.get<
 });
 
 // Fallback puzzle libraries for when API fails — bucketed by difficulty
-const fallbackPuzzles4x4: Record<Difficulty, { puzzle: number[][]; solution: number[][] }[]> = {
-  expert: [],
-  easy: [
+const fallbackPuzzles4x4: Record<string, { puzzle: number[][]; solution: number[][] }[]> = {
+  beginner: [
     {
       puzzle: [
         [1, 2, 3, 0],
@@ -524,7 +534,7 @@ const fallbackPuzzles4x4: Record<Difficulty, { puzzle: number[][]; solution: num
       ],
     },
   ],
-  medium: [
+  advanced: [
     {
       puzzle: [
         [1, 0, 0, 4],
@@ -554,39 +564,9 @@ const fallbackPuzzles4x4: Record<Difficulty, { puzzle: number[][]; solution: num
       ],
     },
   ],
-  hard: [
-    {
-      puzzle: [
-        [0, 3, 0, 0],
-        [0, 0, 0, 1],
-        [2, 0, 0, 0],
-        [0, 0, 1, 0],
-      ],
-      solution: [
-        [1, 3, 2, 4],
-        [4, 2, 3, 1],
-        [2, 1, 4, 3],
-        [3, 4, 1, 2],
-      ],
-    },
-    {
-      puzzle: [
-        [0, 0, 3, 0],
-        [4, 0, 0, 0],
-        [0, 0, 0, 3],
-        [0, 1, 0, 0],
-      ],
-      solution: [
-        [1, 2, 3, 4],
-        [4, 3, 2, 1],
-        [2, 4, 1, 3],
-        [3, 1, 4, 2],
-      ],
-    },
-  ],
 };
 
-const fallbackPuzzles9x9: Record<Difficulty, { puzzle: number[][]; solution: number[][] }[]> = {
+const fallbackPuzzles9x9: Record<string, { puzzle: number[][]; solution: number[][] }[]> = {
   expert: [],
   easy: [
     {
@@ -845,8 +825,6 @@ router.post<{ postId: string }, PuzzleResponse, PuzzleRequest>(
 
     try {
       const { mode, difficulty } = req.body;
-      const diff: Difficulty = difficulty === "easy" || difficulty === "hard" ? difficulty : "medium";
-      console.log(`[SERVER] Requested mode: ${mode}, difficulty: ${diff}`);
 
       if (!mode || (mode !== "4x4" && mode !== "9x9")) {
         res.status(400).json({
@@ -859,6 +837,16 @@ router.post<{ postId: string }, PuzzleResponse, PuzzleRequest>(
         return;
       }
 
+      let diff: AnyDifficulty;
+      let matchDifficulty = true;
+      if (mode === "4x4") {
+        diff = difficulty === "beginner" ? "beginner" : "advanced";
+        matchDifficulty = false;
+      } else {
+        diff = difficulty === "easy" || difficulty === "hard" ? difficulty : "medium";
+      }
+      console.log(`[SERVER] Requested mode: ${mode}, difficulty: ${diff}`);
+
       // Convert mode to grid size
       const size: GridSize = mode === "4x4" ? 4 : 9;
       const boxSize = Math.sqrt(size);
@@ -868,7 +856,7 @@ router.post<{ postId: string }, PuzzleResponse, PuzzleRequest>(
         console.log(`[SERVER] Generating ${mode} ${diff} puzzle with unified generator...`);
         const startTime = Date.now();
 
-        const generator = new SudokuGenerator({ size, boxSize, difficulty: diff });
+        const generator = new SudokuGenerator({ size, boxSize, difficulty: diff, matchDifficulty });
         const generated = generator.generate();
 
         const elapsed = Date.now() - startTime;
@@ -892,9 +880,7 @@ router.post<{ postId: string }, PuzzleResponse, PuzzleRequest>(
 
         const library = mode === "4x4" ? fallbackPuzzles4x4 : fallbackPuzzles9x9;
         const bucket = library[diff];
-        const fallback = bucket[Math.floor(Math.random() * bucket.length)];
-
-        if (!fallback) {
+        if (!bucket || bucket.length === 0) {
           res.status(500).json({
             type: "puzzle",
             status: "error",
@@ -904,6 +890,8 @@ router.post<{ postId: string }, PuzzleResponse, PuzzleRequest>(
           });
           return;
         }
+
+        const fallback = bucket[Math.floor(Math.random() * bucket.length)]!;
 
         res.json({
           type: "puzzle",

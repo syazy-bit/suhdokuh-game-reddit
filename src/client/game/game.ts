@@ -32,7 +32,7 @@ interface GameState {
 }
 
 type GameMode = "4x4" | "9x9";
-type Difficulty = "easy" | "medium" | "hard" | "expert";
+type Difficulty = "easy" | "medium" | "hard" | "expert" | "beginner" | "advanced";
 
 interface PuzzleData {
   puzzle: number[][];
@@ -66,9 +66,8 @@ interface CellRenderEffect {
 
 
 // Fallback puzzle libraries (for when API fails) — bucketed by difficulty
-const puzzleLibrary4x4: Record<Difficulty, PuzzleData[]> = {
-  expert: [],
-  easy: [
+const puzzleLibrary4x4: Record<string, PuzzleData[]> = {
+  beginner: [
     {
       puzzle: [
         [1, 2, 3, 0],
@@ -98,7 +97,7 @@ const puzzleLibrary4x4: Record<Difficulty, PuzzleData[]> = {
       ],
     },
   ],
-  medium: [
+  advanced: [
     {
       puzzle: [
         [1, 0, 0, 4],
@@ -128,39 +127,9 @@ const puzzleLibrary4x4: Record<Difficulty, PuzzleData[]> = {
       ],
     },
   ],
-  hard: [
-    {
-      puzzle: [
-        [0, 3, 0, 0],
-        [0, 0, 0, 1],
-        [2, 0, 0, 0],
-        [0, 0, 1, 0],
-      ],
-      solution: [
-        [1, 3, 2, 4],
-        [4, 2, 3, 1],
-        [2, 1, 4, 3],
-        [3, 4, 1, 2],
-      ],
-    },
-    {
-      puzzle: [
-        [0, 0, 3, 0],
-        [4, 0, 0, 0],
-        [0, 0, 0, 3],
-        [0, 1, 0, 0],
-      ],
-      solution: [
-        [1, 2, 3, 4],
-        [4, 3, 2, 1],
-        [2, 4, 1, 3],
-        [3, 1, 4, 2],
-      ],
-    },
-  ],
 };
 
-const puzzleLibrary9x9: Record<Difficulty, PuzzleData[]> = {
+const puzzleLibrary9x9: Record<string, PuzzleData[]> = {
   expert: [],
   easy: [
     {
@@ -420,9 +389,12 @@ async function fetchPuzzleFromAPI(mode: GameMode, difficulty: Difficulty): Promi
 /**
  * Get a random puzzle from fallback library
  */
-function getRandomFallbackPuzzle(mode: GameMode, difficulty: Difficulty): PuzzleData {
+function getRandomFallbackPuzzle(mode: GameMode, difficulty: string): PuzzleData {
   const library = mode === "4x4" ? puzzleLibrary4x4 : puzzleLibrary9x9;
   const bucket = library[difficulty];
+  if (!bucket || bucket.length === 0) {
+    throw new Error("No puzzles available");
+  }
   const randomIndex = Math.floor(Math.random() * bucket.length);
   const selected = bucket[randomIndex];
   if (!selected) {
@@ -1834,8 +1806,39 @@ document.addEventListener("DOMContentLoaded", () => {
   /**
    * Handle game mode change
    */
+  function updateDifficultyOptions(mode: GameMode): void {
+    const options = difficultySelect?.querySelectorAll("option");
+    if (!options) return;
+
+    // Show/hide options based on mode
+    Array.from(options).forEach((opt) => {
+      const optMode = opt.getAttribute("data-mode");
+      opt.hidden = optMode !== mode;
+    });
+  }
+
+  function getClosestDifficulty(mode: GameMode, currentDifficulty: Difficulty): Difficulty {
+    if (mode === "4x4") {
+      // Map 9×9 difficulties to 4×4
+      if (currentDifficulty === "beginner" || currentDifficulty === "advanced") {
+        return currentDifficulty;
+      }
+      // beginner ← easy/medium, advanced ← hard/expert
+      return currentDifficulty === "easy" || currentDifficulty === "medium" ? "beginner" : "advanced";
+    }
+    // Map 4×4 difficulties to 9×9
+    if (currentDifficulty === "beginner") return "easy";
+    if (currentDifficulty === "advanced") return "medium";
+    return currentDifficulty;
+  }
+
   async function changeGameMode(newMode: GameMode): Promise<void> {
+    state.difficulty = getClosestDifficulty(newMode, state.difficulty);
     state.mode = newMode;
+    updateDifficultyOptions(newMode);
+    if (difficultySelect) {
+      difficultySelect.value = state.difficulty;
+    }
     stopTimer();
     if (instructions) {
       instructions.textContent =
@@ -2091,12 +2094,12 @@ document.addEventListener("DOMContentLoaded", () => {
         </button>
         <div class="accordion-content">
           <table class="stats-table">
-            ${recordRow("4×4 Easy", stats.records["4x4"].easy)}
-            ${recordRow("4×4 Medium", stats.records["4x4"].medium)}
-            ${recordRow("4×4 Hard", stats.records["4x4"].hard)}
+            ${recordRow("4×4 Beginner", stats.records["4x4"].beginner)}
+            ${recordRow("4×4 Advanced", stats.records["4x4"].advanced)}
             ${recordRow("9×9 Easy", stats.records["9x9"].easy)}
             ${recordRow("9×9 Medium", stats.records["9x9"].medium)}
             ${recordRow("9×9 Hard", stats.records["9x9"].hard)}
+            ${recordRow("9×9 Expert", stats.records["9x9"].expert)}
           </table>
         </div>
       </div>
@@ -2109,9 +2112,12 @@ document.addEventListener("DOMContentLoaded", () => {
           <table class="stats-table">
             <tr><td>4×4 Wins</td><td>${stats.progress["4x4"]}</td></tr>
             <tr><td>9×9 Wins</td><td>${stats.progress["9x9"]}</td></tr>
+            <tr><td>Beginner Wins</td><td>${stats.progress.beginner}</td></tr>
+            <tr><td>Advanced Wins</td><td>${stats.progress.advanced}</td></tr>
             <tr><td>Easy Wins</td><td>${stats.progress.easy}</td></tr>
             <tr><td>Medium Wins</td><td>${stats.progress.medium}</td></tr>
             <tr><td>Hard Wins</td><td>${stats.progress.hard}</td></tr>
+            <tr><td>Expert Wins</td><td>${stats.progress.expert}</td></tr>
           </table>
         </div>
       </div>

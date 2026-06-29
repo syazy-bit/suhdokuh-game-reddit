@@ -9,11 +9,13 @@ export type InitResponse = {
 export type GameMode = "4x4" | "9x9";
 
 export type Difficulty = "easy" | "medium" | "hard" | "expert";
+export type Difficulty4x4 = "beginner" | "advanced";
+export type AnyDifficulty = Difficulty | Difficulty4x4;
 
 export type LeaderboardEntry = {
   username: string;
   mode: GameMode;
-  difficulty: Difficulty;
+  difficulty: AnyDifficulty;
   time: number; // completion time in seconds
   timestamp: number;
 };
@@ -22,7 +24,7 @@ export type SubmitScoreRequest = {
   // username is intentionally omitted — the server resolves it from
   // the authenticated Reddit session via reddit.getCurrentUsername().
   mode: GameMode;
-  difficulty: Difficulty;
+  difficulty: AnyDifficulty;
   time: number; // completion time in seconds
 };
 
@@ -48,7 +50,7 @@ export type LeaderboardResponse = {
 
 export type PuzzleRequest = {
   mode: GameMode;
-  difficulty?: Difficulty;
+  difficulty?: AnyDifficulty;
 };
 
 export type PuzzleResponse = {
@@ -64,12 +66,14 @@ export type PlayerStats = {
   totalWins: number;
   totalPlayTime: number;
   records: {
-    "4x4": { easy: number | null; medium: number | null; hard: number | null; expert: number | null };
+    "4x4": { beginner: number | null; advanced: number | null };
     "9x9": { easy: number | null; medium: number | null; hard: number | null; expert: number | null };
   };
   progress: {
     "4x4": number;
     "9x9": number;
+    beginner: number;
+    advanced: number;
     easy: number;
     medium: number;
     hard: number;
