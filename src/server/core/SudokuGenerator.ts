@@ -89,8 +89,14 @@ export class SudokuGenerator {
   }
 
   private generate9x9(): GeneratedPuzzle {
+    if (this.difficulty === "beginner" || this.difficulty === "advanced") {
+      throw new Error(
+        `Failed to generate ${this.size}×${this.size} ${this.difficulty} puzzle: invalid difficulty for 9×9 mode`
+      );
+    }
+
     const solution = this.generateSolvedBoard();
-    const targetRemoval = difficultyTargets[this.difficulty][this.size];
+    const targetRemoval = difficultyTargets[this.difficulty][9];
     const puzzle = this.createPuzzleFromSolution(solution, targetRemoval);
     const solveResult = solve(puzzle);
     const analysis = analyzeSolveResult(solveResult);
@@ -119,7 +125,7 @@ export class SudokuGenerator {
 
     for (let attempt = 2; attempt <= this.maxAttempts; attempt++) {
       const nextSolution = this.generateSolvedBoard();
-      const nextTargetRemoval = difficultyTargets[this.difficulty][this.size];
+      const nextTargetRemoval = difficultyTargets[this.difficulty][9];
       const nextPuzzle = this.createPuzzleFromSolution(nextSolution, nextTargetRemoval);
 
       const nextSolveResult = solve(nextPuzzle);

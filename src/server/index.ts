@@ -837,13 +837,21 @@ router.post<{ postId: string }, PuzzleResponse, PuzzleRequest>(
         return;
       }
 
-      let diff: AnyDifficulty;
+      if (!difficulty || !isValidDifficulty(mode, difficulty)) {
+        res.status(400).json({
+          type: "puzzle",
+          status: "error",
+          puzzle: [],
+          solution: [],
+          message: "Invalid difficulty for the specified mode",
+        });
+        return;
+      }
+
+      let diff: AnyDifficulty = difficulty;
       let matchDifficulty = true;
       if (mode === "4x4") {
-        diff = difficulty === "beginner" ? "beginner" : "advanced";
         matchDifficulty = false;
-      } else {
-        diff = difficulty === "easy" || difficulty === "hard" ? difficulty : "medium";
       }
       console.log(`[SERVER] Requested mode: ${mode}, difficulty: ${diff}`);
 
