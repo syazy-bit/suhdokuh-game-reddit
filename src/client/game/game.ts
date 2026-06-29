@@ -593,6 +593,8 @@ document.addEventListener("DOMContentLoaded", () => {
   let solution: number[][] = [];
   let timerInterval: number | null = null;
   let winResetTimeout: number | null = null;
+  let totalPausedTime = 0;
+  let pausedAt: number | null = null;
   const moveHistory: Move[] = [];
   const redoHistory: Move[] = [];
   let renderEffect: CellRenderEffect | null = null;
@@ -693,7 +695,19 @@ document.addEventListener("DOMContentLoaded", () => {
 
     timerInterval = window.setInterval(() => {
       if (state.startTime !== null) {
-        state.elapsedTime = Math.floor((Date.now() - state.startTime) / 1000);
+        state.elapsedTime = Math.floor((Date.now() - state.startTime - totalPausedTime) / 1000);
+        if (timer) {
+          timer.textContent = formatTime(state.elapsedTime);
+        }
+      }
+    }, 1000);
+  }
+
+  function startTimerInterval(): void {
+    if (timerInterval !== null) return;
+    timerInterval = window.setInterval(() => {
+      if (state.startTime !== null) {
+        state.elapsedTime = Math.floor((Date.now() - state.startTime - totalPausedTime) / 1000);
         if (timer) {
           timer.textContent = formatTime(state.elapsedTime);
         }
@@ -1727,6 +1741,8 @@ document.addEventListener("DOMContentLoaded", () => {
     state.hintsRemaining = DEFAULT_HINTS;
     state.startTime = null;
     state.elapsedTime = 0;
+    totalPausedTime = 0;
+    pausedAt = null;
     stopTimer();
     moveHistory.length = 0;
     redoHistory.length = 0;
@@ -2267,6 +2283,21 @@ document.addEventListener("DOMContentLoaded", () => {
       state.selected = null;
       highlightSelected();
       renderEffect = null;
+    }
+  });
+
+  // Pause timer when page is hidden (Page Visibility API)
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") {
+      if (state.gameWon || state.startTime === null || timerInterval === null || pausedAt !== null) return;
+      pausedAt = Date.now();
+      stopTimer();
+    } else if (document.visibilityState === "visible" && pausedAt !== null) {
+      totalPausedTime += Date.now() - pausedAt;
+      pausedAt = null;
+      state.elapsedTime = Math.floor((Date.now() - state.startTime! - totalPausedTime) / 1000);
+      if (timer) timer.textContent = formatTime(state.elapsedTime);
+      startTimerInterval();
     }
   });
 
