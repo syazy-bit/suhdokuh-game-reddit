@@ -1095,11 +1095,8 @@ document.addEventListener("DOMContentLoaded", () => {
         // Add box border styling
         const isBoxRight = (c + 1) % boxSize === 0 && c !== size - 1;
         const isBoxBottom = (r + 1) % boxSize === 0 && r !== size - 1;
-        if (isBoxRight || isBoxBottom) {
-          cell.classList.add("box-border");
-          if (isBoxRight) cell.classList.add("box-right");
-          if (isBoxBottom) cell.classList.add("box-bottom");
-        }
+        if (isBoxRight) cell.classList.add("box-right");
+        if (isBoxBottom) cell.classList.add("box-bottom");
 
         // Remove outer-edge borders — grid container border handles those
         if (c === size - 1) cell.classList.add("edge-right");
