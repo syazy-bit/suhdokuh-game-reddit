@@ -2,7 +2,7 @@ import type { AnyDifficulty } from "../../shared/types/api";
 import { isValidPlacement, countEmpty, difficultyTargets, type GridSize } from "./SudokuValidator";
 import { hasUniqueSolution } from "./SudokuSolver";
 import { solve } from "./HumanSolverPipeline";
-import { analyzeSolveResult, type AnalysisResult } from "./DifficultyAnalyzer";
+import { analyzeSolveResult, createEmptyAnalysis, type AnalysisResult } from "./DifficultyAnalyzer";
 
 export type { GridSize } from "./SudokuValidator";
 
@@ -54,8 +54,44 @@ export class SudokuGenerator {
    * @returns Generated puzzle and solution
    */
   public generate(): GeneratedPuzzle {
+    if (this.size === 4) {
+      return this.generate4x4();
+    }
+    return this.generate9x9();
+  }
+
+  private generate4x4(): GeneratedPuzzle {
+    if (this.difficulty !== "beginner" && this.difficulty !== "advanced") {
+      throw new Error(
+        `Failed to generate ${this.size}×${this.size} ${this.difficulty} puzzle: invalid difficulty for 4×4 mode`
+      );
+    }
+
+    const start = performance.now();
     const solution = this.generateSolvedBoard();
-    const puzzle = this.createPuzzleFromSolution(solution);
+    const targetRemoval = this.difficulty === "advanced" ? 8 : 6;
+    const puzzle = this.createPuzzleFromSolution(solution, targetRemoval);
+    const cellsRemoved = this.countEmpty(puzzle);
+    const elapsed = Math.round(performance.now() - start);
+
+    console.log(`Generated 4×4 ${this.difficulty} puzzle`);
+    console.log(`Removed ${cellsRemoved} cells`);
+    console.log(`Unique solution verified`);
+    console.log(`Generation: ${elapsed} ms`);
+
+    return {
+      puzzle,
+      solution,
+      size: this.size,
+      cellsRemoved,
+      analysis: createEmptyAnalysis(),
+    };
+  }
+
+  private generate9x9(): GeneratedPuzzle {
+    const solution = this.generateSolvedBoard();
+    const targetRemoval = difficultyTargets[this.difficulty][this.size];
+    const puzzle = this.createPuzzleFromSolution(solution, targetRemoval);
     const solveResult = solve(puzzle);
     const analysis = analyzeSolveResult(solveResult);
 
@@ -83,7 +119,8 @@ export class SudokuGenerator {
 
     for (let attempt = 2; attempt <= this.maxAttempts; attempt++) {
       const nextSolution = this.generateSolvedBoard();
-      const nextPuzzle = this.createPuzzleFromSolution(nextSolution);
+      const nextTargetRemoval = difficultyTargets[this.difficulty][this.size];
+      const nextPuzzle = this.createPuzzleFromSolution(nextSolution, nextTargetRemoval);
 
       const nextSolveResult = solve(nextPuzzle);
       const nextAnalysis = analyzeSolveResult(nextSolveResult);
@@ -155,9 +192,8 @@ export class SudokuGenerator {
     }
   }
 
-  private createPuzzleFromSolution(solution: number[][]): number[][] {
+  private createPuzzleFromSolution(solution: number[][], targetRemoval: number): number[][] {
     const puzzle = solution.map((row) => [...row]);
-    const targetRemoval = difficultyTargets[this.difficulty][this.size];
     const positions = this.buildPositionList();
     this.removeClues(puzzle, positions, targetRemoval);
     return puzzle;
@@ -277,7 +313,6 @@ export class SudokuGenerator {
       }
     }
 
-    console.log(`[GENERATOR] Removed ${removed}/${targetRemoval} cells from ${this.size}×${this.size} puzzle`);
   }
 
   private verifyUniqueness(puzzle: number[][]): boolean {

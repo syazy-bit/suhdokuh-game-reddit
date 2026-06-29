@@ -1,39 +1,33 @@
 import { describe, it, expect } from "vitest";
 import { SudokuGenerator } from "./SudokuGenerator";
 import type { GridSize, GeneratedPuzzle } from "./SudokuGenerator";
-import type { Difficulty } from "../../shared/types/api";
+import type { AnyDifficulty } from "../../shared/types/api";
 import { isValidSolution, areCluesConsistent, difficultyTargets } from "./SudokuValidator";
 import { countSolutions, difficultyCellsRemoved } from "./test-utils";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
-function createGenerator(size: GridSize, difficulty: Difficulty): SudokuGenerator {
+function createGenerator(size: GridSize, difficulty: AnyDifficulty): SudokuGenerator {
   const boxSize = size === 4 ? 2 : 3;
   return new SudokuGenerator({ size, boxSize, difficulty, matchDifficulty: false });
-}
-
-function generateValidPuzzle(size: GridSize, difficulty: Difficulty, maxAttempts = 5): GeneratedPuzzle {
-  for (let i = 0; i < maxAttempts; i++) {
-    const gen = createGenerator(size, difficulty);
-    const result = gen.generate();
-    if (countSolutions(result.puzzle, size, 2, 500_000) === 1) return result;
-  }
-  throw new Error(`Could not generate valid ${size}×${size} ${difficulty} puzzle after ${maxAttempts} attempts`);
 }
 
 // ── 1. Solution Validity ────────────────────────────────────────────────────
 
 describe("Solution validity", () => {
-  const sizes: GridSize[] = [4, 9];
-  const difficulties: Difficulty[] = ["easy", "medium", "hard"];
+  const testCases: Array<{ size: GridSize; difficulty: AnyDifficulty }> = [
+    { size: 4, difficulty: "beginner" },
+    { size: 4, difficulty: "advanced" },
+    { size: 9, difficulty: "easy" },
+    { size: 9, difficulty: "medium" },
+    { size: 9, difficulty: "hard" },
+  ];
 
-  for (const size of sizes) {
-    for (const difficulty of difficulties) {
-      it(`generates a valid solution for ${size}×${size} ${difficulty}`, () => {
-        const result = createGenerator(size, difficulty).generate();
-        expect(isValidSolution(result.solution, size)).toBe(true);
-      });
-    }
+  for (const { size, difficulty } of testCases) {
+    it(`generates a valid solution for ${size}×${size} ${difficulty}`, () => {
+      const result = createGenerator(size, difficulty).generate();
+      expect(isValidSolution(result.solution, size)).toBe(true);
+    });
   }
 
   it("every row contains digits 1–N exactly once", () => {
@@ -46,7 +40,7 @@ describe("Solution validity", () => {
   });
 
   it("every column contains digits 1–N exactly once", () => {
-    const result = createGenerator(4, "easy").generate();
+    const result = createGenerator(4, "beginner").generate();
     for (let c = 0; c < 4; c++) {
       const col = result.solution.map((r) => r[c]!);
       expect(new Set(col).size).toBe(4);
@@ -69,7 +63,7 @@ describe("Solution validity", () => {
   });
 
   it("no value in solution is outside 1..size", () => {
-    const result = createGenerator(4, "hard").generate();
+    const result = createGenerator(4, "advanced").generate();
     for (const row of result.solution)
       for (const v of row)
         expect(v).toBeGreaterThanOrEqual(1);
@@ -82,14 +76,15 @@ describe("Solution validity", () => {
 // ── 2. Puzzle Validity ──────────────────────────────────────────────────────
 
 describe("Puzzle validity", () => {
-  const sizes: GridSize[] = [4, 9];
+  it("every clue matches the solution for 4×4", () => {
+    const result = createGenerator(4, "beginner").generate();
+    expect(areCluesConsistent(result.puzzle, result.solution, 4)).toBe(true);
+  });
 
-  for (const size of sizes) {
-    it(`every clue matches the solution for ${size}×${size}`, () => {
-      const result = createGenerator(size, "medium").generate();
-      expect(areCluesConsistent(result.puzzle, result.solution, size)).toBe(true);
-    });
-  }
+  it("every clue matches the solution for 9×9", () => {
+    const result = createGenerator(9, "medium").generate();
+    expect(areCluesConsistent(result.puzzle, result.solution, 9)).toBe(true);
+  });
 
   it("puzzle cells contain only valid values (0 or 1..size)", () => {
     const result = createGenerator(9, "hard").generate();
@@ -102,7 +97,7 @@ describe("Puzzle validity", () => {
   });
 
   it("no contradictions exist between puzzle clues and solution", () => {
-    const result = createGenerator(4, "easy").generate();
+    const result = createGenerator(4, "beginner").generate();
     for (let r = 0; r < 4; r++)
       for (let c = 0; c < 4; c++)
         if (result.puzzle[r]![c] !== 0)
@@ -113,21 +108,24 @@ describe("Puzzle validity", () => {
 // ── 3. Unique Solution ──────────────────────────────────────────────────────
 
 describe("Unique solution", () => {
-  const sizes: GridSize[] = [4, 9];
-  const difficulties: Difficulty[] = ["easy", "medium", "hard"];
+  const testCases: Array<{ size: GridSize; difficulty: AnyDifficulty }> = [
+    { size: 4, difficulty: "beginner" },
+    { size: 4, difficulty: "advanced" },
+    { size: 9, difficulty: "easy" },
+    { size: 9, difficulty: "medium" },
+    { size: 9, difficulty: "hard" },
+  ];
 
-  for (const size of sizes) {
-    for (const difficulty of difficulties) {
-      it(`${size}×${size} ${difficulty} puzzle has exactly one solution`, () => {
-        const result = createGenerator(size, difficulty).generate();
-        const solutions = countSolutions(result.puzzle, size, 2, 500_000);
-        expect(solutions).toBe(1);
-      });
-    }
+  for (const { size, difficulty } of testCases) {
+    it(`${size}×${size} ${difficulty} puzzle has exactly one solution`, () => {
+      const result = createGenerator(size, difficulty).generate();
+      const solutions = countSolutions(result.puzzle, size, 2, 500_000);
+      expect(solutions).toBe(1);
+    });
   }
 
   it("puzzle with all cells filled is trivially unique", () => {
-    const result = createGenerator(4, "easy").generate();
+    const result = createGenerator(4, "beginner").generate();
     const full = result.solution.map((r) => [...r]);
     expect(countSolutions(full, 4, 2, 100_000)).toBe(1);
   });
@@ -143,17 +141,21 @@ describe("Unique solution", () => {
 // ── 4. Difficulty Consistency ───────────────────────────────────────────────
 
 describe("Difficulty consistency", () => {
-  const sizes: GridSize[] = [4, 9];
+  const testCases: Array<{ size: GridSize; difficulty: AnyDifficulty }> = [
+    { size: 4, difficulty: "beginner" },
+    { size: 4, difficulty: "advanced" },
+    { size: 9, difficulty: "easy" },
+    { size: 9, difficulty: "medium" },
+    { size: 9, difficulty: "hard" },
+  ];
 
-  for (const size of sizes) {
-    for (const difficulty of ["easy", "medium", "hard"] as Difficulty[]) {
-      it(`${size}×${size} ${difficulty} removes cells within expected range`, () => {
-        const result = createGenerator(size, difficulty).generate();
-        const { min, max } = difficultyCellsRemoved[difficulty][size];
-        expect(result.cellsRemoved).toBeGreaterThanOrEqual(min);
-        expect(result.cellsRemoved).toBeLessThanOrEqual(max);
-      });
-    }
+  for (const { size, difficulty } of testCases) {
+    it(`${size}×${size} ${difficulty} removes cells within expected range`, () => {
+      const result = createGenerator(size, difficulty).generate();
+      const { min, max } = difficultyCellsRemoved[difficulty][size];
+      expect(result.cellsRemoved).toBeGreaterThanOrEqual(min);
+      expect(result.cellsRemoved).toBeLessThanOrEqual(max);
+    });
   }
 
   it("hard puzzles remove more cells than easy puzzles for the same size", () => {
@@ -164,12 +166,12 @@ describe("Difficulty consistency", () => {
     expect(hard.cellsRemoved).toBeGreaterThan(easy.cellsRemoved);
   });
 
-  it("4×4 puzzles remove fewer cells than 9×9 puzzles at same difficulty", () => {
-    const gen4 = createGenerator(4, "medium");
-    const gen9 = createGenerator(9, "medium");
-    const p4 = gen4.generate();
-    const p9 = gen9.generate();
-    expect(p4.cellsRemoved).toBeLessThan(p9.cellsRemoved);
+  it("advanced 4×4 puzzles remove more cells than beginner 4×4 puzzles", () => {
+    const genBeginner = createGenerator(4, "beginner");
+    const genAdvanced = createGenerator(4, "advanced");
+    const beginner = genBeginner.generate();
+    const advanced = genAdvanced.generate();
+    expect(advanced.cellsRemoved).toBeGreaterThan(beginner.cellsRemoved);
   });
 
   it("cellsRemoved matches actual empty cell count", () => {
@@ -323,7 +325,7 @@ describe("Regression tests (Phase 0)", () => {
 
     it("generated puzzle does not replicate Phase 0 column-duplicate bug", () => {
       for (let i = 0; i < 10; i++) {
-        const result = createGenerator(4, "hard").generate();
+        const result = createGenerator(4, "advanced").generate();
         expect(isValidSolution(result.solution, 4)).toBe(true);
       }
     });
@@ -333,21 +335,24 @@ describe("Regression tests (Phase 0)", () => {
 // ── 6. Generator Stress Test ───────────────────────────────────────────────
 
 describe("Generator stress test", () => {
-  const sizes: GridSize[] = [4, 9];
-  const difficulties: Difficulty[] = ["easy", "medium", "hard"];
+  const testCases: Array<{ size: GridSize; difficulty: AnyDifficulty }> = [
+    { size: 4, difficulty: "beginner" },
+    { size: 4, difficulty: "advanced" },
+    { size: 9, difficulty: "easy" },
+    { size: 9, difficulty: "medium" },
+    { size: 9, difficulty: "hard" },
+  ];
 
-  for (const size of sizes) {
-    for (const difficulty of difficulties) {
-      it(`generates 20 valid ${size}×${size} ${difficulty} puzzles`, () => {
-        for (let i = 0; i < 20; i++) {
-          const result = createGenerator(size, difficulty).generate();
-          expect(isValidSolution(result.solution, size)).toBe(true);
-          expect(areCluesConsistent(result.puzzle, result.solution, size)).toBe(true);
-          const solutions = countSolutions(result.puzzle, size, 2, 500_000);
-          expect(solutions).toBe(1);
-        }
-      });
-    }
+  for (const { size, difficulty } of testCases) {
+    it(`generates 20 valid ${size}×${size} ${difficulty} puzzles`, () => {
+      for (let i = 0; i < 20; i++) {
+        const result = createGenerator(size, difficulty).generate();
+        expect(isValidSolution(result.solution, size)).toBe(true);
+        expect(areCluesConsistent(result.puzzle, result.solution, size)).toBe(true);
+        const solutions = countSolutions(result.puzzle, size, 2, 500_000);
+        expect(solutions).toBe(1);
+      }
+    });
   }
 
   it("all generated puzzles within the same category are not identical (checks variety)", () => {
@@ -365,49 +370,45 @@ describe("Generator stress test", () => {
 // ── 7. Performance Baseline ────────────────────────────────────────────────
 
 describe("Performance baseline", () => {
-  const sizes: GridSize[] = [4, 9];
+  const testCases: Array<{ size: GridSize; difficulty: AnyDifficulty }> = [
+    { size: 4, difficulty: "beginner" },
+    { size: 4, difficulty: "advanced" },
+    { size: 9, difficulty: "easy" },
+    { size: 9, difficulty: "hard" },
+  ];
 
-  for (const size of sizes) {
-    for (const difficulty of ["easy", "hard"] as Difficulty[]) {
-      it(`measures generation time for ${size}×${size} ${difficulty}`, () => {
-        const gen = createGenerator(size, difficulty);
-        const times: number[] = [];
+  for (const { size, difficulty } of testCases) {
+    it(`measures generation time for ${size}×${size} ${difficulty}`, () => {
+      const gen = createGenerator(size, difficulty);
+      const times: number[] = [];
 
-        for (let i = 0; i < 10; i++) {
-          const start = performance.now();
-          gen.generate();
-          times.push(performance.now() - start);
-        }
+      for (let i = 0; i < 10; i++) {
+        const start = performance.now();
+        gen.generate();
+        times.push(performance.now() - start);
+      }
 
-        const avg = times.reduce((a, b) => a + b, 0) / times.length;
-        const min = Math.min(...times);
-        const max = Math.max(...times);
+      const avg = times.reduce((a, b) => a + b, 0) / times.length;
+      const min = Math.min(...times);
+      const max = Math.max(...times);
 
-        console.log(
-          `  ${size}×${size} ${difficulty}: avg=${avg.toFixed(1)}ms min=${min.toFixed(1)}ms max=${max.toFixed(1)}ms`
-        );
+      console.log(
+        `  ${size}×${size} ${difficulty}: avg=${avg.toFixed(1)}ms min=${min.toFixed(1)}ms max=${max.toFixed(1)}ms`
+      );
 
-        // Soft threshold: generation should complete in reasonable time
-        expect(max).toBeLessThan(size === 9 ? 10000 : 1000);
-      });
-    }
+      // Soft threshold: generation should complete in reasonable time
+      expect(max).toBeLessThan(size === 9 ? 10000 : 1000);
+    });
   }
 });
 
-// ── 8. Difficulty Validation (Phase 5.3, refactored Pre-5.5) ────────────────
+// ── 8. Difficulty Validation ────────────────────────────────────────────────
 
 describe("Difficulty validation", () => {
-  it("matchDifficulty=false returns first puzzle with analysis (no retry loop)", () => {
-    const gen = new SudokuGenerator({ size: 4, boxSize: 2, difficulty: "easy", matchDifficulty: false });
+  it("4×4 beginner generation returns puzzle immediately", () => {
+    const gen = new SudokuGenerator({ size: 4, boxSize: 2, difficulty: "beginner" });
     const result = gen.generate();
-    expect(result.analysis.score).toBeGreaterThanOrEqual(0);
-  });
-
-  it("matchDifficulty=true with maxAttempts=50 succeeds for 4×4 easy", () => {
-    const gen = new SudokuGenerator({ size: 4, boxSize: 2, difficulty: "easy", maxAttempts: 50, matchDifficulty: true });
-    const result = gen.generate();
-    expect(result.analysis.difficulty).toBe("easy");
-    expect(result.analysis.score).toBeGreaterThanOrEqual(0);
+    expect(result.cellsRemoved).toBeGreaterThan(0);
   });
 
   it("matchDifficulty=true with maxAttempts=50 succeeds for 9×9 hard", () => {
@@ -417,30 +418,25 @@ describe("Difficulty validation", () => {
     expect(result.analysis.score).toBeGreaterThan(0);
   });
 
-  it("throws when maxAttempts exhausted — medium demand rarely matches current thresholds", () => {
-    const gen = new SudokuGenerator({ size: 4, boxSize: 2, difficulty: "medium", maxAttempts: 2, matchDifficulty: true });
-    expect(() => gen.generate()).toThrow(/Failed to generate/);
+  it("matchDifficulty=false for 9×9 returns first puzzle without retry", () => {
+    const gen = new SudokuGenerator({ size: 9, boxSize: 3, difficulty: "easy", matchDifficulty: false });
+    const result = gen.generate();
+    expect(result.analysis.score).toBeGreaterThanOrEqual(0);
   });
 
   it("error message includes size, difficulty, attempt count, last score and last difficulty", () => {
     expect.hasAssertions();
     try {
-      const gen = new SudokuGenerator({ size: 4, boxSize: 2, difficulty: "medium", maxAttempts: 1, matchDifficulty: true });
+      const gen = new SudokuGenerator({ size: 9, boxSize: 3, difficulty: "expert", maxAttempts: 1, matchDifficulty: true });
       gen.generate();
     } catch (e) {
       const msg = (e as Error).message;
-      expect(msg).toContain("4×4");
-      expect(msg).toContain("medium");
+      expect(msg).toContain("9×9");
+      expect(msg).toContain("expert");
       expect(msg).toContain("1 attempts");
       expect(msg).toContain("last score:");
       expect(msg).toContain("last difficulty:");
     }
-  });
-
-  it("matchDifficulty=false returns analysis immediately regardless of difficulty match", () => {
-    const gen = new SudokuGenerator({ size: 4, boxSize: 2, difficulty: "medium", matchDifficulty: false });
-    const result = gen.generate();
-    expect(result.analysis.score).toBeGreaterThanOrEqual(0);
   });
 });
 
@@ -516,13 +512,8 @@ describe("Expert configuration", () => {
     }
   });
 
-  it("4×4 expert generation always fails because 4×4 never reaches expert score", () => {
-    // 4×4 boards only use Naked Single (weight 1.0). With 12 empty cells
-    // max, the maximum possible score is 12, far below the hard threshold
-    // of 75. No amount of retries will produce an expert puzzle.
-    const gen = new SudokuGenerator({
-      size: 4, boxSize: 2, difficulty: "expert", matchDifficulty: true, maxAttempts: 10,
-    });
-    expect(() => gen.generate()).toThrow(/Failed to generate/);
+  it("4×4 only supports beginner and advanced difficulties", () => {
+    const gen = new SudokuGenerator({ size: 4, boxSize: 2, difficulty: "expert" });
+    expect(() => gen.generate()).toThrow();
   });
 });

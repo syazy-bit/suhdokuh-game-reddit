@@ -99,10 +99,10 @@ export function countSolutions(grid: number[][], size: GridSize, limit: number, 
 }
 
 export const difficultyCellsRemoved = {
-  easy:     { 4: { min: 4, max: 8 }, 9: { min: 25, max: 38 } },
-  medium:   { 4: { min: 6, max: 10 }, 9: { min: 38, max: 50 } },
-  hard:     { 4: { min: 8, max: 12 }, 9: { min: 42, max: 55 } },
-  expert:   { 4: { min: 10, max: 14 }, 9: { min: 48, max: 60 } },
-  beginner: { 4: { min: 4, max: 8 }, 9: { min: 0, max: 0 } },
-  advanced: { 4: { min: 6, max: 10 }, 9: { min: 0, max: 0 } },
-} as const satisfies Record<string, Record<GridSize, { min: number; max: number }>>;
+  easy:     { 9: { min: 25, max: 38 } },
+  medium:   { 9: { min: 38, max: 50 } },
+  hard:     { 9: { min: 42, max: 55 } },
+  expert:   { 9: { min: 48, max: 60 } },
+  beginner: { 4: { min: 4, max: 8 } },
+  advanced: { 4: { min: 6, max: 10 } },
+} as const;

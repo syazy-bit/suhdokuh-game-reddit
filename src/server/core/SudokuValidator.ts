@@ -66,10 +66,10 @@ export function countEmpty(grid: number[][], size: GridSize): number {
 }
 
 export const difficultyTargets = {
-  easy:     { 4: 6, 9: 30 },
-  medium:   { 4: 8, 9: 45 },
-  hard:     { 4: 10, 9: 50 },
-  expert:   { 4: 12, 9: 55 },
-  beginner: { 4: 6, 9: 0 },
-  advanced: { 4: 8, 9: 0 },
-} as const satisfies Record<string, Record<GridSize, number>>;
+  easy:     { 9: 30 },
+  medium:   { 9: 45 },
+  hard:     { 9: 50 },
+  expert:   { 9: 55 },
+  beginner: { 4: 6 },
+  advanced: { 4: 8 },
+} as const;

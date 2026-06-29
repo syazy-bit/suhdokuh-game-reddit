@@ -323,11 +323,11 @@ describe("recommendThresholds", () => {
 
 describe("Benchmark integration (small sample)", () => {
   it("generates benchmark entries with valid analysis", () => {
-    const gen = new SudokuGenerator({ size: 4, boxSize: 2, difficulty: "easy", matchDifficulty: false });
+    const gen = new SudokuGenerator({ size: 9, boxSize: 3, difficulty: "easy", matchDifficulty: false });
     const result = gen.generate();
-    const entry = createBenchmarkEntry(4, "easy", result.analysis);
+    const entry = createBenchmarkEntry(9, "easy", result.analysis);
     expect(entry.score).toBeGreaterThan(0);
-    expect(entry.size).toBe(4);
+    expect(entry.size).toBe(9);
     expect(entry.requestedDifficulty).toBe("easy");
     expect(entry.actualDifficulty).toBe("easy");
   });
@@ -335,9 +335,9 @@ describe("Benchmark integration (small sample)", () => {
   it("aggregates stats across multiple entries deterministically", () => {
     const entries: BenchmarkEntry[] = [];
     for (let i = 0; i < 5; i++) {
-      const gen = new SudokuGenerator({ size: 4, boxSize: 2, difficulty: "easy", matchDifficulty: false });
+      const gen = new SudokuGenerator({ size: 9, boxSize: 3, difficulty: "easy", matchDifficulty: false });
       const result = gen.generate();
-      entries.push(createBenchmarkEntry(4, "easy", result.analysis));
+      entries.push(createBenchmarkEntry(9, "easy", result.analysis));
     }
     const stats = aggregateStats(entries);
     expect(stats.sampleSize).toBe(5);
