@@ -62,6 +62,12 @@ export const TECHNIQUE_DESCRIPTIONS: Record<Technique, TechniqueDescription> = {
     explanation:
       "For a candidate value, two rows each contain exactly two possible positions. One column is shared between the two pairs (the base), while the other columns form the top cells. Any cell that can see both top cells cannot contain that candidate, because whichever row the candidate goes in, one of the top cells must hold it.",
   },
+  "Two-String Kite": {
+    title: "Two-String Kite",
+    summary: "A row and column each have a strong link for a candidate, sharing one endpoint.",
+    explanation:
+      "For a candidate value, a row and a column each contain exactly two possible positions. The row and column intersect at one shared cell (the pivot). The two opposite endpoints cannot both be false — at least one must hold the candidate. Therefore, any cell that can see both opposite endpoints cannot contain that candidate.",
+  },
   "XY-Wing": {
     title: "XY-Wing",
     summary: "Three cells with three candidates form a chain that eliminates a common candidate.",

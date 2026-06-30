@@ -7,6 +7,7 @@ export const TECHNIQUES = [
   "Claiming Pair",
   "X-Wing",
   "Skyscraper",
+  "Two-String Kite",
   "XY-Wing",
   "Swordfish",
 ] as const;

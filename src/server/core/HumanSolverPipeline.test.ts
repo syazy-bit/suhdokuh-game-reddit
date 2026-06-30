@@ -249,10 +249,11 @@ describe("solve — graceful stop", () => {
   });
 
   it("stops after exhausting available techniques", () => {
-    // This board has a Naked/Hidden Single but then gets stuck
+    // This board has a Naked/Hidden Single but then gets stuck.
+    // Only 3 givens in a 4×4: many empty cells, no single-digit fish possible.
     const board = [
-      [1, 2, 3, 4],
-      [3, 4, 0, 0],
+      [1, 0, 0, 0],
+      [0, 0, 0, 0],
       [0, 0, 0, 0],
       [0, 0, 0, 0],
     ];

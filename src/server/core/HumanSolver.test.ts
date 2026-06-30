@@ -10,6 +10,7 @@ import {
   findXWings,
   findXYWing,
   findSkyscraper,
+  findTwoStringKite,
   findSwordfish,
   type HumanSolverContext,
 } from "./HumanSolver";
@@ -2024,6 +2025,299 @@ describe("findSkyscraper — CandidateMap immutability", () => {
 
     for (let r = 0; r < 4; r++) {
       for (let c = 0; c < 4; c++) {
+        expect(ctx.candidateMap[r]![c]!).toEqual(snapshot[r]![c]!);
+      }
+    }
+  });
+});
+
+// ── Two-String Kite tests ──────────────────────────────────────────────────
+
+// Helper: build a 9×9 board with value 1 at the given given cells.
+function kiteBoard9(givens: Array<[number, number]>): number[][] {
+  const board = Array.from({ length: 9 }, () => Array(9).fill(0));
+  for (const [r, c] of givens) {
+    board[r]![c] = 1;
+  }
+  return board;
+}
+
+describe("findTwoStringKite — zero Two-String Kite", () => {
+  it("returns empty array for empty 9x9 board", () => {
+    const board = Array.from({ length: 9 }, () => Array(9).fill(0));
+    const ctx = createCtx(board, 9, 3);
+    expect(findTwoStringKite(ctx)).toEqual([]);
+  });
+
+  it("returns empty array for a solved 9x9 board", () => {
+    const board = [
+      [1, 2, 3, 4, 5, 6, 7, 8, 9],
+      [4, 5, 6, 7, 8, 9, 1, 2, 3],
+      [7, 8, 9, 1, 2, 3, 4, 5, 6],
+      [2, 3, 4, 5, 6, 7, 8, 9, 1],
+      [5, 6, 7, 8, 9, 1, 2, 3, 4],
+      [8, 9, 1, 2, 3, 4, 5, 6, 7],
+      [3, 4, 5, 6, 7, 8, 9, 1, 2],
+      [6, 7, 8, 9, 1, 2, 3, 4, 5],
+      [9, 1, 2, 3, 4, 5, 6, 7, 8],
+    ];
+    const ctx = createCtx(board, 9, 3);
+    expect(findTwoStringKite(ctx)).toEqual([]);
+  });
+
+  it("returns empty array when no row has a strong link", () => {
+    // Row 0 has 3 cells with value 1 → no row strong link
+    const size = 4;
+    const boxSize = 2;
+    const board = Array.from({ length: size }, () => Array(size).fill(0));
+    const candidateMap: number[][][] = Array.from({ length: size }, () =>
+      Array.from({ length: size }, () => [])
+    );
+    candidateMap[0][0] = [1];
+    candidateMap[0][2] = [1];
+    candidateMap[0][3] = [1];
+    const ctx: HumanSolverContext = { board, size: size as GridSize, boxSize, candidateMap };
+    expect(findTwoStringKite(ctx)).toEqual([]);
+  });
+
+  it("returns empty array when row and column links have no cells in the same box", () => {
+    // Row 0 strong link at cols 0,2 for value 1.
+    // Col 3 strong link at rows 1,2 for value 1.
+    // (0,0) box 0, (0,2) box 0, (1,3) box 1, (2,3) box 1.
+    // No row endpoint shares a box with any col endpoint.
+    const size = 4;
+    const boxSize = 2;
+    const board = Array.from({ length: size }, () => Array(size).fill(0));
+    const candidateMap: number[][][] = Array.from({ length: size }, () =>
+      Array.from({ length: size }, () => [])
+    );
+    candidateMap[0][0] = [1];
+    candidateMap[0][2] = [1];
+    candidateMap[1][3] = [1];
+    candidateMap[2][3] = [1];
+
+    const ctx: HumanSolverContext = { board, size: size as GridSize, boxSize, candidateMap };
+    expect(findTwoStringKite(ctx)).toEqual([]);
+  });
+});
+
+describe("findTwoStringKite — HoDoKu example 1 (col 6 \u00d7 row 7)", () => {
+  // Verified example from HoDoKu: "2-String Kite: 5 in r2c7,r8c4 (connected by r8c9,r9c7) => r2c4<>5"
+  // https://hodoku.sourceforge.net/en/show_example.php?file=2sk01&tech=2-String+Kite
+  // 0-indexed:
+  //   Col 6 strong link at rows (1, 8) — cells (1,6) and (8,6)
+  //   Row 7 strong link at cols (3, 8) — cells (7,3) and (7,8)
+  //   Box-mates: (7,8) and (8,6) in box 8 (rows 6-8, cols 6-8)
+  //   Tips: (7,3) and (1,6)
+  //   Elimination: (1,3) — row 1 sees (1,6), col 3 sees (7,3)
+  it("finds the HoDoKu Two-String Kite for digit 5", () => {
+    const size = 9;
+    const boxSize = 3;
+    const board = Array.from({ length: size }, () => Array(size).fill(0));
+    const candidateMap: number[][][] = Array.from({ length: size }, () =>
+      Array.from({ length: size }, () => [])
+    );
+
+    // Col 6 strong link: (1,6) and (8,6) have 5
+    candidateMap[1][6] = [5];
+    candidateMap[8][6] = [5];
+    // Row 7 strong link: (7,3) and (7,8) have 5
+    candidateMap[7][3] = [5];
+    candidateMap[7][8] = [5];
+    // Elimination target
+    candidateMap[1][3] = [5];
+    // No other cell has 5
+
+    const ctx: HumanSolverContext = { board, size: size as GridSize, boxSize, candidateMap };
+    const result = findTwoStringKite(ctx);
+
+    const kiteMoves = result.filter(
+      (m) => m.type === "elimination" && m.technique === "Two-String Kite"
+    );
+    expect(kiteMoves).toHaveLength(1);
+  });
+});
+
+describe("findTwoStringKite — HoDoKu example 2 (row 5 \u00d7 col 1)", () => {
+  // Verified example from HoDoKu: "2-String Kite: 9 in r6c6,r7c2 (connected by r4c2,r6c1) => r7c6<>9"
+  // https://hodoku.sourceforge.net/en/show_example.php?file=2sk02&tech=2-String+Kite
+  // 0-indexed:
+  //   Row 5 strong link at cols (0, 5) — cells (5,0) and (5,5)
+  //   Col 1 strong link at rows (3, 6) — cells (3,1) and (6,1)
+  //   Box-mates: (5,0) and (3,1) in box 3 (rows 3-5, cols 0-2)
+  //   Tips: (5,5) and (6,1)
+  //   Elimination: (6,5) — row 6 sees (6,1), col 5 sees (5,5)
+  it("finds the HoDoKu Two-String Kite for digit 9", () => {
+    const size = 9;
+    const boxSize = 3;
+    const board = Array.from({ length: size }, () => Array(size).fill(0));
+    const candidateMap: number[][][] = Array.from({ length: size }, () =>
+      Array.from({ length: size }, () => [])
+    );
+
+    // Row 5 strong link: (5,0) and (5,5) have 9
+    candidateMap[5][0] = [9];
+    candidateMap[5][5] = [9];
+    // Col 1 strong link: (3,1) and (6,1) have 9
+    candidateMap[3][1] = [9];
+    candidateMap[6][1] = [9];
+    // Elimination target
+    candidateMap[6][5] = [9];
+    // No other cell has 9
+
+    const ctx: HumanSolverContext = { board, size: size as GridSize, boxSize, candidateMap };
+    const result = findTwoStringKite(ctx);
+
+    const kiteMoves = result.filter(
+      (m) => m.type === "elimination" && m.technique === "Two-String Kite"
+    );
+    expect(kiteMoves).toHaveLength(1);
+
+    const move = kiteMoves[0]!;
+    expect(move.patternCells).toEqual(
+      expect.arrayContaining([
+        { row: 5, col: 0 },
+        { row: 5, col: 5 },
+        { row: 3, col: 1 },
+        { row: 6, col: 1 },
+      ])
+    );
+    expect(move.patternCells).toHaveLength(4);
+    expect(move.eliminations).toEqual(
+      expect.arrayContaining([{ row: 6, col: 5, value: 9 }])
+    );
+  });
+});
+
+describe("findTwoStringKite — invalid box relationship", () => {
+  it("returns empty array when no row and column endpoint pair shares a box", () => {
+    // Row 0 strong link at cols (0, 7) for value 2.
+    // Col 1 strong link at rows (3, 5) for value 2.
+    // (0,0) box 0, (0,7) box 2, (3,1) box 3, (5,1) box 3.
+    // No row endpoint shares a box with any col endpoint.
+    const size = 9;
+    const boxSize = 3;
+    const board = Array.from({ length: size }, () => Array(size).fill(0));
+    const candidateMap: number[][][] = Array.from({ length: size }, () =>
+      Array.from({ length: size }, () => [])
+    );
+    candidateMap[0][0] = [2];
+    candidateMap[0][7] = [2];
+    candidateMap[3][1] = [2];
+    candidateMap[5][1] = [2];
+    const ctx: HumanSolverContext = { board, size: size as GridSize, boxSize, candidateMap };
+    expect(findTwoStringKite(ctx)).toEqual([]);
+  });
+
+  it("returns empty array when the only same-box pair are the same cell", () => {
+    // Row 2 strong link at cols (4, 7) for value 3.
+    // Col 4 strong link at rows (2, 6) for value 3.
+    // (2,4) is an endpoint of BOTH links → same cell, not a valid kite.
+    const size = 9;
+    const boxSize = 3;
+    const board = Array.from({ length: size }, () => Array(size).fill(0));
+    const candidateMap: number[][][] = Array.from({ length: size }, () =>
+      Array.from({ length: size }, () => [])
+    );
+    candidateMap[2][4] = [3];
+    candidateMap[2][7] = [3];
+    candidateMap[6][4] = [3];
+    const ctx: HumanSolverContext = { board, size: size as GridSize, boxSize, candidateMap };
+    expect(findTwoStringKite(ctx)).toEqual([]);
+  });
+});
+
+describe("findTwoStringKite — no eliminations", () => {
+  it("ignores a Two-String Kite pattern where the elimination cell lacks the candidate", () => {
+    // Same strong links as HoDoKu example 1 but (1,3) does NOT have candidate 5.
+    const size = 9;
+    const boxSize = 3;
+    const board = Array.from({ length: size }, () => Array(size).fill(0));
+    const candidateMap: number[][][] = Array.from({ length: size }, () =>
+      Array.from({ length: size }, () => [])
+    );
+    candidateMap[1][6] = [5];
+    candidateMap[8][6] = [5];
+    candidateMap[7][3] = [5];
+    candidateMap[7][8] = [5];
+    const ctx: HumanSolverContext = { board, size: size as GridSize, boxSize, candidateMap };
+    expect(findTwoStringKite(ctx)).toEqual([]);
+  });
+});
+
+describe("findTwoStringKite — duplicate prevention", () => {
+  it("returns only one LogicalMove per Two-String Kite", () => {
+    // Set up the HoDoKu example 1 pattern only.
+    const size = 9;
+    const boxSize = 3;
+    const board = Array.from({ length: size }, () => Array(size).fill(0));
+    const candidateMap: number[][][] = Array.from({ length: size }, () =>
+      Array.from({ length: size }, () => [])
+    );
+    candidateMap[1][6] = [5];
+    candidateMap[8][6] = [5];
+    candidateMap[7][3] = [5];
+    candidateMap[7][8] = [5];
+    candidateMap[1][3] = [5];
+
+    const ctx: HumanSolverContext = { board, size: size as GridSize, boxSize, candidateMap };
+    const result = findTwoStringKite(ctx);
+
+    const kiteMoves = result.filter(
+      (m) => m.type === "elimination" && m.technique === "Two-String Kite"
+    );
+
+    const seen = new Set<string>();
+    for (const m of kiteMoves) {
+      if (m.type !== "elimination") continue;
+      const key = `${m.patternCells.map((c) => `${c.row},${c.col}`).sort().join("|")}|${m.eliminations.map((e) => `${e.row},${e.col},${e.value}`).sort().join("|")}`;
+      expect(seen.has(key)).toBe(false);
+      seen.add(key);
+    }
+  });
+});
+
+describe("findTwoStringKite — board immutability", () => {
+  it("does not mutate the board", () => {
+    const size = 9;
+    const boxSize = 3;
+    const board = Array.from({ length: size }, () => Array(size).fill(0));
+    const candidateMap: number[][][] = Array.from({ length: size }, () =>
+      Array.from({ length: size }, () => [])
+    );
+    candidateMap[1][6] = [5];
+    candidateMap[8][6] = [5];
+    candidateMap[7][3] = [5];
+    candidateMap[7][8] = [5];
+    candidateMap[1][3] = [5];
+
+    const snapshot = cloneBoard(board);
+    const ctx: HumanSolverContext = { board, size: size as GridSize, boxSize, candidateMap };
+    findTwoStringKite(ctx);
+    expect(board).toEqual(snapshot);
+  });
+});
+
+describe("findTwoStringKite — CandidateMap immutability", () => {
+  it("does not mutate the CandidateMap", () => {
+    const size = 9;
+    const boxSize = 3;
+    const board = Array.from({ length: size }, () => Array(size).fill(0));
+    const candidateMap: number[][][] = Array.from({ length: size }, () =>
+      Array.from({ length: size }, () => [])
+    );
+    candidateMap[1][6] = [5];
+    candidateMap[8][6] = [5];
+    candidateMap[7][3] = [5];
+    candidateMap[7][8] = [5];
+    candidateMap[1][3] = [5];
+
+    const ctx: HumanSolverContext = { board, size: size as GridSize, boxSize, candidateMap };
+    const snapshot = ctx.candidateMap.map((row) => row.map((col) => [...col]));
+    findTwoStringKite(ctx);
+
+    for (let r = 0; r < 9; r++) {
+      for (let c = 0; c < 9; c++) {
         expect(ctx.candidateMap[r]![c]!).toEqual(snapshot[r]![c]!);
       }
     }

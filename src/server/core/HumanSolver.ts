@@ -1376,3 +1376,144 @@ export function findSkyscraper(ctx: HumanSolverContext): LogicalMove[] {
   }
   return moves;
 }
+
+export function findTwoStringKite(ctx: HumanSolverContext): LogicalMove[] {
+  const { board, size, boxSize, candidateMap } = ctx;
+  const kiteMap = new Map<
+    string,
+    {
+      patternCells: Array<{ row: number; col: number }>;
+      eliminations: Map<string, { row: number; col: number; value: number }>;
+    }
+  >();
+
+  for (let v = 1; v <= size; v++) {
+    // Row strong links: rows where v appears in exactly 2 columns
+    const rowLinks = new Map<number, [number, number]>();
+
+    for (let r = 0; r < size; r++) {
+      const cols: number[] = [];
+      for (let c = 0; c < size; c++) {
+        if (board[r]![c] !== 0) continue;
+        if (candidateMap[r]![c]!.includes(v)) {
+          cols.push(c);
+        }
+      }
+      if (cols.length === 2) {
+        rowLinks.set(r, [cols[0]!, cols[1]!]);
+      }
+    }
+
+    // Column strong links: columns where v appears in exactly 2 rows
+    const colLinks = new Map<number, [number, number]>();
+
+    for (let c = 0; c < size; c++) {
+      const rows: number[] = [];
+      for (let r = 0; r < size; r++) {
+        if (board[r]![c] !== 0) continue;
+        if (candidateMap[r]![c]!.includes(v)) {
+          rows.push(r);
+        }
+      }
+      if (rows.length === 2) {
+        colLinks.set(c, [rows[0]!, rows[1]!]);
+      }
+    }
+
+    for (const [r, [cA, cB]] of rowLinks) {
+      for (const [c, [rA, rB]] of colLinks) {
+        // Check all 4 pairings of (row endpoint, col endpoint)
+        // to find two DIFFERENT cells in the same box
+        for (const [boxR, boxC] of [[r, cA] as [number, number], [r, cB] as [number, number]]) {
+          for (const [otherR, otherC] of [[rA, c] as [number, number], [rB, c] as [number, number]]) {
+            // Box-mates must be different cells
+            if (boxR === otherR && boxC === otherC) continue;
+
+            // Check if they are in the same box
+            const b1 = Math.floor(boxR / boxSize) * boxSize;
+            const bc1 = Math.floor(boxC / boxSize) * boxSize;
+            const b2 = Math.floor(otherR / boxSize) * boxSize;
+            const bc2 = Math.floor(otherC / boxSize) * boxSize;
+            if (b1 !== b2 || bc1 !== bc2) continue;
+
+            // Determine which endpoint is the row tip and which is the col tip
+            const rowTipC = boxC === cA ? cB : cA;
+            const colTipR = otherR === rA ? rB : rA;
+
+            // All 4 pattern cells must be distinct
+            const patternSet = new Set<string>();
+            patternSet.add(`${r},${cA}`);
+            patternSet.add(`${r},${cB}`);
+            patternSet.add(`${rA},${c}`);
+            patternSet.add(`${rB},${c}`);
+            if (patternSet.size !== 4) continue;
+
+            // Kite tips: (r, rowTipC) from the row link, (colTipR, c) from the col link
+            const tipR = r;
+            const tipC = c;
+            // The other intersection cell (colTipR, rowTipC) is also a potential elimination target
+            // but we'll scan all cells below
+
+            const eliminations = new Map<
+              string,
+              { row: number; col: number; value: number }
+            >();
+
+            for (let er = 0; er < size; er++) {
+              for (let ec = 0; ec < size; ec++) {
+                if (board[er]![ec] !== 0) continue;
+
+                // Skip the 4 pattern cells
+                if (patternSet.has(`${er},${ec}`)) continue;
+
+                if (!candidateMap[er]![ec]!.includes(v)) continue;
+
+                if (
+                  seeEachOther(er, ec, tipR, rowTipC, boxSize) &&
+                  seeEachOther(er, ec, colTipR, tipC, boxSize)
+                ) {
+                  const ek = eliminationCellKey(er, ec, v);
+                  if (!eliminations.has(ek)) {
+                    eliminations.set(ek, { row: er, col: ec, value: v });
+                  }
+                }
+              }
+            }
+
+            if (eliminations.size > 0) {
+              const patternCells = [
+                { row: r, col: cA },
+                { row: r, col: cB },
+                { row: rA, col: c },
+                { row: rB, col: c },
+              ].sort((a, b) => a.row - b.row || a.col - b.col);
+
+              const dk = `kite-v${v}-${boxR},${boxC}-${otherR},${otherC}`;
+              const existing = kiteMap.get(dk);
+              if (existing) {
+                for (const [ek, e] of eliminations) {
+                  if (!existing.eliminations.has(ek)) {
+                    existing.eliminations.set(ek, e);
+                  }
+                }
+              } else {
+                kiteMap.set(dk, { patternCells, eliminations });
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  const moves: LogicalMove[] = [];
+  for (const { patternCells, eliminations } of kiteMap.values()) {
+    moves.push({
+      type: "elimination",
+      technique: "Two-String Kite",
+      patternCells,
+      eliminations: [...eliminations.values()],
+    });
+  }
+  return moves;
+}
