@@ -4,7 +4,7 @@ import { hasUniqueSolution } from "./SudokuSolver";
 import { solve } from "./HumanSolverPipeline";
 import { analyzeSolveResult, createEmptyAnalysis, type AnalysisResult } from "./DifficultyAnalyzer";
 import { buildCandidateMap } from "./CandidateEngine";
-import { evaluateCandidates, estimateDelta, registerDefaultFeatures, getLambda, type RemovalCandidate, type PredictorContextData } from "./predictor/index";
+import { evaluateCandidates, estimateDelta, computeEligibleSet, registerDefaultFeatures, getLambda, getAbsoluteRMSE, type RemovalCandidate, type PredictorContextData } from "./predictor/index";
 
 export type { GridSize } from "./SudokuValidator";
 
@@ -16,6 +16,7 @@ export interface GeneratorConfig {
   matchDifficulty?: boolean;
   useGuidedRemoval?: boolean;
   usePredictor?: boolean;
+  usePredictorAwareBudget?: boolean;
 }
 
 export interface GeneratedPuzzle {
@@ -34,6 +35,7 @@ export class SudokuGenerator {
   private matchDifficulty: boolean;
   private useGuidedRemoval: boolean;
   private usePredictor: boolean;
+  private usePredictorAwareBudget: boolean;
 
   constructor(config: GeneratorConfig) {
     this.size = config.size;
@@ -43,6 +45,7 @@ export class SudokuGenerator {
     this.matchDifficulty = config.matchDifficulty ?? true;
     this.useGuidedRemoval = config.useGuidedRemoval ?? false;
     this.usePredictor = config.usePredictor ?? false;
+    this.usePredictorAwareBudget = config.usePredictorAwareBudget ?? false;
 
     if (this.maxAttempts < 1) {
       throw new Error(
@@ -257,6 +260,35 @@ export class SudokuGenerator {
     }
   }
 
+  private getTolerance(): number {
+    const target = this.getTargetScore();
+    if (this.difficulty === "easy" || this.difficulty === "medium") {
+      return 0.10 * target;
+    }
+    return 0.15 * target;
+  }
+
+  static getEvalBudget(difficulty: string, eligibleCount: number): number {
+    const base: Record<string, number> = {
+      easy: 1, medium: 2, hard: 2, expert: 3,
+    };
+    const min: Record<string, number> = {
+      easy: 1, medium: 2, hard: 2, expert: 3,
+    };
+    const max: Record<string, number> = {
+      easy: 2, medium: 2, hard: 3, expert: 5,
+    };
+
+    let budget = base[difficulty] ?? 2;
+    if ((difficulty === "hard" || difficulty === "expert") && eligibleCount >= 4) {
+      budget += 1;
+    }
+    if (eligibleCount <= 1) {
+      budget = Math.max(budget - 1, 1);
+    }
+    return Math.max(min[difficulty] ?? 1, Math.min(max[difficulty] ?? 5, budget));
+  }
+
   private guidedRemovalStep(
     candidates: Array<{
       row: number; col: number; symRow: number; symCol: number;
@@ -264,6 +296,7 @@ export class SudokuGenerator {
     }>,
     puzzle: number[][],
     usePredictorOrder: boolean = false,
+    usePredictorAwareBudget: boolean = false,
   ): {
     row: number; col: number; symRow: number; symCol: number;
     box1: number; box2: number; delta: number;
@@ -277,81 +310,159 @@ export class SudokuGenerator {
       box1: number; box2: number; distance: number;
     };
 
-    // ── Predictor-enhanced path ──
+    // ── Shared predictor context ─────────────────────────────────────────
+    let currentScore = 0;
+    const targetScore = this.getTargetScore();
+    let ctx: PredictorContextData | null = null;
+
     if (usePredictorOrder) {
       const currentSolveResult = solve(puzzle);
       if (currentSolveResult.solved) {
         const currentAnalysis = analyzeSolveResult(currentSolveResult);
-        const currentScore = currentAnalysis.score;
-        const targetScore = this.getTargetScore();
-
+        currentScore = currentAnalysis.score;
         const beforeMap = buildCandidateMap(puzzle, this.size, this.boxSize);
-        const ctx: PredictorContextData = {
+        ctx = {
           board: puzzle, size: this.size, boxSize: this.boxSize,
           beforeCandidateMap: beforeMap,
         };
+      }
+    }
 
-        const estimated: Array<{
-          row: number; col: number; symRow: number; symCol: number;
-          box1: number; box2: number; estimatedDistance: number;
-        }> = [];
+    // ── Predictor-aware budget path ───────────────────────────────────────
+    if (usePredictorOrder && usePredictorAwareBudget && ctx !== null) {
+      const rc: RemovalCandidate[] = candidates.map((c) => ({
+        row: c.row, col: c.col, symRow: c.symRow, symCol: c.symCol,
+        box1: c.box1, box2: c.box2,
+        balanceScore: 0, predictorScore: 0, finalScore: 0,
+      }));
 
-        for (const c of sampled) {
-          const base: RemovalCandidate = {
-            row: c.row, col: c.col, symRow: c.symRow, symCol: c.symCol,
-            box1: c.box1, box2: c.box2,
-            balanceScore: 0, predictorScore: 0, finalScore: 0,
-          };
-          const pred = estimateDelta(ctx, base, this.difficulty);
-          if (!pred.passedStage1) continue;
-          estimated.push({
-            row: c.row, col: c.col, symRow: c.symRow, symCol: c.symCol,
-            box1: c.box1, box2: c.box2,
-            estimatedDistance: Math.abs(currentScore + pred.delta - targetScore),
-          });
-        }
+      const estimated = computeEligibleSet(ctx, rc, this.difficulty, currentScore, targetScore);
+      if (estimated.length === 0) return null;
 
-        estimated.sort((a, b) => a.estimatedDistance - b.estimatedDistance);
-        const evaluated: Evaluation[] = [];
-        const maxToEval = Math.min(2, estimated.length);
+      const tolerance = this.getTolerance();
+      const rmse = getAbsoluteRMSE(this.difficulty);
+      const threshold = tolerance + rmse;
 
-        for (let i = 0; i < maxToEval; i++) {
-          const e = estimated[i]!;
-          const temp = Array.from({ length: this.size }, () => Array(this.size).fill(0));
-          for (let r = 0; r < this.size; r++) {
-            for (let c = 0; c < this.size; c++) {
-              temp[r]![c] = puzzle[r]![c];
-            }
+      const eligible = estimated.filter((e) => e.distance <= threshold);
+      const toEval = eligible.length > 0 ? eligible : [estimated[0]!];
+
+      const budget = SudokuGenerator.getEvalBudget(this.difficulty, eligible.length);
+      const evalCount = Math.min(budget, toEval.length);
+
+      const evaluated: Evaluation[] = [];
+
+      for (let i = 0; i < evalCount; i++) {
+        const e = toEval[i]!;
+        const temp = Array.from({ length: this.size }, () => Array(this.size).fill(0));
+        for (let r = 0; r < this.size; r++) {
+          for (let c = 0; c < this.size; c++) {
+            temp[r]![c] = puzzle[r]![c];
           }
-          temp[e.row]![e.col] = 0;
-          temp[e.symRow]![e.symCol] = 0;
-
-          if (!hasUniqueSolution(temp, this.size, this.boxSize)) continue;
-          const solveResult = solve(temp);
-          if (!solveResult.solved) continue;
-          const analysis = analyzeSolveResult(solveResult);
-          evaluated.push({
-            row: e.row, col: e.col, symRow: e.symRow, symCol: e.symCol,
-            box1: e.box1, box2: e.box2,
-            distance: Math.abs(analysis.score - targetScore),
-          });
         }
+        temp[e.candidate.row]![e.candidate.col] = 0;
+        temp[e.candidate.symRow]![e.candidate.symCol] = 0;
 
-        if (evaluated.length > 0) {
-          evaluated.sort((a, b) => a.distance - b.distance);
-          const minDistance = evaluated[0]!.distance;
-          const tied = evaluated.filter(
-            (e) => Math.abs(e.distance - minDistance) <= SudokuGenerator.DISTANCE_THRESHOLD
-          );
-          const picked = tied[Math.floor(Math.random() * tied.length)]!;
-          puzzle[picked.row]![picked.col] = 0;
-          puzzle[picked.symRow]![picked.symCol] = 0;
-          const delta = (picked.row === picked.symRow && picked.col === picked.symCol) ? 1 : 2;
+        if (!hasUniqueSolution(temp, this.size, this.boxSize)) continue;
+        const solveResult = solve(temp);
+        if (!solveResult.solved) continue;
+        const analysis = analyzeSolveResult(solveResult);
+        const actualDistance = Math.abs(analysis.score - targetScore);
+        evaluated.push({
+          row: e.candidate.row, col: e.candidate.col,
+          symRow: e.candidate.symRow, symCol: e.candidate.symCol,
+          box1: e.candidate.box1, box2: e.candidate.box2,
+          distance: actualDistance,
+        });
+
+        // Early stopping: if actual score lands in the target window, accept immediately
+        if (actualDistance <= tolerance) {
+          puzzle[e.candidate.row]![e.candidate.col] = 0;
+          puzzle[e.candidate.symRow]![e.candidate.symCol] = 0;
+          const delta = (e.candidate.row === e.candidate.symRow && e.candidate.col === e.candidate.symCol) ? 1 : 2;
           return {
-            row: picked.row, col: picked.col, symRow: picked.symRow, symCol: picked.symCol,
-            box1: picked.box1, box2: picked.box2, delta,
+            row: e.candidate.row, col: e.candidate.col,
+            symRow: e.candidate.symRow, symCol: e.candidate.symCol,
+            box1: e.candidate.box1, box2: e.candidate.box2, delta,
           };
         }
+      }
+
+      // Budget exhausted — pick best evaluated
+      if (evaluated.length > 0) {
+        evaluated.sort((a, b) => a.distance - b.distance);
+        const best = evaluated[0]!;
+        puzzle[best.row]![best.col] = 0;
+        puzzle[best.symRow]![best.symCol] = 0;
+        const delta = (best.row === best.symRow && best.col === best.symCol) ? 1 : 2;
+        return {
+          row: best.row, col: best.col, symRow: best.symRow, symCol: best.symCol,
+          box1: best.box1, box2: best.box2, delta,
+        };
+      }
+    }
+
+    // ── Original predictor-enhanced path ──
+    if (usePredictorOrder && ctx !== null) {
+      const estimated: Array<{
+        row: number; col: number; symRow: number; symCol: number;
+        box1: number; box2: number; estimatedDistance: number;
+      }> = [];
+
+      for (const c of sampled) {
+        const base: RemovalCandidate = {
+          row: c.row, col: c.col, symRow: c.symRow, symCol: c.symCol,
+          box1: c.box1, box2: c.box2,
+          balanceScore: 0, predictorScore: 0, finalScore: 0,
+        };
+        const pred = estimateDelta(ctx, base, this.difficulty);
+        if (!pred.passedStage1) continue;
+        estimated.push({
+          row: c.row, col: c.col, symRow: c.symRow, symCol: c.symCol,
+          box1: c.box1, box2: c.box2,
+          estimatedDistance: Math.abs(currentScore + pred.delta - targetScore),
+        });
+      }
+
+      estimated.sort((a, b) => a.estimatedDistance - b.estimatedDistance);
+      const evaluated: Evaluation[] = [];
+      const maxToEval = Math.min(2, estimated.length);
+
+      for (let i = 0; i < maxToEval; i++) {
+        const e = estimated[i]!;
+        const temp = Array.from({ length: this.size }, () => Array(this.size).fill(0));
+        for (let r = 0; r < this.size; r++) {
+          for (let c = 0; c < this.size; c++) {
+            temp[r]![c] = puzzle[r]![c];
+          }
+        }
+        temp[e.row]![e.col] = 0;
+        temp[e.symRow]![e.symCol] = 0;
+
+        if (!hasUniqueSolution(temp, this.size, this.boxSize)) continue;
+        const solveResult = solve(temp);
+        if (!solveResult.solved) continue;
+        const analysis = analyzeSolveResult(solveResult);
+        evaluated.push({
+          row: e.row, col: e.col, symRow: e.symRow, symCol: e.symCol,
+          box1: e.box1, box2: e.box2,
+          distance: Math.abs(analysis.score - targetScore),
+        });
+      }
+
+      if (evaluated.length > 0) {
+        evaluated.sort((a, b) => a.distance - b.distance);
+        const minDistance = evaluated[0]!.distance;
+        const tied = evaluated.filter(
+          (e) => Math.abs(e.distance - minDistance) <= SudokuGenerator.DISTANCE_THRESHOLD
+        );
+        const picked = tied[Math.floor(Math.random() * tied.length)]!;
+        puzzle[picked.row]![picked.col] = 0;
+        puzzle[picked.symRow]![picked.symCol] = 0;
+        const delta = (picked.row === picked.symRow && picked.col === picked.symCol) ? 1 : 2;
+        return {
+          row: picked.row, col: picked.col, symRow: picked.symRow, symCol: picked.symCol,
+          box1: picked.box1, box2: picked.box2, delta,
+        };
       }
     }
 
@@ -625,7 +736,7 @@ export class SudokuGenerator {
       let guidedSucceeded = false;
 
       if (this.useGuidedRemoval && remaining <= SudokuGenerator.GUIDED_REMOVAL_THRESHOLD && candidates.length > 0) {
-        const picked = this.guidedRemovalStep(candidates, puzzle, this.usePredictor);
+        const picked = this.guidedRemovalStep(candidates, puzzle, this.usePredictor, this.usePredictorAwareBudget);
         if (picked !== null) {
           guidedSucceeded = true;
           removed += picked.delta;

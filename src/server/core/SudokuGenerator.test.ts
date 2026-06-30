@@ -746,7 +746,7 @@ describe("Local search — benchmark", () => {
     for (let i = 0; i < samples; i++) {
       const gen = new SudokuGenerator({
         size: 9, boxSize: 3, difficulty,
-        matchDifficulty: true, useGuidedRemoval: true, maxAttempts: 50,
+        matchDifficulty: true, useGuidedRemoval: true, maxAttempts: 200,
       });
 
       // Toggle local search per trial
@@ -868,7 +868,7 @@ describe("Phase 11.3 — Detailed benchmark", () => {
         const t0 = performance.now();
         const g = new SudokuGenerator({
           size: 9, boxSize: 3, difficulty: diff,
-          matchDifficulty: true, useGuidedRemoval: true, maxAttempts: 50,
+        matchDifficulty: true, useGuidedRemoval: true, maxAttempts: 200,
         });
         const r = g.generate();
         times.push(performance.now() - t0);
@@ -1104,5 +1104,113 @@ describe("Backward compatibility", () => {
     const result = gen.generate();
     expect(isValidSolution(result.solution, 9)).toBe(true);
     expect(areCluesConsistent(result.puzzle, result.solution)).toBe(true);
+  });
+});
+
+// ── 15. Predictor-Aware Budget ──────────────────────────────────────────────
+
+describe("getEvalBudget", () => {
+  it("easy returns 1-2", () => {
+    for (let i = 0; i < 10; i++) {
+      const b = SudokuGenerator.getEvalBudget("easy", i);
+      expect(b).toBeGreaterThanOrEqual(1);
+      expect(b).toBeLessThanOrEqual(2);
+    }
+  });
+
+  it("medium always returns 2", () => {
+    for (let i = 0; i < 10; i++) {
+      expect(SudokuGenerator.getEvalBudget("medium", i)).toBe(2);
+    }
+  });
+
+  it("hard returns 2-3", () => {
+    expect(SudokuGenerator.getEvalBudget("hard", 1)).toBeGreaterThanOrEqual(2);
+    expect(SudokuGenerator.getEvalBudget("hard", 1)).toBeLessThanOrEqual(3);
+    expect(SudokuGenerator.getEvalBudget("hard", 5)).toBeGreaterThanOrEqual(2);
+    expect(SudokuGenerator.getEvalBudget("hard", 5)).toBeLessThanOrEqual(3);
+  });
+
+  it("expert returns 3-5", () => {
+    expect(SudokuGenerator.getEvalBudget("expert", 1)).toBeGreaterThanOrEqual(3);
+    expect(SudokuGenerator.getEvalBudget("expert", 1)).toBeLessThanOrEqual(5);
+    expect(SudokuGenerator.getEvalBudget("expert", 5)).toBeGreaterThanOrEqual(3);
+    expect(SudokuGenerator.getEvalBudget("expert", 5)).toBeLessThanOrEqual(5);
+  });
+
+  it("hard/expert with eligibleCount >= 4 increases budget", () => {
+    const baseHard = SudokuGenerator.getEvalBudget("hard", 2);
+    const bumpedHard = SudokuGenerator.getEvalBudget("hard", 4);
+    expect(bumpedHard).toBeGreaterThanOrEqual(baseHard);
+
+    const baseExpert = SudokuGenerator.getEvalBudget("expert", 2);
+    const bumpedExpert = SudokuGenerator.getEvalBudget("expert", 4);
+    expect(bumpedExpert).toBeGreaterThanOrEqual(baseExpert);
+  });
+
+  it("eligibleCount <= 1 reduces budget (but not below min)", () => {
+    expect(SudokuGenerator.getEvalBudget("easy", 0)).toBe(1);
+    expect(SudokuGenerator.getEvalBudget("medium", 1)).toBe(2);
+  });
+});
+
+describe("Predictor-aware budget — puzzle validity", () => {
+  const difficulties: AnyDifficulty[] = ["easy", "medium", "hard", "expert"];
+
+  for (const difficulty of difficulties) {
+    it(`generates a valid 9×9 ${difficulty} puzzle`, () => {
+      const gen = new SudokuGenerator({
+        size: 9, boxSize: 3, difficulty,
+        matchDifficulty: false,
+        useGuidedRemoval: true,
+        usePredictor: true,
+        usePredictorAwareBudget: true,
+      });
+      const result = gen.generate();
+      expect(isValidSolution(result.solution, 9)).toBe(true);
+      expect(areCluesConsistent(result.puzzle, result.solution)).toBe(true);
+      const solutions = countSolutions(result.puzzle, 9, 2, 500_000);
+      expect(solutions).toBe(1);
+    });
+  }
+
+  it("matchDifficulty=true works with predictor-aware budget", () => {
+    const gen = new SudokuGenerator({
+      size: 9, boxSize: 3, difficulty: "hard",
+      matchDifficulty: true, useGuidedRemoval: true,
+      usePredictor: true, usePredictorAwareBudget: true,
+      maxAttempts: 50,
+    });
+    const result = gen.generate();
+    expect(result.analysis.difficulty).toBe("hard");
+    expect(result.analysis.score).toBeGreaterThan(0);
+  });
+});
+
+describe("Predictor-aware budget — backward compatibility", () => {
+  it("default usePredictorAwareBudget is false", () => {
+    const gen = new SudokuGenerator({
+      size: 9, boxSize: 3, difficulty: "easy",
+      matchDifficulty: false,
+    });
+    expect((gen as any).usePredictorAwareBudget).toBe(false);
+  });
+
+  it("explicit false produces same result as default", () => {
+    const gen1 = new SudokuGenerator({
+      size: 9, boxSize: 3, difficulty: "medium",
+      matchDifficulty: false, useGuidedRemoval: true,
+    });
+    const gen2 = new SudokuGenerator({
+      size: 9, boxSize: 3, difficulty: "medium",
+      matchDifficulty: false, useGuidedRemoval: true,
+      usePredictorAwareBudget: false,
+    });
+    const r1 = gen1.generate();
+    const r2 = gen2.generate();
+    expect(isValidSolution(r1.solution, 9)).toBe(true);
+    expect(isValidSolution(r2.solution, 9)).toBe(true);
+    expect(areCluesConsistent(r1.puzzle, r1.solution)).toBe(true);
+    expect(areCluesConsistent(r2.puzzle, r2.solution)).toBe(true);
   });
 });

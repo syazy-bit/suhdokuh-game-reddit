@@ -333,6 +333,22 @@ Artifacts:
 - generateCalibrationDataset.ts |
 | 13 | TBD |
 
+## Phase 12.4 — Predictor-Aware Guided Removal
+
+Status:
+✔ Complete
+
+Highlights
+- Added eligible candidate selection using predicted delta
+- Added RMSE-aware candidate filtering
+- Added dynamic HumanSolver evaluation budget
+- Added early stopping during candidate evaluation
+- Preserved backward compatibility behind usePredictorAwareBudget
+- Removed duplicated predictor initialization
+- Consolidated normalization helpers
+- 403/403 tests passing
+- Clean build and type-check
+
 ### Future techniques (not yet scheduled)
 
 - Jellyfish

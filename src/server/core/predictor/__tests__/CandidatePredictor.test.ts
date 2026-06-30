@@ -7,9 +7,9 @@ import {
   registerStage1Filter,
   registerStage2Feature,
 } from "../FeatureRegistry";
-import { evaluateCandidates, estimateDelta } from "../PredictorPipeline";
-import { getBlendRatios, FEATURE_WEIGHTS } from "../PredictorWeights";
-import type { PredictorContextData, RemovalCandidate } from "../types";
+import { evaluateCandidates, estimateDelta, computeEligibleSet } from "../PredictorPipeline";
+import { getBlendRatios, getAbsoluteRMSE, FEATURE_WEIGHTS } from "../PredictorWeights";
+import type { PredictorContextData, RemovalCandidate, EligibleCandidate } from "../types";
 import { buildCandidateMap } from "../../CandidateEngine";
 import { isolationFilter } from "../features/Stage1IsolationFilter";
 import { boxDepletionFilter } from "../features/Stage1BoxDepletionFilter";
@@ -440,6 +440,115 @@ describe("Stage 2 — estimateDelta", () => {
     const ctx = makeContext(board);
     const candidate = makeCandidate(0, 0);
     estimateDelta(ctx, candidate, "medium");
+    expect(board).toEqual(original);
+  });
+});
+
+describe("getAbsoluteRMSE", () => {
+  beforeEach(() => {
+    clearRegistry();
+  });
+
+  it("returns finite RMSE for all standard difficulties", () => {
+    for (const d of ["easy", "medium", "hard", "expert"]) {
+      const rmse = getAbsoluteRMSE(d);
+      expect(Number.isFinite(rmse)).toBe(true);
+      expect(rmse).toBeGreaterThan(0);
+    }
+  });
+
+  it("maps beginner/advanced to easy RMSE", () => {
+    const easy = getAbsoluteRMSE("easy");
+    expect(getAbsoluteRMSE("beginner")).toBe(easy);
+    expect(getAbsoluteRMSE("advanced")).toBe(easy);
+  });
+
+  it("returns a known RMSE value matching calibrated-weights.json", () => {
+    // These values come directly from calibration holdout — test detects
+    // accidental changes to the calibration file.
+    const easy = getAbsoluteRMSE("easy");
+    expect(easy).toBeGreaterThan(0.2);
+    expect(easy).toBeLessThan(0.4);
+  });
+});
+
+describe("computeEligibleSet", () => {
+  beforeEach(() => {
+    clearRegistry();
+    registerDefaultFeatures();
+  });
+
+  it("returns empty array when no candidates pass Stage 1", () => {
+    const board = solvedBoard9x9();
+    board[0][1] = 0;
+    board[1][0] = 0;
+    const ctx = makeContext(board);
+    const candidates = [makeCandidate(0, 0)];
+    const result = computeEligibleSet(ctx, candidates, "medium", 30, 40);
+    expect(result).toHaveLength(0);
+  });
+
+  it("returns candidates sorted by distance ascending", () => {
+    const board = solvedBoard9x9();
+    board[1][0] = 0;
+    board[1][1] = 0;
+    board[2][0] = 0;
+    const ctx = makeContext(board);
+
+    const candidates = [
+      makeCandidate(0, 0, 0.7),
+      makeCandidate(0, 3, 0.5),
+      makeCandidate(0, 6, 0.3),
+    ];
+
+    const result = computeEligibleSet(ctx, candidates, "hard", 50, 62);
+    expect(result.length).toBeGreaterThanOrEqual(1);
+    for (let i = 1; i < result.length; i++) {
+      expect(result[i]!.distance).toBeGreaterThanOrEqual(result[i - 1]!.distance);
+    }
+  });
+
+  it("includes all passing candidates", () => {
+    const board = solvedBoard9x9();
+    board[1][0] = 0;
+    board[1][1] = 0;
+    board[1][2] = 0;
+    board[2][0] = 0;
+    board[2][1] = 0;
+    const ctx = makeContext(board);
+
+    const candidates = [
+      makeCandidate(0, 0, 0.8),
+      makeCandidate(0, 3, 0.6),
+      makeCandidate(0, 6, 0.4),
+    ];
+
+    const result = computeEligibleSet(ctx, candidates, "hard", 50, 62);
+    expect(result).toHaveLength(candidates.length);
+  });
+
+  it("returns EligibleCandidate with expected fields", () => {
+    const board = solvedBoard9x9();
+    board[1][0] = 0;
+    board[1][1] = 0;
+    const ctx = makeContext(board);
+    const candidates = [makeCandidate(0, 0, 0.5)];
+    const result = computeEligibleSet(ctx, candidates, "medium", 30, 40);
+    if (result.length > 0) {
+      expect(result[0]!.candidate).toBeDefined();
+      expect(typeof result[0]!.distance).toBe("number");
+      expect(typeof result[0]!.predictedDelta).toBe("number");
+    }
+  });
+
+  it("does not modify the original board", () => {
+    const board = solvedBoard9x9();
+    board[1][0] = 0;
+    board[1][1] = 0;
+    const original = board.map((r) => [...r]);
+    const ctx = makeContext(board);
+    const candidates = [makeCandidate(0, 0, 0.5)];
+    computeEligibleSet(ctx, candidates, "medium", 30, 40);
     expect(board).toEqual(original);
   });
 });

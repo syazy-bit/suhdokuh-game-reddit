@@ -1,4 +1,4 @@
-import type { PredictorContextData, RemovalCandidate } from "./types";
+import type { PredictorContextData, RemovalCandidate, EligibleCandidate } from "./types";
 import type { AnyDifficulty } from "../../../shared/types/api";
 import { getStage1Filters, getStage2Features } from "./FeatureRegistry";
 import { getBlendRatios, FEATURE_WEIGHTS, CALIBRATED_COEFFICIENTS } from "./PredictorWeights";
@@ -113,4 +113,24 @@ export function estimateDelta(
     predictorScore: Math.max(0, rawScore),
     passedStage1: true,
   };
+}
+
+export function computeEligibleSet(
+  ctx: PredictorContextData,
+  candidates: RemovalCandidate[],
+  difficulty: AnyDifficulty,
+  currentScore: number,
+  targetScore: number,
+): EligibleCandidate[] {
+  const estimated: EligibleCandidate[] = [];
+
+  for (const candidate of candidates) {
+    const pred = estimateDelta(ctx, candidate, difficulty);
+    if (!pred.passedStage1) continue;
+    const distance = Math.abs(currentScore + pred.delta - targetScore);
+    estimated.push({ candidate, distance, predictedDelta: pred.delta });
+  }
+
+  estimated.sort((a, b) => a.distance - b.distance);
+  return estimated;
 }

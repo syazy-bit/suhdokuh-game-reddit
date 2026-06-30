@@ -31,3 +31,9 @@ export interface Stage2FeatureDefinition {
   enabledForDifficulty: (difficulty: AnyDifficulty) => boolean;
   compute: (ctx: PredictorContextData, candidate: RemovalCandidate) => number;
 }
+
+export interface EligibleCandidate {
+  candidate: RemovalCandidate;
+  distance: number;
+  predictedDelta: number;
+}

@@ -60,20 +60,35 @@ function buildCalibratedCoefficients(): Record<string, Record<string, number>> {
 export const CALIBRATED_COEFFICIENTS: Readonly<Record<string, Readonly<Record<string, number>>>> =
   buildCalibratedCoefficients();
 
-type LambdaKey = "easy" | "medium" | "hard" | "expert";
-
-const LAMBDA_VALUES: Record<LambdaKey, number> = {
+const LAMBDA_VALUES: Record<BlendKey, number> = {
   easy: 0.2,
   medium: 0.4,
   hard: 0.6,
   expert: 0.8,
 };
 
-function normalizeLambdaDifficulty(difficulty: AnyDifficulty): LambdaKey {
-  if (difficulty === "beginner" || difficulty === "advanced") return "easy";
-  return difficulty as LambdaKey;
+export function getLambda(difficulty: AnyDifficulty): number {
+  return LAMBDA_VALUES[normalizeDifficulty(difficulty)];
 }
 
-export function getLambda(difficulty: AnyDifficulty): number {
-  return LAMBDA_VALUES[normalizeLambdaDifficulty(difficulty)];
+// ── Absolute RMSE ───────────────────────────────────────────────────────────
+// Read directly from calibration holdout metrics (already in score units).
+// The calibration pipeline computes actualDelta = Score(after) - Score(before),
+// so the holdout RMSE is already measured in absolute score space.
+
+const RAW_HOLDOUT_METRICS: Record<string, unknown> | undefined =
+  (calibratedWeights as { holdoutMetrics?: Record<string, unknown> }).holdoutMetrics;
+
+const ABSOLUTE_RMSE: Record<string, number> = (() => {
+  const result: Record<string, number> = {};
+  for (const key of BLEND_KEYS) {
+    const metrics = RAW_HOLDOUT_METRICS?.[key] as Record<string, unknown> | undefined;
+    const rmse = metrics?.rmse;
+    result[key] = typeof rmse === "number" && Number.isFinite(rmse) ? rmse : 0.3;
+  }
+  return result;
+})();
+
+export function getAbsoluteRMSE(difficulty: AnyDifficulty): number {
+  return ABSOLUTE_RMSE[normalizeDifficulty(difficulty)] ?? 0.3;
 }
