@@ -517,3 +517,153 @@ describe("Expert configuration", () => {
     expect(() => gen.generate()).toThrow();
   });
 });
+
+// ── 11. Guided Removal ───────────────────────────────────────────────────────
+
+function createGuidedGenerator(difficulty: AnyDifficulty): SudokuGenerator {
+  const boxSize = 3;
+  return new SudokuGenerator({ size: 9, boxSize, difficulty, matchDifficulty: false, useGuidedRemoval: true });
+}
+
+describe("Guided removal — constructor", () => {
+  it("defaults useGuidedRemoval to false", () => {
+    const gen = new SudokuGenerator({ size: 9, boxSize: 3, difficulty: "easy" });
+    expect(gen).toBeDefined();
+    // Generate with default to confirm no error
+    const result = gen.generate();
+    expect(result.puzzle).toBeDefined();
+  });
+
+  it("accepts useGuidedRemoval: true", () => {
+    const gen = new SudokuGenerator({ size: 9, boxSize: 3, difficulty: "easy", matchDifficulty: false, useGuidedRemoval: true });
+    expect(gen).toBeDefined();
+    const result = gen.generate();
+    expect(result.puzzle).toBeDefined();
+  });
+
+  it("accepts useGuidedRemoval: false explicitly", () => {
+    const gen = new SudokuGenerator({ size: 9, boxSize: 3, difficulty: "medium", matchDifficulty: false, useGuidedRemoval: false });
+    expect(gen).toBeDefined();
+    const result = gen.generate();
+    expect(result.puzzle).toBeDefined();
+  });
+});
+
+describe("Guided removal — puzzle validity", () => {
+  const difficulties: Array<AnyDifficulty> = ["easy", "medium", "hard", "expert"];
+
+  for (const difficulty of difficulties) {
+    it(`generates a valid 9×9 ${difficulty} puzzle`, () => {
+      const result = createGuidedGenerator(difficulty).generate();
+      expect(isValidSolution(result.solution, 9)).toBe(true);
+      expect(areCluesConsistent(result.puzzle, result.solution, 9)).toBe(true);
+      const solutions = countSolutions(result.puzzle, 9, 2, 500_000);
+      expect(solutions).toBe(1);
+    });
+  }
+
+  it("generated puzzle has cells removed within expected range", () => {
+    const result = createGuidedGenerator("hard").generate();
+    const actual = result.cellsRemoved;
+    expect(actual).toBeGreaterThan(0);
+    expect(actual).toBeLessThanOrEqual(81);
+  });
+
+  it("cellsRemoved matches actual empty cell count", () => {
+    const result = createGuidedGenerator("medium").generate();
+    let actual = 0;
+    for (const row of result.puzzle) for (const v of row) if (v === 0) actual++;
+    expect(result.cellsRemoved).toBe(actual);
+  });
+});
+
+describe("Guided removal — diversity", () => {
+  it("produces at least 2 different puzzles across 5 runs", () => {
+    const puzzles = new Set<string>();
+    for (let i = 0; i < 5; i++) {
+      const result = createGuidedGenerator("medium").generate();
+      puzzles.add(JSON.stringify(result.puzzle));
+    }
+    expect(puzzles.size).toBeGreaterThan(1);
+  });
+
+  it("produces non-identical puzzles across multiple difficulties", () => {
+    for (const diff of ["easy", "medium", "hard"] as const) {
+      const puzzles = new Set<string>();
+      for (let i = 0; i < 3; i++) {
+        const result = createGuidedGenerator(diff as AnyDifficulty).generate();
+        puzzles.add(JSON.stringify(result.puzzle));
+      }
+      expect(puzzles.size).toBeGreaterThan(1);
+    }
+  });
+});
+
+// ── 12. Guided Removal Benchmark ─────────────────────────────────────────────
+
+describe("Guided removal — benchmark", () => {
+  const DIFFICULTIES = ["easy", "medium", "hard", "expert"] as const;
+
+  function runTrial(
+    useGuided: boolean,
+    difficulty: typeof DIFFICULTIES[number],
+    samples: number
+  ): { scores: number[]; times: number[] } {
+    const scores: number[] = [];
+    const times: number[] = [];
+    for (let i = 0; i < samples; i++) {
+      const gen = new SudokuGenerator({
+        size: 9, boxSize: 3, difficulty,
+        matchDifficulty: false,
+        useGuidedRemoval: useGuided,
+      });
+      const start = performance.now();
+      const result = gen.generate();
+      times.push(performance.now() - start);
+      scores.push(result.analysis.score);
+    }
+    return { scores, times };
+  }
+
+  it("compares baseline vs guided removal across difficulties", () => {
+    const SAMPLES = 3;
+
+    for (const difficulty of DIFFICULTIES) {
+      const baseline = runTrial(false, difficulty, SAMPLES);
+      const guided = runTrial(true, difficulty, SAMPLES);
+
+      const baselineAvg = baseline.scores.reduce((a, b) => a + b, 0) / SAMPLES;
+      const guidedAvg = guided.scores.reduce((a, b) => a + b, 0) / SAMPLES;
+      const baselineTime = baseline.times.reduce((a, b) => a + b, 0) / SAMPLES;
+      const guidedTime = guided.times.reduce((a, b) => a + b, 0) / SAMPLES;
+
+      console.log(`\n${difficulty.toUpperCase()}:`);
+      console.log(`  Baseline scores:   ${baseline.scores.map((s) => s.toFixed(1)).join(", ")}  avg=${baselineAvg.toFixed(1)}`);
+      console.log(`  Guided scores:     ${guided.scores.map((s) => s.toFixed(1)).join(", ")}  avg=${guidedAvg.toFixed(1)}`);
+      console.log(`  Baseline avg time: ${baselineTime.toFixed(1)}ms`);
+      console.log(`  Guided avg time:   ${guidedTime.toFixed(1)}ms`);
+
+      // Verify all scores are finite
+      expect(baseline.scores.every((s) => Number.isFinite(s))).toBe(true);
+      expect(guided.scores.every((s) => Number.isFinite(s))).toBe(true);
+    }
+  });
+
+  it("guided removal score distribution has finite variance", () => {
+    const { scores } = runTrial(true, "hard", 5);
+    const mean = scores.reduce((a, b) => a + b, 0) / scores.length;
+    const variance = scores.reduce((acc, s) => acc + (s - mean) ** 2, 0) / scores.length;
+    expect(Number.isFinite(variance)).toBe(true);
+    expect(variance).toBeGreaterThanOrEqual(0);
+  });
+
+  it("matchDifficulty=true works with guided removal", () => {
+    const gen = new SudokuGenerator({
+      size: 9, boxSize: 3, difficulty: "hard",
+      matchDifficulty: true, useGuidedRemoval: true, maxAttempts: 50,
+    });
+    const result = gen.generate();
+    expect(result.analysis.difficulty).toBe("hard");
+    expect(result.analysis.score).toBeGreaterThan(0);
+  });
+});

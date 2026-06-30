@@ -12,6 +12,7 @@ export interface GeneratorConfig {
   difficulty: AnyDifficulty;
   maxAttempts?: number;
   matchDifficulty?: boolean;
+  useGuidedRemoval?: boolean;
 }
 
 export interface GeneratedPuzzle {
@@ -28,6 +29,7 @@ export class SudokuGenerator {
   private difficulty: AnyDifficulty;
   private maxAttempts: number;
   private matchDifficulty: boolean;
+  private useGuidedRemoval: boolean;
 
   constructor(config: GeneratorConfig) {
     this.size = config.size;
@@ -35,6 +37,7 @@ export class SudokuGenerator {
     this.difficulty = config.difficulty;
     this.maxAttempts = config.maxAttempts ?? 50;
     this.matchDifficulty = config.matchDifficulty ?? true;
+    this.useGuidedRemoval = config.useGuidedRemoval ?? false;
 
     if (this.maxAttempts < 1) {
       throw new Error(
@@ -205,6 +208,80 @@ export class SudokuGenerator {
     return puzzle;
   }
 
+  private static readonly GUIDED_REMOVAL_THRESHOLD = 12;
+  private static readonly TOPK = 10;
+  private static readonly SAMPLE_SIZE = 5;
+  private static readonly DISTANCE_THRESHOLD = 3;
+
+  private getTargetScore(): number {
+    switch (this.difficulty) {
+      case "easy": return 20;
+      case "medium": return 40;
+      case "hard": return 62;
+      case "expert": return 90;
+      default: return 50;
+    }
+  }
+
+  private guidedRemovalStep(
+    candidates: Array<{
+      row: number; col: number; symRow: number; symCol: number;
+      box1: number; box2: number; score: number;
+    }>,
+    puzzle: number[][],
+  ): {
+    row: number; col: number; symRow: number; symCol: number;
+    box1: number; box2: number; delta: number;
+  } | null {
+    const topK = candidates.slice(0, SudokuGenerator.TOPK);
+    const sampled = this.shuffleArray(topK).slice(0, SudokuGenerator.SAMPLE_SIZE);
+
+    type Evaluation = {
+      row: number; col: number; symRow: number; symCol: number;
+      box1: number; box2: number; distance: number;
+    };
+
+    const evaluated: Evaluation[] = [];
+    const temp = Array.from({ length: this.size }, () => Array(this.size).fill(0));
+
+    for (const { row, col, symRow, symCol, box1, box2 } of sampled) {
+      for (let r = 0; r < this.size; r++) {
+        for (let c = 0; c < this.size; c++) {
+          temp[r]![c] = puzzle[r]![c];
+        }
+      }
+
+      temp[row]![col] = 0;
+      temp[symRow]![symCol] = 0;
+
+      if (!hasUniqueSolution(temp, this.size, this.boxSize)) continue;
+
+      const solveResult = solve(temp);
+      if (!solveResult.solved) continue;
+
+      const analysis = analyzeSolveResult(solveResult);
+      const distance = Math.abs(analysis.score - this.getTargetScore());
+
+      evaluated.push({ row, col, symRow, symCol, box1, box2, distance });
+    }
+
+    if (evaluated.length === 0) return null;
+
+    evaluated.sort((a, b) => a.distance - b.distance);
+    const minDistance = evaluated[0]!.distance;
+    const tied = evaluated.filter(
+      (e) => Math.abs(e.distance - minDistance) <= SudokuGenerator.DISTANCE_THRESHOLD
+    );
+    const picked = tied[Math.floor(Math.random() * tied.length)]!;
+
+    puzzle[picked.row]![picked.col] = 0;
+    puzzle[picked.symRow]![picked.symCol] = 0;
+
+    const delta = (picked.row === picked.symRow && picked.col === picked.symCol) ? 1 : 2;
+
+    return { row: picked.row, col: picked.col, symRow: picked.symRow, symCol: picked.symCol, box1: picked.box1, box2: picked.box2, delta };
+  }
+
   private buildPositionList(): Array<[number, number]> {
     const positions: Array<[number, number]> = [];
     for (let r = 0; r < this.size; r++) {
@@ -286,35 +363,59 @@ export class SudokuGenerator {
 
       candidates.sort((a, b) => b.score - a.score);
 
-      for (const { row, col, symRow, symCol, box1, box2 } of candidates) {
-        if (removed >= targetRemoval || consecutiveFailures >= maxConsecutiveFailures) break;
-        if (puzzle[row]![col] === 0) continue;
+      const remaining = targetRemoval - removed;
+      let guidedSucceeded = false;
 
-        const backup1 = puzzle[row]![col]!;
-        const backup2 = puzzle[symRow]![symCol]!;
-
-        puzzle[row]![col] = 0;
-        puzzle[symRow]![symCol] = 0;
-
-        if (this.verifyUniqueness(puzzle)) {
-          const delta = (row === symRow && col === symCol) ? 1 : 2;
-
-          removed += delta;
+      if (this.useGuidedRemoval && remaining <= SudokuGenerator.GUIDED_REMOVAL_THRESHOLD && candidates.length > 0) {
+        const picked = this.guidedRemovalStep(candidates, puzzle);
+        if (picked !== null) {
+          guidedSucceeded = true;
+          removed += picked.delta;
           consecutiveFailures = 0;
 
-          rowRemoved[row]!++;
-          colRemoved[col]!++;
-          boxRemoved[box1]!++;
+          rowRemoved[picked.row]!++;
+          colRemoved[picked.col]!++;
+          boxRemoved[picked.box1]!++;
 
-          if (row !== symRow || col !== symCol) {
-            rowRemoved[symRow]!++;
-            colRemoved[symCol]!++;
-            boxRemoved[box2]!++;
+          if (picked.row !== picked.symRow || picked.col !== picked.symCol) {
+            rowRemoved[picked.symRow]!++;
+            colRemoved[picked.symCol]!++;
+            boxRemoved[picked.box2]!++;
           }
-        } else {
-          puzzle[row]![col] = backup1;
-          puzzle[symRow]![symCol] = backup2;
-          consecutiveFailures++;
+        }
+      }
+
+      if (!guidedSucceeded) {
+        for (const { row, col, symRow, symCol, box1, box2 } of candidates) {
+          if (removed >= targetRemoval || consecutiveFailures >= maxConsecutiveFailures) break;
+          if (puzzle[row]![col] === 0) continue;
+
+          const backup1 = puzzle[row]![col]!;
+          const backup2 = puzzle[symRow]![symCol]!;
+
+          puzzle[row]![col] = 0;
+          puzzle[symRow]![symCol] = 0;
+
+          if (this.verifyUniqueness(puzzle)) {
+            const delta = (row === symRow && col === symCol) ? 1 : 2;
+
+            removed += delta;
+            consecutiveFailures = 0;
+
+            rowRemoved[row]!++;
+            colRemoved[col]!++;
+            boxRemoved[box1]!++;
+
+            if (row !== symRow || col !== symCol) {
+              rowRemoved[symRow]!++;
+              colRemoved[symCol]!++;
+              boxRemoved[box2]!++;
+            }
+          } else {
+            puzzle[row]![col] = backup1;
+            puzzle[symRow]![symCol] = backup2;
+            consecutiveFailures++;
+          }
         }
       }
     }
