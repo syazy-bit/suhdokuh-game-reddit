@@ -450,7 +450,7 @@ describe("getAbsoluteRMSE", () => {
   });
 
   it("returns finite RMSE for all standard difficulties", () => {
-    for (const d of ["easy", "medium", "hard", "expert"]) {
+    for (const d of ["easy", "medium", "hard", "expert"] as const) {
       const rmse = getAbsoluteRMSE(d);
       expect(Number.isFinite(rmse)).toBe(true);
       expect(rmse).toBeGreaterThan(0);

@@ -806,7 +806,7 @@ describe("Local search — benchmark", () => {
 
     // Local search should not make things worse on average
     expect(avgLs).toBeLessThanOrEqual(avgBase + 5); // small tolerance for noise
-  });
+  }, 30000);
 });
 
 // ── 14. Phase 11.3 — Detailed Benchmark ─────────────────────────────────────

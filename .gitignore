@@ -10,3 +10,4 @@ webroot
 dist
 dist/types
 .env
+bench-results/

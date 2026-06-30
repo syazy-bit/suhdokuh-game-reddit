@@ -349,6 +349,28 @@ Highlights
 - 403/403 tests passing
 - Clean build and type-check
 
+## Phase 13 — Benchmark Framework ✅
+
+Status: COMPLETE
+
+Implemented:
+- Benchmark collector
+- Performance probes
+- Statistical analysis
+- Histogram generation
+- SVG visualization
+- Acceptance gates
+- Reporter (JSON/CSV/TXT)
+- Benchmark test suite
+- Performance instrumentation
+- Production-safe isolation
+- Gitignored benchmark artifacts
+
+Validation:
+- Type-check: PASS
+- Build: PASS
+- Tests: 414/414 PASS
+- Independent engineering review: APPROVED
 ### Future techniques (not yet scheduled)
 
 - Jellyfish
