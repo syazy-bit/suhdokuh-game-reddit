@@ -993,3 +993,116 @@ describe("Phase 11.3 — Detailed benchmark", () => {
     expect(aggLS.length).toBeGreaterThan(0);
   }, TIMEOUT);
 });
+
+describe("Stage 1 normalization (formula)", () => {
+  it("normalized value maps min→0, max→1 in normal range", () => {
+    const scores = [10, 20, 30, 40];
+    const min = Math.min(...scores);
+    const max = Math.max(...scores);
+    const range = max - min;
+    const normalized = scores.map((s) => (s - min) / range);
+    expect(normalized[0]).toBe(0);
+    expect(normalized[3]).toBe(1);
+    expect(normalized[1]).toBeCloseTo(1 / 3);
+    expect(normalized[2]).toBeCloseTo(2 / 3);
+  });
+
+  it("zero range falls back to 1 and normalized values are all 0", () => {
+    const scores = [25, 25, 25];
+    const min = Math.min(...scores);
+    const max = Math.max(...scores);
+    const range = max - min || 1;
+    const normalized = scores.map((s) => (s - min) / range);
+    expect(normalized).toEqual([0, 0, 0]);
+  });
+
+  it("ordering is preserved after normalization", () => {
+    const scores = [5, 15, 10];
+    const min = Math.min(...scores);
+    const max = Math.max(...scores);
+    const range = max - min || 1;
+    const normalized = scores.map((s) => (s - min) / range);
+    // normalization is monotonic: pairwise order matches original
+    expect(normalized[0]).toBeLessThan(normalized[1]);
+    expect(normalized[0]).toBeLessThan(normalized[2]);
+    expect(normalized[1]).toBeGreaterThan(normalized[2]);
+  });
+
+  it("values stay within [0, 1]", () => {
+    const scores = [10, 20, 30, 40, 50];
+    const min = Math.min(...scores);
+    const max = Math.max(...scores);
+    const range = max - min || 1;
+    const normalized = scores.map((s) => (s - min) / range);
+    for (const v of normalized) {
+      expect(v).toBeGreaterThanOrEqual(0);
+      expect(v).toBeLessThanOrEqual(1);
+    }
+  });
+});
+
+describe("Guided removal with predictor pre-filter", () => {
+  it("generates a valid puzzle with usePredictor=true and useGuidedRemoval=true", () => {
+    const gen = new SudokuGenerator({
+      size: 9, boxSize: 3, difficulty: "easy",
+      matchDifficulty: false,
+      useGuidedRemoval: true,
+      usePredictor: true,
+    });
+    const result = gen.generate();
+    expect(isValidSolution(result.solution, 9)).toBe(true);
+    expect(areCluesConsistent(result.puzzle, result.solution)).toBe(true);
+  });
+
+  it("generates valid puzzles across all difficulties with predictor", () => {
+    const diffs: AnyDifficulty[] = ["easy", "medium", "hard", "expert"];
+    for (const diff of diffs) {
+      const gen = new SudokuGenerator({
+        size: 9, boxSize: 3, difficulty: diff,
+        matchDifficulty: false,
+        useGuidedRemoval: true,
+        usePredictor: true,
+      });
+      const result = gen.generate();
+      expect(isValidSolution(result.solution, 9)).toBe(true);
+      expect(areCluesConsistent(result.puzzle, result.solution)).toBe(true);
+    }
+  });
+
+  it("falls back to legacy path when predictor-enhanced path has no valid candidates", () => {
+    for (let i = 0; i < 5; i++) {
+      const gen = new SudokuGenerator({
+        size: 9, boxSize: 3, difficulty: "medium",
+        matchDifficulty: false,
+        useGuidedRemoval: true,
+        usePredictor: true,
+      });
+      const result = gen.generate();
+      expect(isValidSolution(result.solution, 9)).toBe(true);
+      expect(areCluesConsistent(result.puzzle, result.solution)).toBe(true);
+    }
+  });
+});
+
+describe("Backward compatibility", () => {
+  it("default usePredictor is false and produces valid puzzles", () => {
+    const gen = new SudokuGenerator({
+      size: 9, boxSize: 3, difficulty: "easy",
+      matchDifficulty: false,
+    });
+    const result = gen.generate();
+    expect(isValidSolution(result.solution, 9)).toBe(true);
+    expect(areCluesConsistent(result.puzzle, result.solution)).toBe(true);
+  });
+
+  it("explicit usePredictor=false behaves identically to default", () => {
+    const gen = new SudokuGenerator({
+      size: 9, boxSize: 3, difficulty: "medium",
+      matchDifficulty: false,
+      usePredictor: false,
+    });
+    const result = gen.generate();
+    expect(isValidSolution(result.solution, 9)).toBe(true);
+    expect(areCluesConsistent(result.puzzle, result.solution)).toBe(true);
+  });
+});

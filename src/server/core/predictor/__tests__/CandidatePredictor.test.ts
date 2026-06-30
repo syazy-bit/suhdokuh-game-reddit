@@ -7,7 +7,7 @@ import {
   registerStage1Filter,
   registerStage2Feature,
 } from "../FeatureRegistry";
-import { evaluateCandidates } from "../PredictorPipeline";
+import { evaluateCandidates, estimateDelta } from "../PredictorPipeline";
 import { getBlendRatios, FEATURE_WEIGHTS } from "../PredictorWeights";
 import type { PredictorContextData, RemovalCandidate } from "../types";
 import { buildCandidateMap } from "../../CandidateEngine";
@@ -356,5 +356,142 @@ describe("Determinism", () => {
       expect(result1[i]!.col).toBe(result2[i]!.col);
       expect(result1[i]!.finalScore).toBe(result2[i]!.finalScore);
     }
+  });
+});
+
+describe("Stage 2 — estimateDelta", () => {
+  beforeEach(() => {
+    clearRegistry();
+  });
+
+  it("returns passedStage1=false, delta=0, predictorScore=0 when Stage 1 filter rejects", () => {
+    registerStage1Filter({
+      name: "test-reject",
+      enabledForDifficulty: () => true,
+      filter: () => false,
+    });
+    const board = solvedBoard9x9();
+    const ctx = makeContext(board);
+    const candidate = makeCandidate(0, 0);
+    const result = estimateDelta(ctx, candidate, "medium");
+    expect(result.passedStage1).toBe(false);
+    expect(result.delta).toBe(0);
+    expect(result.predictorScore).toBe(0);
+  });
+
+  it("returns passedStage1=true when Stage 1 filters pass", () => {
+    registerStage1Filter({
+      name: "test-pass",
+      enabledForDifficulty: () => true,
+      filter: () => true,
+    });
+    const board = solvedBoard9x9();
+    const ctx = makeContext(board);
+    const candidate = makeCandidate(0, 0);
+    const result = estimateDelta(ctx, candidate, "medium");
+    expect(result.passedStage1).toBe(true);
+  });
+
+  it("predictorScore is never negative", () => {
+    registerStage1Filter({
+      name: "test-pass",
+      enabledForDifficulty: () => true,
+      filter: () => true,
+    });
+    registerStage2Feature({
+      name: "NAKED_SINGLE_CREATED",
+      enabledForDifficulty: () => true,
+      compute: () => 10,
+    });
+    const board = solvedBoard9x9();
+    const ctx = makeContext(board);
+    const candidate = makeCandidate(0, 0);
+    const result = estimateDelta(ctx, candidate, "medium");
+    expect(result.predictorScore).toBeGreaterThanOrEqual(0);
+  });
+
+  it("delta may be negative when features produce negative raw contributions", () => {
+    registerStage1Filter({
+      name: "test-pass",
+      enabledForDifficulty: () => true,
+      filter: () => true,
+    });
+    registerStage2Feature({
+      name: "NAKED_SINGLE_CREATED",
+      enabledForDifficulty: () => true,
+      compute: () => 5,
+    });
+    const board = solvedBoard9x9();
+    const ctx = makeContext(board);
+    const candidate = makeCandidate(0, 0);
+    const result = estimateDelta(ctx, candidate, "medium");
+    expect(result.delta).toBeLessThan(0);
+    expect(result.predictorScore).toBe(0);
+  });
+
+  it("restores the board after execution", () => {
+    registerStage1Filter({
+      name: "test-pass",
+      enabledForDifficulty: () => true,
+      filter: () => true,
+    });
+    const board = solvedBoard9x9();
+    const original = board.map((r) => [...r]);
+    const ctx = makeContext(board);
+    const candidate = makeCandidate(0, 0);
+    estimateDelta(ctx, candidate, "medium");
+    expect(board).toEqual(original);
+  });
+});
+
+describe("Safety — try/finally board restoration", () => {
+  beforeEach(() => {
+    clearRegistry();
+  });
+
+  it("restores board when a Stage 2 feature throws an exception", () => {
+    registerStage1Filter({
+      name: "always-pass",
+      enabledForDifficulty: () => true,
+      filter: () => true,
+    });
+    registerStage2Feature({
+      name: "BIVALUE_CREATED",
+      enabledForDifficulty: () => true,
+      compute: () => { throw new Error("simulated feature crash"); },
+    });
+    const board = solvedBoard9x9();
+    const original = board.map((r) => [...r]);
+    const ctx = makeContext(board);
+    const candidate = makeCandidate(0, 0);
+    try {
+      estimateDelta(ctx, candidate, "medium");
+    } catch {
+      // expected — feature threw
+    }
+    expect(board).toEqual(original);
+  });
+
+  it("restores board when evaluateCandidates feature throws", () => {
+    registerStage1Filter({
+      name: "always-pass",
+      enabledForDifficulty: () => true,
+      filter: () => true,
+    });
+    registerStage2Feature({
+      name: "BIVALUE_CREATED",
+      enabledForDifficulty: () => true,
+      compute: () => { throw new Error("simulated evaluateCandidates crash"); },
+    });
+    const board = solvedBoard9x9();
+    const original = board.map((r) => [...r]);
+    const ctx = makeContext(board);
+    const candidates = [makeCandidate(0, 0)];
+    try {
+      evaluateCandidates(ctx, candidates, "medium");
+    } catch {
+      // expected
+    }
+    expect(board).toEqual(original);
   });
 });

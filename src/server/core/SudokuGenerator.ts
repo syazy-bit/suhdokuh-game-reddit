@@ -4,7 +4,7 @@ import { hasUniqueSolution } from "./SudokuSolver";
 import { solve } from "./HumanSolverPipeline";
 import { analyzeSolveResult, createEmptyAnalysis, type AnalysisResult } from "./DifficultyAnalyzer";
 import { buildCandidateMap } from "./CandidateEngine";
-import { evaluateCandidates, registerDefaultFeatures, type RemovalCandidate, type PredictorContextData } from "./predictor/index";
+import { evaluateCandidates, estimateDelta, registerDefaultFeatures, getLambda, type RemovalCandidate, type PredictorContextData } from "./predictor/index";
 
 export type { GridSize } from "./SudokuValidator";
 
@@ -277,6 +277,85 @@ export class SudokuGenerator {
       box1: number; box2: number; distance: number;
     };
 
+    // ── Predictor-enhanced path ──
+    if (usePredictorOrder) {
+      const currentSolveResult = solve(puzzle);
+      if (currentSolveResult.solved) {
+        const currentAnalysis = analyzeSolveResult(currentSolveResult);
+        const currentScore = currentAnalysis.score;
+        const targetScore = this.getTargetScore();
+
+        const beforeMap = buildCandidateMap(puzzle, this.size, this.boxSize);
+        const ctx: PredictorContextData = {
+          board: puzzle, size: this.size, boxSize: this.boxSize,
+          beforeCandidateMap: beforeMap,
+        };
+
+        const estimated: Array<{
+          row: number; col: number; symRow: number; symCol: number;
+          box1: number; box2: number; estimatedDistance: number;
+        }> = [];
+
+        for (const c of sampled) {
+          const base: RemovalCandidate = {
+            row: c.row, col: c.col, symRow: c.symRow, symCol: c.symCol,
+            box1: c.box1, box2: c.box2,
+            balanceScore: 0, predictorScore: 0, finalScore: 0,
+          };
+          const pred = estimateDelta(ctx, base, this.difficulty);
+          if (!pred.passedStage1) continue;
+          estimated.push({
+            row: c.row, col: c.col, symRow: c.symRow, symCol: c.symCol,
+            box1: c.box1, box2: c.box2,
+            estimatedDistance: Math.abs(currentScore + pred.delta - targetScore),
+          });
+        }
+
+        estimated.sort((a, b) => a.estimatedDistance - b.estimatedDistance);
+        const evaluated: Evaluation[] = [];
+        const maxToEval = Math.min(2, estimated.length);
+
+        for (let i = 0; i < maxToEval; i++) {
+          const e = estimated[i]!;
+          const temp = Array.from({ length: this.size }, () => Array(this.size).fill(0));
+          for (let r = 0; r < this.size; r++) {
+            for (let c = 0; c < this.size; c++) {
+              temp[r]![c] = puzzle[r]![c];
+            }
+          }
+          temp[e.row]![e.col] = 0;
+          temp[e.symRow]![e.symCol] = 0;
+
+          if (!hasUniqueSolution(temp, this.size, this.boxSize)) continue;
+          const solveResult = solve(temp);
+          if (!solveResult.solved) continue;
+          const analysis = analyzeSolveResult(solveResult);
+          evaluated.push({
+            row: e.row, col: e.col, symRow: e.symRow, symCol: e.symCol,
+            box1: e.box1, box2: e.box2,
+            distance: Math.abs(analysis.score - targetScore),
+          });
+        }
+
+        if (evaluated.length > 0) {
+          evaluated.sort((a, b) => a.distance - b.distance);
+          const minDistance = evaluated[0]!.distance;
+          const tied = evaluated.filter(
+            (e) => Math.abs(e.distance - minDistance) <= SudokuGenerator.DISTANCE_THRESHOLD
+          );
+          const picked = tied[Math.floor(Math.random() * tied.length)]!;
+          puzzle[picked.row]![picked.col] = 0;
+          puzzle[picked.symRow]![picked.symCol] = 0;
+          const delta = (picked.row === picked.symRow && picked.col === picked.symCol) ? 1 : 2;
+          return {
+            row: picked.row, col: picked.col, symRow: picked.symRow, symCol: picked.symCol,
+            box1: picked.box1, box2: picked.box2, delta,
+          };
+        }
+      }
+    }
+
+    // ── Fallback: evaluate all sampled candidates via HumanSolver ─────────
     const evaluated: Evaluation[] = [];
     const temp = Array.from({ length: this.size }, () => Array(this.size).fill(0));
 
@@ -509,7 +588,7 @@ export class SudokuGenerator {
         });
       }
 
-      // ── Predictor re-ranking (Stage 1 + Stage 2 + blend) ────────────────
+      // ── Predictor re-ranking (Stage 1 + Stage 2 + normalized blend) ────
       if (this.usePredictor) {
         SudokuGenerator.ensurePredictorInitialized();
         const beforeMap = buildCandidateMap(puzzle, this.size, this.boxSize);
@@ -524,11 +603,20 @@ export class SudokuGenerator {
           box1: c.box1, box2: c.box2, balanceScore: c.score,
           predictorScore: 0, finalScore: 0,
         }));
-        const sorted = evaluateCandidates(ctx, predictorCandidates, this.difficulty);
-        candidates = sorted.map((c) => ({
+        const scored = evaluateCandidates(ctx, predictorCandidates, this.difficulty);
+
+        const predScores = scored.map((c) => c.predictorScore);
+        const minPred = Math.min(...predScores);
+        const maxPred = Math.max(...predScores);
+        const pRange = maxPred - minPred || 1;
+        const lambda = getLambda(this.difficulty);
+
+        candidates = scored.map((c) => ({
           row: c.row, col: c.col, symRow: c.symRow, symCol: c.symCol,
-          box1: c.box1, box2: c.box2, score: c.finalScore,
+          box1: c.box1, box2: c.box2,
+          score: c.balanceScore + lambda * ((c.predictorScore - minPred) / pRange),
         }));
+        candidates.sort((a, b) => b.score - a.score);
       } else {
         candidates.sort((a, b) => b.score - a.score);
       }
