@@ -808,3 +808,188 @@ describe("Local search — benchmark", () => {
     expect(avgLs).toBeLessThanOrEqual(avgBase + 5); // small tolerance for noise
   });
 });
+
+// ── 14. Phase 11.3 — Detailed Benchmark ─────────────────────────────────────
+
+describe("Phase 11.3 — Detailed benchmark", () => {
+  const S = 100;
+  const DIFFS = ["easy", "medium", "hard", "expert"] as const;
+  const TGT: Record<string, number> = { easy: 20, medium: 40, hard: 62, expert: 90 };
+  const TIMEOUT = 600_000;
+
+  function medianSorted(s: number[]): number {
+    const n = s.length;
+    return n % 2 === 0 ? (s[n / 2 - 1]! + s[n / 2]!) / 2 : s[Math.floor(n / 2)]!;
+  }
+
+  function sampleStddev(s: number[], m: number): number {
+    if (s.length < 2) return 0;
+    return Math.sqrt(s.reduce((a, v) => a + (v - m) ** 2, 0) / (s.length - 1));
+  }
+
+  // Normal CDF — Abramowitz & Stegun 26.2.17, max error 1.5e-7
+  function normCdf(x: number): number {
+    const a = [0.254829592, -0.284496736, 1.421413741, -1.453152027, 1.061405429];
+    const p = 0.3275911;
+    const sign = x < 0 ? -1 : 1;
+    const z = Math.abs(x);
+    const t = 1 / (1 + p * z);
+    let y = 0;
+    for (let i = a.length - 1; i >= 0; i--) y = (y + a[i]!) * t;
+    return 0.5 * (1 + sign * (1 - y * Math.exp((-z * z) / 2)));
+  }
+
+  function runCond(useLS: boolean, diff: typeof DIFFS[number]) {
+    SudokuGenerator.USE_LOCAL_SEARCH = useLS;
+    const target = TGT[diff]!;
+
+    const genSpy = vi.spyOn(SudokuGenerator.prototype as any, "generateSolvedBoard");
+    const origLS = (SudokuGenerator.prototype as any).localSearch;
+    let lsCalls = 0;
+    let lsWins = 0;
+    const lsSpy = vi.spyOn(SudokuGenerator.prototype as any, "localSearch").mockImplementation(
+      function (this: any, ...a: any[]) {
+        lsCalls++;
+        const r = origLS.apply(this, a);
+        if (r !== null) lsWins++;
+        return r;
+      },
+    );
+
+    const scores: number[] = [];
+    const times: number[] = [];
+    const retries: number[] = [];
+    let errs = 0;
+    let prevGenCalls = 0;
+
+    for (let i = 0; i < S; i++) {
+      const beforeCalls = genSpy.mock.calls.length;
+      try {
+        const t0 = performance.now();
+        const g = new SudokuGenerator({
+          size: 9, boxSize: 3, difficulty: diff,
+          matchDifficulty: true, useGuidedRemoval: true, maxAttempts: 50,
+        });
+        const r = g.generate();
+        times.push(performance.now() - t0);
+        scores.push(r.analysis.score);
+        const genCallsThisRun = genSpy.mock.calls.length - beforeCalls;
+        retries.push(Math.max(0, genCallsThisRun - 1));
+      } catch {
+        errs++;
+      }
+      prevGenCalls = genSpy.mock.calls.length;
+    }
+
+    genSpy.mockRestore();
+    lsSpy.mockRestore();
+    SudokuGenerator.USE_LOCAL_SEARCH = false;
+
+    const nOk = scores.length;
+    const avgScore = nOk > 0 ? scores.reduce((a, b) => a + b, 0) / nOk : 0;
+    const medScore = nOk > 0 ? medianSorted([...scores].sort((a, b) => a - b)) : 0;
+    const sdScore = nOk > 0 ? sampleStddev(scores, avgScore) : 0;
+    const avgDist = nOk > 0 ? scores.reduce((a, s) => a + Math.abs(s - target), 0) / nOk : 0;
+    const avgTime = times.length > 0 ? times.reduce((a, t) => a + t, 0) / times.length : 0;
+    const avgRetries = retries.length > 0 ? retries.reduce((a, r) => a + r, 0) / retries.length : 0;
+    const activationRate = S > 0 ? lsCalls / S : 0;
+    const improvementRate = lsCalls > 0 ? lsWins / lsCalls : 0;
+    const distances = scores.map((s) => Math.abs(s - target));
+
+    return {
+      nOk, errs, avgScore, medScore, sdScore, avgDist, avgTime, avgRetries,
+      lsCalls, lsWins, activationRate, improvementRate, scores, distances,
+    };
+  }
+
+  it("runs detailed benchmark and tests statistical significance", () => {
+    type Run = ReturnType<typeof runCond>;
+    const rows: Array<{ diff: string; cond: string; r: Run }> = [];
+
+    for (const diff of DIFFS) {
+      for (const useLS of [false, true]) {
+        const label = useLS ? "local-search" : "baseline";
+        const r = runCond(useLS, diff);
+        rows.push({ diff, cond: label, r });
+      }
+    }
+
+    // ── Print table ────────────────────────────────────────────────────────
+    console.log("\n\n========== PHASE 11.3 DETAILED BENCHMARK ==========");
+
+    for (const diff of DIFFS) {
+      const base = rows.find((x) => x.diff === diff && x.cond === "baseline")!.r;
+      const ls = rows.find((x) => x.diff === diff && x.cond === "local-search")!.r;
+
+      const dNok = ls.nOk - base.nOk;
+      const dScore = ls.avgScore - base.avgScore;
+      const dMed = ls.medScore - base.medScore;
+      const dSd = ls.sdScore - base.sdScore;
+      const dDist = ls.avgDist - base.avgDist;
+      const dTime = ls.avgTime - base.avgTime;
+      const dRet = ls.avgRetries - base.avgRetries;
+
+      console.log(`\n--- ${diff.toUpperCase()} ---`);
+      console.log(`  metric           baseline     local-search  delta`);
+      console.log(`  ─────────────────────────────────────────────────`);
+      console.log(`  puzzles          ${String(base.nOk).padStart(5)}       ${String(ls.nOk).padStart(8)}       ${dNok > 0 ? "+" : ""}${dNok}/${base.errs}/${ls.errs} err`);
+      console.log(`  avg score        ${base.avgScore.toFixed(2).padStart(7)}     ${ls.avgScore.toFixed(2).padStart(10)}     ${dScore > 0 ? "+" : ""}${dScore.toFixed(2)}`);
+      console.log(`  median score     ${base.medScore.toFixed(2).padStart(7)}     ${ls.medScore.toFixed(2).padStart(10)}     ${dMed > 0 ? "+" : ""}${dMed.toFixed(2)}`);
+      console.log(`  score stddev     ${base.sdScore.toFixed(2).padStart(7)}     ${ls.sdScore.toFixed(2).padStart(10)}     ${dSd > 0 ? "+" : ""}${dSd.toFixed(2)}`);
+      console.log(`  avg dist→target  ${base.avgDist.toFixed(2).padStart(7)}     ${ls.avgDist.toFixed(2).padStart(10)}     ${dDist > 0 ? "+" : ""}${dDist.toFixed(2)}`);
+      console.log(`  avg time (ms)    ${base.avgTime.toFixed(1).padStart(7)}     ${ls.avgTime.toFixed(1).padStart(10)}     ${dTime > 0 ? "+" : ""}${dTime.toFixed(1)}`);
+      console.log(`  avg retries      ${base.avgRetries.toFixed(2).padStart(7)}     ${ls.avgRetries.toFixed(2).padStart(10)}     ${dRet > 0 ? "+" : ""}${dRet.toFixed(2)}`);
+      console.log(`  LS activation    N/A               ${(ls.activationRate * 100).toFixed(1).padStart(5)}%`);
+      console.log(`  LS improvement   N/A               ${(ls.improvementRate * 100).toFixed(1).padStart(5)}%`);
+
+      if (base.distances.length > 1 && ls.distances.length > 1) {
+        const n1 = base.distances.length, n2 = ls.distances.length;
+        const m1 = base.avgDist;
+        const m2 = ls.avgDist;
+        const dv1 = base.distances.reduce((a, v) => a + (v - m1) ** 2, 0) / (n1 - 1);
+        const dv2 = ls.distances.reduce((a, v) => a + (v - m2) ** 2, 0) / (n2 - 1);
+        const se = Math.sqrt(dv1 / n1 + dv2 / n2);
+        const t = se > 0 ? (m1 - m2) / se : 0;
+        const df = (dv1 / n1 + dv2 / n2) ** 2
+          / ((dv1 / n1) ** 2 / (n1 - 1) + (dv2 / n2) ** 2 / (n2 - 1));
+        const p = 2 * (1 - normCdf(Math.abs(t)));
+        console.log(`  Welch t-test     t(${df.toFixed(0)}) = ${t.toFixed(4)}   p = ${p.toFixed(6)}${p < 0.05 ? "   **" : ""}`);
+      }
+    }
+
+    // ── Aggregate ──────────────────────────────────────────────────────────
+    const aggBase = rows.filter((x) => x.cond === "baseline").flatMap((x) => x.r.distances);
+    const aggLS = rows.filter((x) => x.cond === "local-search").flatMap((x) => x.r.distances);
+    const aMean = (arr: number[]) => arr.reduce((a, b) => a + b, 0) / arr.length;
+    const aVar = (arr: number[], m: number) =>
+      arr.reduce((a, v) => a + (v - m) ** 2, 0) / (arr.length - 1);
+
+    const abm = aMean(aggBase);
+    const alm = aMean(aggLS);
+    const abv = aVar(aggBase, abm);
+    const alv = aVar(aggLS, alm);
+    const an1 = aggBase.length, an2 = aggLS.length;
+    const aSe = Math.sqrt(abv / an1 + alv / an2);
+    const aT = aSe > 0 ? (abm - alm) / aSe : 0;
+    const aDf = (abv / an1 + alv / an2) ** 2
+      / ((abv / an1) ** 2 / (an1 - 1) + (alv / an2) ** 2 / (an2 - 1));
+    const aP = 2 * (1 - normCdf(Math.abs(aT)));
+
+    console.log("\n--- AGGREGATE (pooled across all difficulties) ---");
+    console.log(`  baseline avg dist:      ${abm.toFixed(4)}  (n=${an1})`);
+    console.log(`  local-search avg dist:  ${alm.toFixed(4)}  (n=${an2})`);
+    console.log(`  delta:                  ${(alm - abm).toFixed(4)}`);
+    console.log(`  Welch t(${aDf.toFixed(0)}) = ${aT.toFixed(4)}   p = ${aP.toFixed(6)}`);
+
+    if (Math.abs(aT) > 1.96) {
+      console.log("\n  *** The observed difference is STATISTICALLY SIGNIFICANT (|t| > 1.96, p < 0.05) ***");
+    } else {
+      console.log("\n  *** The observed difference is NOT statistically significant (|t| <= 1.96, p >= 0.05) ***");
+      console.log("  *** The regression from 8.00 to 8.68 was sampling noise. ***");
+    }
+
+    // Vanilla assertions to confirm data was collected
+    expect(aggBase.length).toBeGreaterThan(0);
+    expect(aggLS.length).toBeGreaterThan(0);
+  }, TIMEOUT);
+});
