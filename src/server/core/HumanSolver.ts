@@ -157,6 +157,21 @@ function eliminationCellKey(
   return `${row},${col},${value}`;
 }
 
+function seeEachOther(
+  r1: number, c1: number,
+  r2: number, c2: number,
+  boxSize: number
+): boolean {
+  if (r1 === r2 && c1 === c2) return false;
+  if (r1 === r2) return true;
+  if (c1 === c2) return true;
+  const br1 = Math.floor(r1 / boxSize) * boxSize;
+  const bc1 = Math.floor(c1 / boxSize) * boxSize;
+  const br2 = Math.floor(r2 / boxSize) * boxSize;
+  const bc2 = Math.floor(c2 / boxSize) * boxSize;
+  return br1 === br2 && bc1 === bc2;
+}
+
 export function findNakedPairs(ctx: HumanSolverContext): LogicalMove[] {
   const { board, size, boxSize, candidateMap } = ctx;
   const pairMap = new Map<
@@ -836,17 +851,6 @@ export function findXWings(ctx: HumanSolverContext): LogicalMove[] {
 export function findXYWing(ctx: HumanSolverContext): LogicalMove[] {
   const { board, size, boxSize, candidateMap } = ctx;
 
-  function seeEachOther(r1: number, c1: number, r2: number, c2: number): boolean {
-    if (r1 === r2 && c1 === c2) return false;
-    if (r1 === r2) return true;
-    if (c1 === c2) return true;
-    const br1 = Math.floor(r1 / boxSize) * boxSize;
-    const bc1 = Math.floor(c1 / boxSize) * boxSize;
-    const br2 = Math.floor(r2 / boxSize) * boxSize;
-    const bc2 = Math.floor(c2 / boxSize) * boxSize;
-    return br1 === br2 && bc1 === bc2;
-  }
-
   // Collect all bi-value cells as potential pivots
   const biValueCells: Array<{ row: number; col: number }> = [];
   for (let r = 0; r < size; r++) {
@@ -874,8 +878,8 @@ export function findXYWing(ctx: HumanSolverContext): LogicalMove[] {
     const wings: Array<{ row: number; col: number }> = [];
     for (const cell of biValueCells) {
       if (cell.row === pivot.row && cell.col === pivot.col) continue;
-      if (!seeEachOther(pivot.row, pivot.col, cell.row, cell.col)) continue;
-
+      if (!seeEachOther(pivot.row, pivot.col, cell.row, cell.col, boxSize)) continue;
+ 
       const cands = candidateMap[cell.row]![cell.col]!;
       const shared = cands.filter((c) => c === x || c === y);
       if (shared.length !== 1) continue;
@@ -890,8 +894,8 @@ export function findXYWing(ctx: HumanSolverContext): LogicalMove[] {
         const wingB = wings[j]!;
 
         // Wings must not see each other
-        if (seeEachOther(wingA.row, wingA.col, wingB.row, wingB.col)) continue;
-
+        if (seeEachOther(wingA.row, wingA.col, wingB.row, wingB.col, boxSize)) continue;
+ 
         const candsA = candidateMap[wingA.row]![wingA.col]!;
         const candsB = candidateMap[wingB.row]![wingB.col]!;
 
@@ -928,8 +932,8 @@ export function findXYWing(ctx: HumanSolverContext): LogicalMove[] {
             if (!cellCands.includes(z)) continue;
 
             if (
-              seeEachOther(r, c, wingA.row, wingA.col) &&
-              seeEachOther(r, c, wingB.row, wingB.col)
+              seeEachOther(r, c, wingA.row, wingA.col, boxSize) &&
+              seeEachOther(r, c, wingB.row, wingB.col, boxSize)
             ) {
               const ek = eliminationCellKey(r, c, z);
               if (!eliminations.has(ek)) {
@@ -1153,6 +1157,219 @@ export function findSwordfish(ctx: HumanSolverContext): LogicalMove[] {
     moves.push({
       type: "elimination",
       technique: "Swordfish",
+      patternCells,
+      eliminations: [...eliminations.values()],
+    });
+  }
+  return moves;
+}
+
+export function findSkyscraper(ctx: HumanSolverContext): LogicalMove[] {
+  const { board, size, boxSize, candidateMap } = ctx;
+  const skyMap = new Map<
+    string,
+    {
+      patternCells: Array<{ row: number; col: number }>;
+      eliminations: Map<string, { row: number; col: number; value: number }>;
+    }
+  >();
+
+  // Row-based Skyscraper
+  for (let v = 1; v <= size; v++) {
+    const rowCols = new Map<number, number[]>();
+
+    for (let row = 0; row < size; row++) {
+      const cols: number[] = [];
+      for (let col = 0; col < size; col++) {
+        if (board[row]![col] !== 0) continue;
+        if (candidateMap[row]![col]!.includes(v)) {
+          cols.push(col);
+        }
+      }
+      if (cols.length === 2) {
+        rowCols.set(row, cols);
+      }
+    }
+
+    const rows = [...rowCols.keys()];
+    for (let i = 0; i < rows.length; i++) {
+      for (let j = i + 1; j < rows.length; j++) {
+        const r1 = rows[i]!;
+        const r2 = rows[j]!;
+        const cols1 = rowCols.get(r1)!;
+        const cols2 = rowCols.get(r2)!;
+
+        // Find shared column (base)
+        let baseCol: number;
+        let topCol1: number;
+        let topCol2: number;
+
+        if (cols1[0]! === cols2[0]!) {
+          baseCol = cols1[0]!; topCol1 = cols1[1]!; topCol2 = cols2[1]!;
+        } else if (cols1[0]! === cols2[1]!) {
+          baseCol = cols1[0]!; topCol1 = cols1[1]!; topCol2 = cols2[0]!;
+        } else if (cols1[1]! === cols2[0]!) {
+          baseCol = cols1[1]!; topCol1 = cols1[0]!; topCol2 = cols2[1]!;
+        } else if (cols1[1]! === cols2[1]!) {
+          baseCol = cols1[1]!; topCol1 = cols1[0]!; topCol2 = cols2[0]!;
+        } else {
+          continue;
+        }
+
+        // Top cells: (r1, topCol1) and (r2, topCol2)
+        // Eliminate v from any cell that sees both top cells
+        const eliminations = new Map<
+          string,
+          { row: number; col: number; value: number }
+        >();
+
+        for (let r = 0; r < size; r++) {
+          for (let c = 0; c < size; c++) {
+            if (board[r]![c] !== 0) continue;
+
+            // Skip the four pattern cells themselves
+            if ((r === r1 || r === r2) && c === baseCol) continue;
+            if (r === r1 && c === topCol1) continue;
+            if (r === r2 && c === topCol2) continue;
+
+            if (!candidateMap[r]![c]!.includes(v)) continue;
+
+            if (
+              seeEachOther(r, c, r1, topCol1, boxSize) &&
+              seeEachOther(r, c, r2, topCol2, boxSize)
+            ) {
+              const ek = eliminationCellKey(r, c, v);
+              if (!eliminations.has(ek)) {
+                eliminations.set(ek, { row: r, col: c, value: v });
+              }
+            }
+          }
+        }
+
+        if (eliminations.size > 0) {
+          const patternCells = [
+            { row: r1, col: baseCol },
+            { row: r1, col: topCol1 },
+            { row: r2, col: baseCol },
+            { row: r2, col: topCol2 },
+          ].sort((a, b) => a.row - b.row || a.col - b.col);
+
+          const dk = `skyscraper-row-v${v}-${patternCells.map((c) => `${c.row},${c.col}`).join("-")}`;
+          const existing = skyMap.get(dk);
+          if (existing) {
+            for (const [ek, e] of eliminations) {
+              if (!existing.eliminations.has(ek)) {
+                existing.eliminations.set(ek, e);
+              }
+            }
+          } else {
+            skyMap.set(dk, { patternCells, eliminations });
+          }
+        }
+      }
+    }
+  }
+
+  // Column-based Skyscraper
+  for (let v = 1; v <= size; v++) {
+    const colRows = new Map<number, number[]>();
+
+    for (let col = 0; col < size; col++) {
+      const rows: number[] = [];
+      for (let row = 0; row < size; row++) {
+        if (board[row]![col] !== 0) continue;
+        if (candidateMap[row]![col]!.includes(v)) {
+          rows.push(row);
+        }
+      }
+      if (rows.length === 2) {
+        colRows.set(col, rows);
+      }
+    }
+
+    const cols = [...colRows.keys()];
+    for (let i = 0; i < cols.length; i++) {
+      for (let j = i + 1; j < cols.length; j++) {
+        const c1 = cols[i]!;
+        const c2 = cols[j]!;
+        const rows1 = colRows.get(c1)!;
+        const rows2 = colRows.get(c2)!;
+
+        // Find shared row (base)
+        let baseRow: number;
+        let topRow1: number;
+        let topRow2: number;
+
+        if (rows1[0]! === rows2[0]!) {
+          baseRow = rows1[0]!; topRow1 = rows1[1]!; topRow2 = rows2[1]!;
+        } else if (rows1[0]! === rows2[1]!) {
+          baseRow = rows1[0]!; topRow1 = rows1[1]!; topRow2 = rows2[0]!;
+        } else if (rows1[1]! === rows2[0]!) {
+          baseRow = rows1[1]!; topRow1 = rows1[0]!; topRow2 = rows2[1]!;
+        } else if (rows1[1]! === rows2[1]!) {
+          baseRow = rows1[1]!; topRow1 = rows1[0]!; topRow2 = rows2[0]!;
+        } else {
+          continue;
+        }
+
+        // Top cells: (topRow1, c1) and (topRow2, c2)
+        const eliminations = new Map<
+          string,
+          { row: number; col: number; value: number }
+        >();
+
+        for (let r = 0; r < size; r++) {
+          for (let c = 0; c < size; c++) {
+            if (board[r]![c] !== 0) continue;
+
+            // Skip the four pattern cells themselves
+            if (r === baseRow && (c === c1 || c === c2)) continue;
+            if (r === topRow1 && c === c1) continue;
+            if (r === topRow2 && c === c2) continue;
+
+            if (!candidateMap[r]![c]!.includes(v)) continue;
+
+            if (
+              seeEachOther(r, c, topRow1, c1, boxSize) &&
+              seeEachOther(r, c, topRow2, c2, boxSize)
+            ) {
+              const ek = eliminationCellKey(r, c, v);
+              if (!eliminations.has(ek)) {
+                eliminations.set(ek, { row: r, col: c, value: v });
+              }
+            }
+          }
+        }
+
+        if (eliminations.size > 0) {
+          const patternCells = [
+            { row: baseRow, col: c1 },
+            { row: topRow1, col: c1 },
+            { row: baseRow, col: c2 },
+            { row: topRow2, col: c2 },
+          ].sort((a, b) => a.row - b.row || a.col - b.col);
+
+          const dk = `skyscraper-col-v${v}-${patternCells.map((c) => `${c.row},${c.col}`).join("-")}`;
+          const existing = skyMap.get(dk);
+          if (existing) {
+            for (const [ek, e] of eliminations) {
+              if (!existing.eliminations.has(ek)) {
+                existing.eliminations.set(ek, e);
+              }
+            }
+          } else {
+            skyMap.set(dk, { patternCells, eliminations });
+          }
+        }
+      }
+    }
+  }
+
+  const moves: LogicalMove[] = [];
+  for (const { patternCells, eliminations } of skyMap.values()) {
+    moves.push({
+      type: "elimination",
+      technique: "Skyscraper",
       patternCells,
       eliminations: [...eliminations.values()],
     });

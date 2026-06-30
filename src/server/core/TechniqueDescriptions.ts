@@ -56,11 +56,17 @@ export const TECHNIQUE_DESCRIPTIONS: Record<Technique, TechniqueDescription> = {
     explanation:
       "A candidate appears in exactly two rows in the same two columns. Those four cells form a rectangle. The candidate must be placed in both rows within those two columns, so it can be eliminated from all other cells in those columns (and vice versa from the rows).",
   },
+  "Skyscraper": {
+    title: "Skyscraper",
+    summary: "A candidate forms two pairs in separate rows linked by a shared column.",
+    explanation:
+      "For a candidate value, two rows each contain exactly two possible positions. One column is shared between the two pairs (the base), while the other columns form the top cells. Any cell that can see both top cells cannot contain that candidate, because whichever row the candidate goes in, one of the top cells must hold it.",
+  },
   "XY-Wing": {
     title: "XY-Wing",
-    summary: "Three bi-value cells form a chain that eliminates a common candidate.",
+    summary: "Three cells with three candidates form a chain that eliminates a common candidate.",
     explanation:
-      "A pivot cell containing candidates X and Y shares a unit with two wing cells: one containing X and Z, the other containing Y and Z. Whichever value goes in the pivot, one wing is forced to contain Z. Any cell that sees both wings cannot contain Z, so Z is eliminated from those cells.",
+      "A pivot cell contains candidates XY, and two wing cells contain candidates XZ and YZ. The wing cells share a unit with the pivot, and any cell that can see both wings cannot contain Z, because whichever value the pivot takes, one wing will hold Z.",
   },
   "Swordfish": {
     title: "Swordfish",

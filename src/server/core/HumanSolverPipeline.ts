@@ -8,6 +8,7 @@ import {
   findClaimingPairs,
   findXWings,
   findXYWing,
+  findSkyscraper,
   findSwordfish,
   type HumanSolverContext,
   type LogicalMove,
@@ -31,6 +32,7 @@ const FINDERS: Array<{ name: Technique; fn: (ctx: HumanSolverContext) => Logical
   { name: "Pointing Pair", fn: findPointingPairs },
   { name: "Claiming Pair", fn: findClaimingPairs },
   { name: "X-Wing", fn: findXWings },
+  { name: "Skyscraper", fn: findSkyscraper },
   { name: "XY-Wing", fn: findXYWing },
   { name: "Swordfish", fn: findSwordfish },
 ];

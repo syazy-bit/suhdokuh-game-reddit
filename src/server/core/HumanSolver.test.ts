@@ -9,6 +9,7 @@ import {
   findClaimingPairs,
   findXWings,
   findXYWing,
+  findSkyscraper,
   findSwordfish,
   type HumanSolverContext,
 } from "./HumanSolver";
@@ -1841,6 +1842,188 @@ describe("findXYWing — CandidateMap immutability", () => {
 
     for (let r = 0; r < 9; r++) {
       for (let c = 0; c < 9; c++) {
+        expect(ctx.candidateMap[r]![c]!).toEqual(snapshot[r]![c]!);
+      }
+    }
+  });
+});
+
+// ── Skyscraper ────────────────────────────────────────────────────
+// ── Zero Skyscraper ────────────────────────────────────────────────
+
+describe("findSkyscraper — zero Skyscraper", () => {
+  it("returns empty array for empty 4x4 board", () => {
+    const board = [
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+    ];
+    const ctx = createCtx(board, 4, 2);
+
+    const result = findSkyscraper(ctx);
+
+    expect(result).toEqual([]);
+  });
+
+  it("returns empty array for a solved 4x4 board", () => {
+    const board = [
+      [1, 2, 3, 4],
+      [3, 4, 1, 2],
+      [2, 1, 4, 3],
+      [4, 3, 2, 1],
+    ];
+    const ctx = createCtx(board, 4, 2);
+
+    const result = findSkyscraper(ctx);
+
+    expect(result).toEqual([]);
+  });
+
+  it("returns empty array when no candidate appears in exactly two rows with a shared column", () => {
+    const board = [
+      [0, 0, 2, 3],
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+    ];
+    const ctx = createCtx(board, 4, 2);
+
+    const result = findSkyscraper(ctx);
+
+    expect(result).toEqual([]);
+  });
+});
+
+// ── Row-based Skyscraper ───────────────────────────────────────
+
+describe("findSkyscraper — row-based", () => {
+  it("finds a row-based Skyscraper for value 1 in 4x4", () => {
+    // Row 0: 1 in cols 0,3   (base col 0, top col 3)
+    // Row 2: 1 in cols 0,2   (base col 0, top col 2)
+    // Shared base column: 0
+    // Top cells: (0,3) and (2,2)
+    // (1,2) sees (0,3) via box (0,2)-(1,3), sees (2,2) via col 2 → remove 1
+    // (3,3) sees (0,3) via col 3, sees (2,2) via box (2,2)-(3,3) → remove 1
+    const board = [
+      [0, 2, 3, 0],
+      [3, 0, 0, 0],
+      [0, 3, 0, 2],
+      [2, 0, 0, 0],
+    ];
+    const snapshot = cloneBoard(board);
+    const ctx = createCtx(board, 4, 2);
+
+    const result = findSkyscraper(ctx);
+
+    expect(result.length).toBeGreaterThanOrEqual(1);
+    const move = result.find(
+      (m) => m.type === "elimination" && m.technique === "Skyscraper"
+    )!;
+    expect(move).toBeDefined();
+    if (move.type !== "elimination") return;
+
+    // Four pattern cells: base column cells + top cells
+    expect(move.patternCells).toHaveLength(4);
+    expect(move.patternCells).toContainEqual({ row: 0, col: 0 }); // base
+    expect(move.patternCells).toContainEqual({ row: 0, col: 3 }); // top
+    expect(move.patternCells).toContainEqual({ row: 2, col: 0 }); // base
+    expect(move.patternCells).toContainEqual({ row: 2, col: 2 }); // top
+
+    // Eliminations: remove 1 from (1,2) and (3,3)
+    expect(move.eliminations).toContainEqual({ row: 1, col: 2, value: 1 });
+    expect(move.eliminations).toContainEqual({ row: 3, col: 3, value: 1 });
+
+    expect(board).toEqual(snapshot);
+  });
+});
+
+// ── Skyscraper with no eliminations ─────────────────────────────
+
+describe("findSkyscraper — no eliminations", () => {
+  it("ignores a Skyscraper pattern where the elimination cells lack the candidate", () => {
+    // Rows 0,2 form the same Skyscraper but the elimination cells
+    // (1,2) and (3,3) are filled, blocking all eliminations
+    const board = [
+      [0, 2, 3, 0],
+      [3, 0, 4, 0],
+      [0, 3, 0, 2],
+      [2, 0, 0, 4],
+    ];
+    const ctx = createCtx(board, 4, 2);
+
+    const result = findSkyscraper(ctx);
+
+    expect(
+      result.filter((m) => m.type === "elimination")
+    ).toHaveLength(0);
+  });
+});
+
+// ── Duplicate prevention ──────────────────────────────────────
+
+describe("findSkyscraper — duplicate prevention", () => {
+  it("returns only one LogicalMove per Skyscraper", () => {
+    const board = [
+      [0, 2, 3, 0],
+      [3, 0, 0, 0],
+      [0, 3, 0, 2],
+      [2, 0, 0, 0],
+    ];
+    const ctx = createCtx(board, 4, 2);
+
+    const result = findSkyscraper(ctx);
+
+    const skyMoves = result.filter(
+      (m) => m.type === "elimination" && m.technique === "Skyscraper"
+    );
+
+    const seen = new Set<string>();
+    for (const m of skyMoves) {
+      if (m.type !== "elimination") continue;
+      const key = `${m.patternCells.map((c) => `${c.row},${c.col}`).sort().join("|")}|${m.eliminations.map((e) => `${e.row},${e.col},${e.value}`).sort().join("|")}`;
+      expect(seen.has(key)).toBe(false);
+      seen.add(key);
+    }
+  });
+});
+
+// ── Board immutability ────────────────────────────────────────
+
+describe("findSkyscraper — board immutability", () => {
+  it("does not mutate the board", () => {
+    const board = [
+      [0, 2, 3, 0],
+      [3, 0, 0, 0],
+      [0, 3, 0, 2],
+      [2, 0, 0, 0],
+    ];
+    const snapshot = cloneBoard(board);
+    const ctx = createCtx(board, 4, 2);
+
+    findSkyscraper(ctx);
+
+    expect(board).toEqual(snapshot);
+  });
+});
+
+// ── CandidateMap immutability ─────────────────────────────────
+
+describe("findSkyscraper — CandidateMap immutability", () => {
+  it("does not mutate the CandidateMap", () => {
+    const board = [
+      [0, 2, 3, 0],
+      [3, 0, 0, 0],
+      [0, 3, 0, 2],
+      [2, 0, 0, 0],
+    ];
+    const ctx = createCtx(board, 4, 2);
+    const snapshot = ctx.candidateMap.map((row) => row.map((col) => [...col]));
+
+    findSkyscraper(ctx);
+
+    for (let r = 0; r < 4; r++) {
+      for (let c = 0; c < 4; c++) {
         expect(ctx.candidateMap[r]![c]!).toEqual(snapshot[r]![c]!);
       }
     }
