@@ -290,7 +290,28 @@ Three-stage generation pipeline with independent feature flags.
 
 | Phase | Planned work |
 |---|---|
-| 12.2 | TBD |
+| 12.2 | ## Phase 12.2 ✅ Complete
+
+### Predictor Pipeline
+- Added calibrated predictor pipeline
+- Added Stage 1 normalization
+- Added estimateDelta()
+- Added predictor-guided candidate pre-filter
+- Added offline calibration tooling
+- Added developer calibration script
+
+### Safety
+- try/finally board restoration
+- predictor cannot corrupt board state
+
+### Tests
+- +16 unit tests
+- Total tests: 343
+- Type-check: PASS
+- Build: PASS
+
+Status:
+✅ Complete |
 | 12.3 | TBD |
 | 13 | TBD |
 
