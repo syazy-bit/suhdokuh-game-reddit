@@ -56,6 +56,12 @@ export const TECHNIQUE_DESCRIPTIONS: Record<Technique, TechniqueDescription> = {
     explanation:
       "A candidate appears in exactly two rows in the same two columns. Those four cells form a rectangle. The candidate must be placed in both rows within those two columns, so it can be eliminated from all other cells in those columns (and vice versa from the rows).",
   },
+  "XY-Wing": {
+    title: "XY-Wing",
+    summary: "Three bi-value cells form a chain that eliminates a common candidate.",
+    explanation:
+      "A pivot cell containing candidates X and Y shares a unit with two wing cells: one containing X and Z, the other containing Y and Z. Whichever value goes in the pivot, one wing is forced to contain Z. Any cell that sees both wings cannot contain Z, so Z is eliminated from those cells.",
+  },
   "Swordfish": {
     title: "Swordfish",
     summary: "A candidate forms a pattern across three rows and three columns.",

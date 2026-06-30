@@ -12,6 +12,7 @@ export const TECHNIQUE_WEIGHTS: Record<Technique, number> = {
   "Pointing Pair": 5.0,
   "Claiming Pair": 5.5,
   "X-Wing": 7.0,
+  "XY-Wing": 8.0,
   "Swordfish": 9.0,
 };
 

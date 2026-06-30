@@ -833,6 +833,147 @@ export function findXWings(ctx: HumanSolverContext): LogicalMove[] {
   return moves;
 }
 
+export function findXYWing(ctx: HumanSolverContext): LogicalMove[] {
+  const { board, size, boxSize, candidateMap } = ctx;
+
+  function seeEachOther(r1: number, c1: number, r2: number, c2: number): boolean {
+    if (r1 === r2 && c1 === c2) return false;
+    if (r1 === r2) return true;
+    if (c1 === c2) return true;
+    const br1 = Math.floor(r1 / boxSize) * boxSize;
+    const bc1 = Math.floor(c1 / boxSize) * boxSize;
+    const br2 = Math.floor(r2 / boxSize) * boxSize;
+    const bc2 = Math.floor(c2 / boxSize) * boxSize;
+    return br1 === br2 && bc1 === bc2;
+  }
+
+  // Collect all bi-value cells as potential pivots
+  const biValueCells: Array<{ row: number; col: number }> = [];
+  for (let r = 0; r < size; r++) {
+    for (let c = 0; c < size; c++) {
+      if (board[r]![c] !== 0) continue;
+      if (candidateMap[r]![c]!.length === 2) {
+        biValueCells.push({ row: r, col: c });
+      }
+    }
+  }
+
+  const xyMap = new Map<
+    string,
+    {
+      patternCells: Array<{ row: number; col: number }>;
+      eliminations: Map<string, { row: number; col: number; value: number }>;
+    }
+  >();
+
+  for (const pivot of biValueCells) {
+    const pivotCands = candidateMap[pivot.row]![pivot.col]!;
+    const [x, y] = pivotCands;
+
+    // Find potential wings: bi-value cells that see the pivot and share exactly one candidate
+    const wings: Array<{ row: number; col: number }> = [];
+    for (const cell of biValueCells) {
+      if (cell.row === pivot.row && cell.col === pivot.col) continue;
+      if (!seeEachOther(pivot.row, pivot.col, cell.row, cell.col)) continue;
+
+      const cands = candidateMap[cell.row]![cell.col]!;
+      const shared = cands.filter((c) => c === x || c === y);
+      if (shared.length !== 1) continue;
+
+      wings.push(cell);
+    }
+
+    // Pair wings: one shares X with pivot, the other shares Y, same Z value
+    for (let i = 0; i < wings.length; i++) {
+      for (let j = i + 1; j < wings.length; j++) {
+        const wingA = wings[i]!;
+        const wingB = wings[j]!;
+
+        // Wings must not see each other
+        if (seeEachOther(wingA.row, wingA.col, wingB.row, wingB.col)) continue;
+
+        const candsA = candidateMap[wingA.row]![wingA.col]!;
+        const candsB = candidateMap[wingB.row]![wingB.col]!;
+
+        const sharedA = candsA.find((c) => c === x || c === y)!;
+        const sharedB = candsB.find((c) => c === x || c === y)!;
+
+        // Shared candidates must differ (one must be X, the other Y)
+        if (sharedA === sharedB) continue;
+
+        // Both wings must share the same Z value
+        const zA = candsA.find((c) => c !== sharedA)!;
+        const zB = candsB.find((c) => c !== sharedB)!;
+        if (zA !== zB) continue;
+
+        const z = zA;
+
+        // Find cells that see both wings and contain Z as a candidate
+        const eliminations = new Map<
+          string,
+          { row: number; col: number; value: number }
+        >();
+
+        for (let r = 0; r < size; r++) {
+          for (let c = 0; c < size; c++) {
+            if (board[r]![c] !== 0) continue;
+            if (
+              (r === pivot.row && c === pivot.col) ||
+              (r === wingA.row && c === wingA.col) ||
+              (r === wingB.row && c === wingB.col)
+            )
+              continue;
+
+            const cellCands = candidateMap[r]![c]!;
+            if (!cellCands.includes(z)) continue;
+
+            if (
+              seeEachOther(r, c, wingA.row, wingA.col) &&
+              seeEachOther(r, c, wingB.row, wingB.col)
+            ) {
+              const ek = eliminationCellKey(r, c, z);
+              if (!eliminations.has(ek)) {
+                eliminations.set(ek, { row: r, col: c, value: z });
+              }
+            }
+          }
+        }
+
+        if (eliminations.size > 0) {
+          const patternCells = [
+            { row: pivot.row, col: pivot.col },
+            { row: wingA.row, col: wingA.col },
+            { row: wingB.row, col: wingB.col },
+          ].sort((a, b) => a.row - b.row || a.col - b.col);
+
+          const dk = `xywing-${patternCells.map((c) => `${c.row},${c.col}`).join("-")}-z${z}`;
+          const existing = xyMap.get(dk);
+          if (existing) {
+            for (const [ek, e] of eliminations) {
+              if (!existing.eliminations.has(ek)) {
+                existing.eliminations.set(ek, e);
+              }
+            }
+          } else {
+            xyMap.set(dk, { patternCells, eliminations });
+          }
+        }
+      }
+    }
+  }
+
+  const moves: LogicalMove[] = [];
+  for (const { patternCells, eliminations } of xyMap.values()) {
+    moves.push({
+      type: "elimination",
+      technique: "XY-Wing",
+      patternCells,
+      eliminations: [...eliminations.values()],
+    });
+  }
+  return moves;
+}
+
 export function findSwordfish(ctx: HumanSolverContext): LogicalMove[] {
   const { board, size, candidateMap } = ctx;
   const swordfishMap = new Map<

@@ -8,6 +8,7 @@ import {
   findPointingPairs,
   findClaimingPairs,
   findXWings,
+  findXYWing,
   findSwordfish,
   type HumanSolverContext,
 } from "./HumanSolver";
@@ -1633,6 +1634,213 @@ describe("findSwordfish — CandidateMap immutability", () => {
 
     for (let r = 0; r < 4; r++) {
       for (let c = 0; c < 4; c++) {
+        expect(ctx.candidateMap[r]![c]!).toEqual(snapshot[r]![c]!);
+      }
+    }
+  });
+});
+
+// ── Zero XY-Wing ──────────────────────────────────────────────────
+
+describe("findXYWing — zero XY-Wing", () => {
+  it("returns empty array for empty 9x9 board", () => {
+    const board = Array.from({ length: 9 }, () => Array(9).fill(0));
+    const ctx = createCtx(board, 9, 3);
+
+    const result = findXYWing(ctx);
+
+    expect(result).toEqual([]);
+  });
+
+  it("returns empty array for a solved board", () => {
+    const board = [
+      [5, 3, 4, 6, 7, 8, 9, 1, 2],
+      [6, 7, 2, 1, 9, 5, 3, 4, 8],
+      [1, 9, 8, 3, 4, 2, 5, 6, 7],
+      [8, 5, 9, 7, 6, 1, 4, 2, 3],
+      [4, 2, 6, 8, 5, 3, 7, 9, 1],
+      [7, 1, 3, 9, 2, 4, 8, 5, 6],
+      [9, 6, 1, 5, 3, 7, 2, 8, 4],
+      [2, 8, 7, 4, 1, 9, 6, 3, 5],
+      [3, 4, 5, 2, 8, 6, 1, 7, 9],
+    ];
+    const ctx = createCtx(board, 9, 3);
+
+    const result = findXYWing(ctx);
+
+    expect(result).toEqual([]);
+  });
+
+  it("returns empty array when no bi-value cell can form an XY-Wing", () => {
+    // Board where most empty cells have 1 or 3+ candidates, no XY-Wing forms
+    const board = [
+      [0, 2, 3, 0],
+      [3, 0, 1, 0],
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+    ];
+    const ctx = createCtx(board, 4, 2);
+
+    const result = findXYWing(ctx);
+
+    expect(result).toEqual([]);
+  });
+});
+
+// ── Standard XY-Wing (single elimination) ─────────────────────────
+
+describe("findXYWing — standard XY-Wing", () => {
+  it("finds an XY-Wing in a 9x9 board (pivot [5,7], wings [2,5] and [2,7], eliminate 2)", () => {
+    // Board state from HoDoKu XY-Wing example:
+    // Pivot at (0,2)[5,7], Wing A at (0,5)[2,5], Wing B at (1,0)[2,7]
+    // Elimination at (1,5) removes candidate 2
+    const board = [
+      [8, 0, 0, 3, 6, 0, 9, 0, 0],
+      [0, 0, 9, 0, 1, 0, 8, 6, 3],
+      [0, 6, 3, 0, 8, 9, 0, 0, 5],
+      [9, 2, 4, 6, 7, 3, 1, 5, 8],
+      [3, 8, 6, 9, 5, 1, 7, 2, 4],
+      [5, 7, 1, 8, 2, 4, 3, 9, 6],
+      [4, 3, 2, 1, 9, 6, 5, 8, 7],
+      [6, 9, 8, 5, 3, 7, 0, 0, 0],
+      [0, 0, 0, 2, 4, 8, 6, 3, 9],
+    ];
+    const snapshot = cloneBoard(board);
+    const ctx = createCtx(board, 9, 3);
+
+    const result = findXYWing(ctx);
+
+    expect(result.length).toBeGreaterThanOrEqual(1);
+    const move = result.find(
+      (m) => m.type === "elimination" && m.technique === "XY-Wing"
+    )!;
+    expect(move).toBeDefined();
+    if (move.type !== "elimination") return;
+
+    // Pattern cells: pivot, wing A, wing B
+    expect(move.patternCells).toHaveLength(3);
+    expect(move.patternCells).toContainEqual({ row: 0, col: 2 }); // pivot
+    expect(move.patternCells).toContainEqual({ row: 0, col: 5 }); // wing A
+    expect(move.patternCells).toContainEqual({ row: 1, col: 0 }); // wing B
+
+    // Elimination: remove 2 from (1,5)
+    expect(move.eliminations).toContainEqual({ row: 1, col: 5, value: 2 });
+
+    expect(board).toEqual(snapshot);
+  });
+});
+
+// ── Multiple eliminations ─────────────────────────────────────────
+
+// ── XY-Wing with no eliminations ──────────────────────────────────
+
+describe("findXYWing — no eliminations", () => {
+  it("ignores an XY-Wing pattern where the elimination cell lacks candidate Z", () => {
+    // Board where (1,5) has already been resolved (filled with 2),
+    // and the cells that see both wings don't contain Z=2 as a candidate.
+    const board = [
+      [4, 0, 9, 0, 0, 0, 0, 0, 0],
+      [0, 0, 2, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    ];
+    const ctx = createCtx(board, 9, 3);
+
+    // Most cells have many candidates, so few bi-value cells exist
+    // and those that do won't form a valid XY-Wing
+    const result = findXYWing(ctx);
+
+    expect(
+      result.filter((m) => m.type === "elimination")
+    ).toHaveLength(0);
+  });
+});
+
+// ── Duplicate prevention ────────────────────────────────────────
+
+describe("findXYWing — duplicate prevention", () => {
+  it("returns only one LogicalMove per XY-Wing", () => {
+    const board = [
+      [8, 0, 0, 3, 6, 0, 9, 0, 0],
+      [0, 0, 9, 0, 1, 0, 8, 6, 3],
+      [0, 6, 3, 0, 8, 9, 0, 0, 5],
+      [9, 2, 4, 6, 7, 3, 1, 5, 8],
+      [3, 8, 6, 9, 5, 1, 7, 2, 4],
+      [5, 7, 1, 8, 2, 4, 3, 9, 6],
+      [4, 3, 2, 1, 9, 6, 5, 8, 7],
+      [6, 9, 8, 5, 3, 7, 0, 0, 0],
+      [0, 0, 0, 2, 4, 8, 6, 3, 9],
+    ];
+    const ctx = createCtx(board, 9, 3);
+
+    const result = findXYWing(ctx);
+
+    const xywingMoves = result.filter(
+      (m) => m.type === "elimination" && m.technique === "XY-Wing"
+    );
+
+    // Each deduction should appear only once
+    const seen = new Set<string>();
+    for (const m of xywingMoves) {
+      if (m.type !== "elimination") continue;
+      const key = `${m.patternCells.map((c) => `${c.row},${c.col}`).sort().join("|")}|${m.eliminations.map((e) => `${e.row},${e.col},${e.value}`).sort().join("|")}`;
+      expect(seen.has(key)).toBe(false);
+      seen.add(key);
+    }
+  });
+});
+
+// ── Board immutability ──────────────────────────────────────────
+
+describe("findXYWing — board immutability", () => {
+  it("does not mutate the board", () => {
+    const board = [
+      [8, 0, 0, 3, 6, 0, 9, 0, 0],
+      [0, 0, 9, 0, 1, 0, 8, 6, 3],
+      [0, 6, 3, 0, 8, 9, 0, 0, 5],
+      [9, 2, 4, 6, 7, 3, 1, 5, 8],
+      [3, 8, 6, 9, 5, 1, 7, 2, 4],
+      [5, 7, 1, 8, 2, 4, 3, 9, 6],
+      [4, 3, 2, 1, 9, 6, 5, 8, 7],
+      [6, 9, 8, 5, 3, 7, 0, 0, 0],
+      [0, 0, 0, 2, 4, 8, 6, 3, 9],
+    ];
+    const snapshot = cloneBoard(board);
+    const ctx = createCtx(board, 9, 3);
+
+    findXYWing(ctx);
+
+    expect(board).toEqual(snapshot);
+  });
+});
+
+// ── CandidateMap immutability ───────────────────────────────────
+
+describe("findXYWing — CandidateMap immutability", () => {
+  it("does not mutate the CandidateMap", () => {
+    const board = [
+      [8, 0, 0, 3, 6, 0, 9, 0, 0],
+      [0, 0, 9, 0, 1, 0, 8, 6, 3],
+      [0, 6, 3, 0, 8, 9, 0, 0, 5],
+      [9, 2, 4, 6, 7, 3, 1, 5, 8],
+      [3, 8, 6, 9, 5, 1, 7, 2, 4],
+      [5, 7, 1, 8, 2, 4, 3, 9, 6],
+      [4, 3, 2, 1, 9, 6, 5, 8, 7],
+      [6, 9, 8, 5, 3, 7, 0, 0, 0],
+      [0, 0, 0, 2, 4, 8, 6, 3, 9],
+    ];
+    const ctx = createCtx(board, 9, 3);
+    const snapshot = ctx.candidateMap.map((row) => row.map((col) => [...col]));
+
+    findXYWing(ctx);
+
+    for (let r = 0; r < 9; r++) {
+      for (let c = 0; c < 9; c++) {
         expect(ctx.candidateMap[r]![c]!).toEqual(snapshot[r]![c]!);
       }
     }
