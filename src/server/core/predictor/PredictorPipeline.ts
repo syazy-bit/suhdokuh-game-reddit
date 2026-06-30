@@ -91,10 +91,11 @@ export function estimateDelta(
     if (isSymDifferent) {
       board[candidate.symRow]![candidate.symCol] = 0;
     }
+    const difficultyCoefs = CALIBRATED_COEFFICIENTS[difficulty] ?? {};
     for (const feature of stage2Features) {
       if (feature.enabledForDifficulty(difficulty)) {
         const raw = feature.compute(ctx, candidate);
-        const coeff = CALIBRATED_COEFFICIENTS[feature.name];
+        const coeff = difficultyCoefs[feature.name] ?? CALIBRATED_COEFFICIENTS["easy"]?.[feature.name];
         if (coeff !== undefined) {
           rawScore += raw * coeff;
         }

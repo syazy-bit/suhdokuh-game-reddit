@@ -419,7 +419,7 @@ describe("Stage 2 — estimateDelta", () => {
     registerStage2Feature({
       name: "NAKED_SINGLE_CREATED",
       enabledForDifficulty: () => true,
-      compute: () => 5,
+      compute: () => -5,
     });
     const board = solvedBoard9x9();
     const ctx = makeContext(board);

@@ -312,7 +312,25 @@ Three-stage generation pipeline with independent feature flags.
 
 Status:
 ✅ Complete |
-| 12.3 | TBD |
+| 12.3 | ## Phase 12.3 — Predictor Calibration
+Status: ✅ Complete
+
+Completed:
+- Offline calibration dataset generation
+- Ridge regression weight training
+- Cross-validation
+- Validation gates
+- Calibrated coefficient artifact
+- Predictor integration
+- Updated tests
+- 382/382 tests passing
+- Type-check passing
+- Build passing
+
+Artifacts:
+- calibrated-weights.json
+- trainPredictorWeights.ts
+- generateCalibrationDataset.ts |
 | 13 | TBD |
 
 ### Future techniques (not yet scheduled)
