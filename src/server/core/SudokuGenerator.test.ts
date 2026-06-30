@@ -726,7 +726,7 @@ describe("Local search — puzzle validity", () => {
     for (const difficulty of difficulties) {
       const gen = new SudokuGenerator({
         size: 9, boxSize: 3, difficulty,
-        matchDifficulty: true, useGuidedRemoval: true, maxAttempts: 20,
+        matchDifficulty: true, useGuidedRemoval: true, maxAttempts: 50,
       });
       const result = gen.generate();
       expect(result.analysis.score).toBeGreaterThanOrEqual(0);

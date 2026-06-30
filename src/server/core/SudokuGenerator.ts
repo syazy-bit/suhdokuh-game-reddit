@@ -3,6 +3,8 @@ import { isValidPlacement, countEmpty, difficultyTargets, type GridSize } from "
 import { hasUniqueSolution } from "./SudokuSolver";
 import { solve } from "./HumanSolverPipeline";
 import { analyzeSolveResult, createEmptyAnalysis, type AnalysisResult } from "./DifficultyAnalyzer";
+import { buildCandidateMap } from "./CandidateEngine";
+import { evaluateCandidates, registerDefaultFeatures, type RemovalCandidate, type PredictorContextData } from "./predictor/index";
 
 export type { GridSize } from "./SudokuValidator";
 
@@ -13,6 +15,7 @@ export interface GeneratorConfig {
   maxAttempts?: number;
   matchDifficulty?: boolean;
   useGuidedRemoval?: boolean;
+  usePredictor?: boolean;
 }
 
 export interface GeneratedPuzzle {
@@ -30,6 +33,7 @@ export class SudokuGenerator {
   private maxAttempts: number;
   private matchDifficulty: boolean;
   private useGuidedRemoval: boolean;
+  private usePredictor: boolean;
 
   constructor(config: GeneratorConfig) {
     this.size = config.size;
@@ -38,6 +42,7 @@ export class SudokuGenerator {
     this.maxAttempts = config.maxAttempts ?? 50;
     this.matchDifficulty = config.matchDifficulty ?? true;
     this.useGuidedRemoval = config.useGuidedRemoval ?? false;
+    this.usePredictor = config.usePredictor ?? false;
 
     if (this.maxAttempts < 1) {
       throw new Error(
@@ -222,6 +227,15 @@ export class SudokuGenerator {
     return puzzle;
   }
 
+  private static predictorInitialized = false;
+
+  private static ensurePredictorInitialized(): void {
+    if (!SudokuGenerator.predictorInitialized) {
+      registerDefaultFeatures();
+      SudokuGenerator.predictorInitialized = true;
+    }
+  }
+
   private static readonly GUIDED_REMOVAL_THRESHOLD = 12;
   private static readonly TOPK = 10;
   private static readonly SAMPLE_SIZE = 5;
@@ -249,12 +263,14 @@ export class SudokuGenerator {
       box1: number; box2: number; score: number;
     }>,
     puzzle: number[][],
+    usePredictorOrder: boolean = false,
   ): {
     row: number; col: number; symRow: number; symCol: number;
     box1: number; box2: number; delta: number;
   } | null {
-    const topK = candidates.slice(0, SudokuGenerator.TOPK);
-    const sampled = this.shuffleArray(topK).slice(0, SudokuGenerator.SAMPLE_SIZE);
+    const sampled = usePredictorOrder
+      ? candidates.slice(0, SudokuGenerator.SAMPLE_SIZE)
+      : this.shuffleArray(candidates.slice(0, SudokuGenerator.TOPK)).slice(0, SudokuGenerator.SAMPLE_SIZE);
 
     type Evaluation = {
       row: number; col: number; symRow: number; symCol: number;
@@ -370,8 +386,8 @@ export class SudokuGenerator {
 
           const temp = puzzle.map((row) => [...row]);
 
-          temp[rp.r]![rp.c] = solution[rp.r]![rp.c];
-          temp[rp.symR]![rp.symC] = solution[rp.symR]![rp.symC];
+          temp[rp.r]![rp.c] = solution[rp.r]![rp.c]!;
+          temp[rp.symR]![rp.symC] = solution[rp.symR]![rp.symC]!;
           temp[fp.r]![fp.c] = 0;
           temp[fp.symR]![fp.symC] = 0;
 
@@ -398,8 +414,8 @@ export class SudokuGenerator {
 
       if (bestEval === null) break;
 
-      puzzle[bestEval.restoreR]![bestEval.restoreC] = solution[bestEval.restoreR]![bestEval.restoreC];
-      puzzle[bestEval.restoreSymR]![bestEval.restoreSymC] = solution[bestEval.restoreSymR]![bestEval.restoreSymC];
+      puzzle[bestEval.restoreR]![bestEval.restoreC] = solution[bestEval.restoreR]![bestEval.restoreC]!;
+      puzzle[bestEval.restoreSymR]![bestEval.restoreSymC] = solution[bestEval.restoreSymR]![bestEval.restoreSymC]!;
       puzzle[bestEval.removeR]![bestEval.removeC] = 0;
       puzzle[bestEval.removeSymR]![bestEval.removeSymC] = 0;
 
@@ -448,7 +464,7 @@ export class SudokuGenerator {
       prevRemoved = removed;
 
       // Build scored candidate list (single pass, single array)
-      const candidates: Array<{
+      let candidates: Array<{
         row: number; col: number; symRow: number; symCol: number;
         box1: number; box2: number; score: number;
       }> = [];
@@ -493,13 +509,35 @@ export class SudokuGenerator {
         });
       }
 
-      candidates.sort((a, b) => b.score - a.score);
+      // ── Predictor re-ranking (Stage 1 + Stage 2 + blend) ────────────────
+      if (this.usePredictor) {
+        SudokuGenerator.ensurePredictorInitialized();
+        const beforeMap = buildCandidateMap(puzzle, this.size, this.boxSize);
+        const ctx: PredictorContextData = {
+          board: puzzle,
+          size: this.size,
+          boxSize: this.boxSize,
+          beforeCandidateMap: beforeMap,
+        };
+        const predictorCandidates: RemovalCandidate[] = candidates.map((c) => ({
+          row: c.row, col: c.col, symRow: c.symRow, symCol: c.symCol,
+          box1: c.box1, box2: c.box2, balanceScore: c.score,
+          predictorScore: 0, finalScore: 0,
+        }));
+        const sorted = evaluateCandidates(ctx, predictorCandidates, this.difficulty);
+        candidates = sorted.map((c) => ({
+          row: c.row, col: c.col, symRow: c.symRow, symCol: c.symCol,
+          box1: c.box1, box2: c.box2, score: c.finalScore,
+        }));
+      } else {
+        candidates.sort((a, b) => b.score - a.score);
+      }
 
       const remaining = targetRemoval - removed;
       let guidedSucceeded = false;
 
       if (this.useGuidedRemoval && remaining <= SudokuGenerator.GUIDED_REMOVAL_THRESHOLD && candidates.length > 0) {
-        const picked = this.guidedRemovalStep(candidates, puzzle);
+        const picked = this.guidedRemovalStep(candidates, puzzle, this.usePredictor);
         if (picked !== null) {
           guidedSucceeded = true;
           removed += picked.delta;
