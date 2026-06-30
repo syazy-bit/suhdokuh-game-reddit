@@ -124,6 +124,20 @@ export class SudokuGenerator {
       };
     }
 
+    // ── Local search phase ──────────────────────────────────────────────────
+    if (SudokuGenerator.USE_LOCAL_SEARCH) {
+      const improved = this.localSearch(puzzle, solution, analysis);
+      if (improved !== null) {
+        return {
+          puzzle: improved.puzzle,
+          solution,
+          size: this.size,
+          cellsRemoved: this.countEmpty(improved.puzzle),
+          analysis: improved.analysis,
+        };
+      }
+    }
+
     let lastAnalysis = analysis;
 
     for (let attempt = 2; attempt <= this.maxAttempts; attempt++) {
@@ -213,6 +227,12 @@ export class SudokuGenerator {
   private static readonly SAMPLE_SIZE = 5;
   private static readonly DISTANCE_THRESHOLD = 3;
 
+  /** @internal Set to true during benchmarking. Disabled by default — no config flag. */
+  static USE_LOCAL_SEARCH = false;
+  private static readonly LOCAL_SEARCH_MAX_ITERATIONS = 15;
+  private static readonly LOCAL_SEARCH_CANDIDATES = 10;
+  private static readonly LOCAL_SEARCH_CLOSE_THRESHOLD = 25;
+
   private getTargetScore(): number {
     switch (this.difficulty) {
       case "easy": return 20;
@@ -280,6 +300,118 @@ export class SudokuGenerator {
     const delta = (picked.row === picked.symRow && picked.col === picked.symCol) ? 1 : 2;
 
     return { row: picked.row, col: picked.col, symRow: picked.symRow, symCol: picked.symCol, box1: picked.box1, box2: picked.box2, delta };
+  }
+
+  private collectSymmetryPairs(
+    puzzle: number[][],
+  ): {
+    removedPairs: Array<{ r: number; c: number; symR: number; symC: number }>;
+    filledPairs: Array<{ r: number; c: number; symR: number; symC: number }>;
+  } {
+    const visited = Array.from({ length: this.size }, () => Array(this.size).fill(false));
+    const removedPairs: Array<{ r: number; c: number; symR: number; symC: number }> = [];
+    const filledPairs: Array<{ r: number; c: number; symR: number; symC: number }> = [];
+
+    for (let r = 0; r < this.size; r++) {
+      for (let c = 0; c < this.size; c++) {
+        if (visited[r]![c]) continue;
+
+        const symR = this.size - 1 - r;
+        const symC = this.size - 1 - c;
+        visited[r]![c] = true;
+        visited[symR]![symC] = true;
+
+        if (puzzle[r]![c] === 0) {
+          removedPairs.push({ r, c, symR, symC });
+        } else {
+          filledPairs.push({ r, c, symR, symC });
+        }
+      }
+    }
+
+    return { removedPairs, filledPairs };
+  }
+
+  private localSearch(
+    puzzle: number[][],
+    solution: number[][],
+    currentAnalysis: AnalysisResult,
+  ): { puzzle: number[][]; analysis: AnalysisResult } | null {
+    const targetScore = this.getTargetScore();
+    let currentDistance = Math.abs(currentAnalysis.score - targetScore);
+
+    if (currentDistance > SudokuGenerator.LOCAL_SEARCH_CLOSE_THRESHOLD) return null;
+
+    let improved = false;
+    let lastAnalysis = currentAnalysis;
+
+    for (let iter = 0; iter < SudokuGenerator.LOCAL_SEARCH_MAX_ITERATIONS; iter++) {
+      const { removedPairs, filledPairs } = this.collectSymmetryPairs(puzzle);
+
+      if (removedPairs.length === 0 || filledPairs.length === 0) break;
+
+      const shuffledR = this.shuffleArray(removedPairs);
+      const shuffledF = this.shuffleArray(filledPairs);
+
+      type EvalResult = {
+        restoreR: number; restoreC: number; restoreSymR: number; restoreSymC: number;
+        removeR: number; removeC: number; removeSymR: number; removeSymC: number;
+        score: number;
+      };
+
+      let bestEval: EvalResult | null = null;
+      let bestDist = currentDistance;
+      let candidateCount = 0;
+
+      for (const rp of shuffledR) {
+        for (const fp of shuffledF) {
+          if (candidateCount >= SudokuGenerator.LOCAL_SEARCH_CANDIDATES) break;
+          candidateCount++;
+
+          const temp = puzzle.map((row) => [...row]);
+
+          temp[rp.r]![rp.c] = solution[rp.r]![rp.c];
+          temp[rp.symR]![rp.symC] = solution[rp.symR]![rp.symC];
+          temp[fp.r]![fp.c] = 0;
+          temp[fp.symR]![fp.symC] = 0;
+
+          if (!hasUniqueSolution(temp, this.size, this.boxSize)) continue;
+
+          const solveResult = solve(temp);
+          if (!solveResult.solved) continue;
+
+          const analysis = analyzeSolveResult(solveResult);
+          const distance = Math.abs(analysis.score - targetScore);
+
+          if (distance < bestDist) {
+            bestDist = distance;
+            bestEval = {
+              restoreR: rp.r, restoreC: rp.c, restoreSymR: rp.symR, restoreSymC: rp.symC,
+              removeR: fp.r, removeC: fp.c, removeSymR: fp.symR, removeSymC: fp.symC,
+              score: analysis.score,
+            };
+            lastAnalysis = analysis;
+          }
+        }
+        if (candidateCount >= SudokuGenerator.LOCAL_SEARCH_CANDIDATES) break;
+      }
+
+      if (bestEval === null) break;
+
+      puzzle[bestEval.restoreR]![bestEval.restoreC] = solution[bestEval.restoreR]![bestEval.restoreC];
+      puzzle[bestEval.restoreSymR]![bestEval.restoreSymC] = solution[bestEval.restoreSymR]![bestEval.restoreSymC];
+      puzzle[bestEval.removeR]![bestEval.removeC] = 0;
+      puzzle[bestEval.removeSymR]![bestEval.removeSymC] = 0;
+
+      currentDistance = bestDist;
+      improved = true;
+
+      if (currentDistance === 0) break;
+    }
+
+    if (!improved) return null;
+
+    return { puzzle, analysis: lastAnalysis };
   }
 
   private buildPositionList(): Array<[number, number]> {

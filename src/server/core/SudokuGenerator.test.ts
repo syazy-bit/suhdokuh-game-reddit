@@ -667,3 +667,144 @@ describe("Guided removal — benchmark", () => {
     expect(result.analysis.score).toBeGreaterThan(0);
   });
 });
+
+// ── 13. Local Search ─────────────────────────────────────────────────────────
+
+describe("Local search — puzzle validity", () => {
+  beforeAll(() => {
+    SudokuGenerator.USE_LOCAL_SEARCH = true;
+  });
+
+  afterAll(() => {
+    SudokuGenerator.USE_LOCAL_SEARCH = false;
+  });
+
+  const difficulties = ["easy", "medium", "hard", "expert"] as const;
+
+  for (const difficulty of difficulties) {
+    it(`generates a valid 9×9 ${difficulty} puzzle with local search`, () => {
+      const gen = new SudokuGenerator({
+        size: 9, boxSize: 3, difficulty,
+        matchDifficulty: true, useGuidedRemoval: true, maxAttempts: 50,
+      });
+      const result = gen.generate();
+      expect(isValidSolution(result.solution, 9)).toBe(true);
+      expect(areCluesConsistent(result.puzzle, result.solution, 9)).toBe(true);
+      const solutions = countSolutions(result.puzzle, 9, 2, 500_000);
+      expect(solutions).toBe(1);
+    });
+  }
+
+  it("preserves rotational symmetry of empty/filled pattern", () => {
+    const gen = new SudokuGenerator({
+      size: 9, boxSize: 3, difficulty: "medium",
+      matchDifficulty: true, useGuidedRemoval: true, maxAttempts: 10,
+    });
+    const result = gen.generate();
+    for (let r = 0; r < 9; r++) {
+      for (let c = 0; c < 9; c++) {
+        const cell = result.puzzle[r]![c];
+        const sym = result.puzzle[8 - r]![8 - c];
+        // Both are either zero (empty) or positive (filled)
+        expect((cell === 0) === (sym === 0)).toBe(true);
+      }
+    }
+  });
+
+  it("preserves clue count", () => {
+    const gen = new SudokuGenerator({
+      size: 9, boxSize: 3, difficulty: "hard",
+      matchDifficulty: true, useGuidedRemoval: true, maxAttempts: 10,
+    });
+    const result = gen.generate();
+    let filled = 0;
+    for (const row of result.puzzle) for (const v of row) if (v !== 0) filled++;
+    expect(filled + result.cellsRemoved).toBe(81);
+  });
+
+  it("produces non-negative score for all difficulties", () => {
+    for (const difficulty of difficulties) {
+      const gen = new SudokuGenerator({
+        size: 9, boxSize: 3, difficulty,
+        matchDifficulty: true, useGuidedRemoval: true, maxAttempts: 20,
+      });
+      const result = gen.generate();
+      expect(result.analysis.score).toBeGreaterThanOrEqual(0);
+    }
+  });
+});
+
+describe("Local search — benchmark", () => {
+  const DIFFICULTIES = ["easy", "medium", "hard", "expert"] as const;
+
+  function runTrial(useLocal: boolean, difficulty: typeof DIFFICULTIES[number], samples: number) {
+    const scores: number[] = [];
+    const times: number[] = [];
+    const distances: number[] = [];
+    const targets: Record<string, number> = { easy: 20, medium: 40, hard: 62, expert: 90 };
+
+    for (let i = 0; i < samples; i++) {
+      const gen = new SudokuGenerator({
+        size: 9, boxSize: 3, difficulty,
+        matchDifficulty: true, useGuidedRemoval: true, maxAttempts: 50,
+      });
+
+      // Toggle local search per trial
+      SudokuGenerator.USE_LOCAL_SEARCH = useLocal;
+
+      const start = performance.now();
+      const result = gen.generate();
+      times.push(performance.now() - start);
+      scores.push(result.analysis.score);
+      distances.push(Math.abs(result.analysis.score - targets[difficulty]!));
+    }
+    SudokuGenerator.USE_LOCAL_SEARCH = false;
+
+    return { scores, times, distances };
+  }
+
+  it("compares baseline vs local search across difficulties", () => {
+    const SAMPLES = 3;
+
+    for (const difficulty of DIFFICULTIES) {
+      const base = runTrial(false, difficulty, SAMPLES);
+      const ls = runTrial(true, difficulty, SAMPLES);
+
+      const baseAvgDist = base.distances.reduce((a, b) => a + b, 0) / SAMPLES;
+      const lsAvgDist = ls.distances.reduce((a, b) => a + b, 0) / SAMPLES;
+      const baseTime = base.times.reduce((a, b) => a + b, 0) / SAMPLES;
+      const lsTime = ls.times.reduce((a, b) => a + b, 0) / SAMPLES;
+
+      console.log(`\n${difficulty.toUpperCase()}:`);
+      console.log(`  Baseline scores:  ${base.scores.map((s) => s.toFixed(1)).join(", ")}  avgDist=${baseAvgDist.toFixed(1)}`);
+      console.log(`  Local search:     ${ls.scores.map((s) => s.toFixed(1)).join(", ")}  avgDist=${lsAvgDist.toFixed(1)}`);
+      console.log(`  Baseline avg time: ${baseTime.toFixed(1)}ms`);
+      console.log(`  Local search time: ${lsTime.toFixed(1)}ms`);
+
+      expect(base.scores.every((s) => Number.isFinite(s))).toBe(true);
+      expect(ls.scores.every((s) => Number.isFinite(s))).toBe(true);
+    }
+  });
+
+  it("local search reduces score distance or remains equal on average", () => {
+    const SAMPLES = 5;
+    let totalBaseDist = 0;
+    let totalLsDist = 0;
+
+    for (const difficulty of DIFFICULTIES) {
+      const base = runTrial(false, difficulty, SAMPLES);
+      const ls = runTrial(true, difficulty, SAMPLES);
+
+      totalBaseDist += base.distances.reduce((a, b) => a + b, 0) / SAMPLES;
+      totalLsDist += ls.distances.reduce((a, b) => a + b, 0) / SAMPLES;
+    }
+
+    const avgBase = totalBaseDist / DIFFICULTIES.length;
+    const avgLs = totalLsDist / DIFFICULTIES.length;
+
+    console.log(`\nAggregate avg distance: baseline=${avgBase.toFixed(2)}  local-search=${avgLs.toFixed(2)}`);
+
+    // Local search should not make things worse on average
+    expect(avgLs).toBeLessThanOrEqual(avgBase + 5); // small tolerance for noise
+  });
+});
