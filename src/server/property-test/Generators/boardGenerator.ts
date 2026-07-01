@@ -28,7 +28,12 @@ export function randomSolvedBoard(size: GridSize, rng: RngFn): number[][] {
   return cloneGrid(result.solution);
 }
 
-export function randomPartialBoard(size: GridSize, rng: RngFn, fillRatio?: number): number[][] {
+export interface PartialBoardWithSolution {
+  partial: number[][];
+  solution: number[][];
+}
+
+export function randomPartialBoardWithSolution(size: GridSize, rng: RngFn, fillRatio?: number): PartialBoardWithSolution {
   const solved = randomSolvedBoard(size, rng);
   const ratio = fillRatio ?? 0.5;
 
@@ -41,12 +46,16 @@ export function randomPartialBoard(size: GridSize, rng: RngFn, fillRatio?: numbe
   const shuffled = shuffleArray(flat, rng);
   const keepCount = Math.round(flat.length * ratio);
 
-  const result: number[][] = Array.from({ length: size }, () => Array(size).fill(0));
+  const partial: number[][] = Array.from({ length: size }, () => Array(size).fill(0));
   for (let i = 0; i < keepCount; i++) {
     const cell = shuffled[i]!;
-    result[cell.r]![cell.c] = cell.v;
+    partial[cell.r]![cell.c] = cell.v;
   }
-  return result;
+  return { partial, solution: solved };
+}
+
+export function randomPartialBoard(size: GridSize, rng: RngFn, fillRatio?: number): number[][] {
+  return randomPartialBoardWithSolution(size, rng, fillRatio).partial;
 }
 
 export function cloneBoard(grid: number[][]): number[][] {

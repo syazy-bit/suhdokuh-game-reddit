@@ -10,6 +10,7 @@ import type {
   PropertyTestConfig,
 } from "./types";
 import { resolveConfig } from "./Config";
+import { allGroups } from "./Groups/index";
 
 const alwaysPass: PropertyDefinition = {
   name: "always pass",
@@ -392,4 +393,27 @@ describe("replayIteration", () => {
     const r2 = await replayIteration(groups, state);
     expect(r1).toEqual(r2);
   });
+});
+
+describe("Stage 4 property groups", () => {
+  for (const group of allGroups) {
+    describe(group.name, () => {
+      for (const prop of group.properties) {
+        it(prop.name, async () => {
+          const groups: PropertyGroup[] = [{ name: group.name, properties: [prop] }];
+          const config = resolveConfig({
+            sizes: [4, 9],
+            iterationsPerSize: 5,
+            timeoutMs: 10000,
+            stopOnFirstFailure: false,
+          });
+          const result = await runPropertyTests(config, groups);
+          if (!result.passed) {
+            const msg = result.failures.map((f) => f.reason).join("; ");
+            throw new Error(msg);
+          }
+        });
+      }
+    });
+  }
 });
