@@ -1,8 +1,7 @@
-const POPCOUNT = new Array<number>(512);
+const POPCOUNT = new Uint8Array(512);
 for (let i = 0; i < 512; i++) {
-  POPCOUNT[i] = 0;
   let x = i;
-  while (x) { POPCOUNT[i]++; x &= x - 1; }
+  while (x) { POPCOUNT[i]!++; x &= x - 1; }
 }
 
 function popcount(x: number): number {

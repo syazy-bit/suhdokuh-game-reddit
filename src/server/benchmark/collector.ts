@@ -1,4 +1,4 @@
-import type { ModeResult, MetricStats } from "./result";
+import type { ModeResult, MetricStats, PredictorAccuracyStats, PredictorCallRecord, MemorySnapshot } from "./result";
 import { mean, median, min, max, p90, p95, stddev } from "./statistics";
 import { computeHistogram } from "./histogram";
 
@@ -13,30 +13,39 @@ interface MetricCollection {
   timeSamples: Map<string, number[]>;
   counterSamples: Map<string, number[]>;
   puzzles: PuzzleRecord[];
+  memorySnapshots: MemorySnapshot[];
+  predictorCalls: PredictorCallRecord[];
 }
 
 export class BenchmarkCollector {
   private currentTimers = new Map<string, number[]>();
   private currentCounters = new Map<string, number>();
+  private currentMemoryBefore = 0;
   private collection: MetricCollection = {
     timeSamples: new Map(),
     counterSamples: new Map(),
     puzzles: [],
+    memorySnapshots: [],
+    predictorCalls: [],
   };
 
   clear(): void {
     this.currentTimers.clear();
     this.currentCounters.clear();
+    this.currentMemoryBefore = 0;
     this.collection = {
       timeSamples: new Map(),
       counterSamples: new Map(),
       puzzles: [],
+      memorySnapshots: [],
+      predictorCalls: [],
     };
   }
 
   startPuzzle(): void {
     this.currentTimers.clear();
     this.currentCounters.clear();
+    this.currentMemoryBefore = 0;
   }
 
   recordTime(label: string, durationMs: number): void {
@@ -93,6 +102,27 @@ export class BenchmarkCollector {
     });
   }
 
+  recordMemoryBefore(): void {
+    const usage = process.memoryUsage();
+    this.currentMemoryBefore = usage.heapUsed;
+  }
+
+  recordMemoryAfter(): void {
+    const usage = process.memoryUsage();
+    const beforeBytes = this.currentMemoryBefore > 0 ? this.currentMemoryBefore : usage.heapUsed;
+    const deltaMb = (usage.heapUsed - beforeBytes) / (1024 * 1024);
+    this.collection.memorySnapshots.push({
+      heapUsedBeforeMb: beforeBytes / (1024 * 1024),
+      heapUsedAfterMb: usage.heapUsed / (1024 * 1024),
+      deltaMb,
+    });
+    this.currentMemoryBefore = 0;
+  }
+
+  recordPredictionCall(record: PredictorCallRecord): void {
+    this.collection.predictorCalls.push(record);
+  }
+
   private computeMetricStats(samples: number[]): MetricStats {
     const sorted = [...samples].sort((a, b) => a - b);
     const avg = mean(samples);
@@ -145,6 +175,21 @@ export class BenchmarkCollector {
       ? genBoardRaw.map((c) => Math.max(0, c - 1))
       : [];
 
+    // Memory stats (per-puzzle heap delta)
+    const memDeltas = this.collection.memorySnapshots.map((s) => s.deltaMb);
+    const memoryUsage = memDeltas.length > 0
+      ? this.computeMetricStats(memDeltas)
+      : undefined;
+
+    // Predictor accuracy stats
+    const pc = this.collection.predictorCalls;
+    const predictorAccuracy: PredictorAccuracyStats | undefined = pc.length > 0
+      ? {
+          totalCalls: pc.length,
+          totalCandidates: pc.reduce((s, c) => s + c.candidateCount, 0),
+        }
+      : undefined;
+
     return {
       generationTimeMs: buildMetric("generate"),
       clueRemovalTimeMs: buildMetric("removeClues"),
@@ -164,6 +209,9 @@ export class BenchmarkCollector {
       clueCount: this.computeMetricStats(clueArray),
       successRate: total > 0 ? scored.length / total : 0,
       sampleCount: total,
+      // Phase 15.1 Stage 2 — conditional spread for exactOptionalPropertyTypes
+      ...(memoryUsage !== undefined ? { memoryUsage } : {}),
+      ...(predictorAccuracy !== undefined ? { predictorAccuracy } : {}),
     };
   }
 }

@@ -44,6 +44,15 @@ export function installProbes(collector: BenchmarkCollector): SpyHandle[] {
     const result = origEvaluate(ctx, candidates, difficulty as any);
     collector.recordTime("evaluateCandidates", performance.now() - t0);
     collector.incrementCounter("predictorEvals");
+    // Record predictor accuracy data
+    if (result.length > 0) {
+      collector.recordPredictionCall({
+        candidateCount: result.length,
+        topBalanceScore: result[0]!.balanceScore,
+        topPredictorScore: result[0]!.predictorScore,
+        topFinalScore: result[0]!.finalScore,
+      });
+    }
     return result;
   }) as typeof origEvaluate);
   handles.push({ restore: () => { evalSpy.mockRestore(); } });
@@ -93,9 +102,11 @@ export function installProbes(collector: BenchmarkCollector): SpyHandle[] {
   const origGenerate = SudokuGenerator.prototype.generate;
   const genSpy = vi.spyOn(SudokuGenerator.prototype, "generate");
   genSpy.mockImplementation(function (this: SudokuGenerator) {
+    collector.recordMemoryBefore();
     const t0 = performance.now();
     const result = origGenerate.call(this);
     collector.recordTime("generate", performance.now() - t0);
+    collector.recordMemoryAfter();
     return result;
   });
   handles.push({ restore: () => { genSpy.mockRestore(); } });

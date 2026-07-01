@@ -34,6 +34,10 @@ export interface ModeResult {
   clueCount: MetricStats;
   successRate: number;
   sampleCount: number;
+
+  // Phase 15.1 Stage 2 extensions (optional — backward compatible)
+  memoryUsage?: MetricStats;
+  predictorAccuracy?: PredictorAccuracyStats;
 }
 
 export interface DifficultyReport {
@@ -65,4 +69,126 @@ export interface AcceptanceCheck {
   threshold: number;
   mode: string;
   difficulty: string | null;
+}
+
+// ── Phase 15.1 Stage 1 types ─────────────────────────────────────────────────
+
+export type GateSeverity = "blocking" | "advisory";
+
+export interface DeterminismArtifacts {
+  puzzle: number;
+  solution: number;
+  removalSequence: number;
+  analysis: number;
+}
+
+export interface DeterminismResult {
+  overall: number;
+  artifacts: DeterminismArtifacts;
+  sampleCount: number;
+}
+
+export interface MetricComparison {
+  mode: string;
+  difficulty: string;
+  metric: string;
+  baselineMean: number;
+  currentMean: number;
+  deltaPercent: number;
+  mwUStatistic: number;
+  mwUPValue: number;
+  welchTStat: number | null;
+  welchDf: number | null;
+  welchPValue: number | null;
+  cohensD: number;
+  significant: boolean;
+}
+
+export interface ComparisonReport {
+  baselineTimestamp: string;
+  currentTimestamp: string;
+  comparisons: MetricComparison[];
+}
+
+export interface RegressionItem {
+  mode: string;
+  difficulty: string;
+  metric: string;
+  deltaPercent: number;
+  pValue: number;
+  effectSize: number;
+  severity: GateSeverity;
+}
+
+export interface RegressionResult {
+  blocking: RegressionItem[];
+  advisory: RegressionItem[];
+}
+
+export interface CertificationVerdict {
+  certified: boolean;
+  blockingPassed: number;
+  blockingFailed: number;
+  advisoryPassed: number;
+  advisoryFailed: number;
+  blockingRegressions: number;
+  advisoryRegressions: number;
+}
+
+export interface CertificationReport {
+  version: string;
+  timestamp: string;
+  profile: string;
+  config: import("./config").BenchmarkConfig;
+  modes: ModeReport[];
+  acceptance: AcceptanceResult | null;
+  determinism: DeterminismResult | null;
+  comparison: ComparisonReport | null;
+  regressions: RegressionResult | null;
+  verdict: CertificationVerdict;
+}
+
+export interface CIReport {
+  version: string;
+  timestamp: string;
+  profile: string;
+  certified: boolean;
+  blockingPassed: number;
+  blockingFailed: number;
+  advisoryPassed: number;
+  advisoryFailed: number;
+  regressions: {
+    blocking: number;
+    advisory: number;
+  };
+  determinism: {
+    overall: number;
+    artifacts: DeterminismArtifacts;
+  };
+}
+
+// ── Phase 15.1 Stage 2 types ─────────────────────────────────────────────────
+
+export interface MemorySnapshot {
+  heapUsedBeforeMb: number;
+  heapUsedAfterMb: number;
+  deltaMb: number;
+}
+
+export interface PredictorCallRecord {
+  candidateCount: number;
+  topBalanceScore: number;
+  topPredictorScore: number;
+  topFinalScore: number;
+}
+
+export interface PredictorAccuracyStats {
+  totalCalls: number;
+  totalCandidates: number;
+}
+
+export interface DeterminismRecord {
+  puzzleHash: number;
+  solutionHash: number;
+  analysisHash: number;
 }
