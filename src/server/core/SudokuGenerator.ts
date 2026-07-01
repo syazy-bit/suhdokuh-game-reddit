@@ -353,37 +353,40 @@ export class SudokuGenerator {
 
       for (let i = 0; i < evalCount; i++) {
         const e = toEval[i]!;
-        const temp = Array.from({ length: this.size }, () => Array(this.size).fill(0));
-        for (let r = 0; r < this.size; r++) {
-          for (let c = 0; c < this.size; c++) {
-            temp[r]![c] = puzzle[r]![c];
-          }
-        }
-        temp[e.candidate.row]![e.candidate.col] = 0;
-        temp[e.candidate.symRow]![e.candidate.symCol] = 0;
+        const backupRow = puzzle[e.candidate.row]![e.candidate.col]!;
+        const backupSym = puzzle[e.candidate.symRow]![e.candidate.symCol]!;
+        puzzle[e.candidate.row]![e.candidate.col] = 0;
+        puzzle[e.candidate.symRow]![e.candidate.symCol] = 0;
 
-        if (!hasUniqueSolution(temp, this.size, this.boxSize)) continue;
-        const solveResult = solve(temp);
-        if (!solveResult.solved) continue;
-        const analysis = analyzeSolveResult(solveResult);
-        const actualDistance = Math.abs(analysis.score - targetScore);
-        evaluated.push({
-          row: e.candidate.row, col: e.candidate.col,
-          symRow: e.candidate.symRow, symCol: e.candidate.symCol,
-          box1: e.candidate.box1, box2: e.candidate.box2,
-          distance: actualDistance,
-        });
-
-        // Early stopping: if actual score lands in the target window, accept immediately
-        if (actualDistance <= tolerance) {
-          puzzle[e.candidate.row]![e.candidate.col] = 0;
-          puzzle[e.candidate.symRow]![e.candidate.symCol] = 0;
-          const delta = (e.candidate.row === e.candidate.symRow && e.candidate.col === e.candidate.symCol) ? 1 : 2;
-          return {
+        let accepted = false;
+        try {
+          if (!hasUniqueSolution(puzzle, this.size, this.boxSize)) continue;
+          const solveResult = solve(puzzle);
+          if (!solveResult.solved) continue;
+          const analysis = analyzeSolveResult(solveResult);
+          const actualDistance = Math.abs(analysis.score - targetScore);
+          evaluated.push({
             row: e.candidate.row, col: e.candidate.col,
             symRow: e.candidate.symRow, symCol: e.candidate.symCol,
-            box1: e.candidate.box1, box2: e.candidate.box2, delta,
-          };
+            box1: e.candidate.box1, box2: e.candidate.box2,
+            distance: actualDistance,
+          });
+
+          // Early stopping: if actual score lands in the target window, accept immediately
+          if (actualDistance <= tolerance) {
+            accepted = true;
+            const delta = (e.candidate.row === e.candidate.symRow && e.candidate.col === e.candidate.symCol) ? 1 : 2;
+            return {
+              row: e.candidate.row, col: e.candidate.col,
+              symRow: e.candidate.symRow, symCol: e.candidate.symCol,
+              box1: e.candidate.box1, box2: e.candidate.box2, delta,
+            };
+          }
+        } finally {
+          if (!accepted) {
+            puzzle[e.candidate.row]![e.candidate.col] = backupRow;
+            puzzle[e.candidate.symRow]![e.candidate.symCol] = backupSym;
+          }
         }
       }
 
@@ -429,24 +432,25 @@ export class SudokuGenerator {
 
       for (let i = 0; i < maxToEval; i++) {
         const e = estimated[i]!;
-        const temp = Array.from({ length: this.size }, () => Array(this.size).fill(0));
-        for (let r = 0; r < this.size; r++) {
-          for (let c = 0; c < this.size; c++) {
-            temp[r]![c] = puzzle[r]![c];
-          }
-        }
-        temp[e.row]![e.col] = 0;
-        temp[e.symRow]![e.symCol] = 0;
+        const backupRow = puzzle[e.row]![e.col]!;
+        const backupSym = puzzle[e.symRow]![e.symCol]!;
+        puzzle[e.row]![e.col] = 0;
+        puzzle[e.symRow]![e.symCol] = 0;
 
-        if (!hasUniqueSolution(temp, this.size, this.boxSize)) continue;
-        const solveResult = solve(temp);
-        if (!solveResult.solved) continue;
-        const analysis = analyzeSolveResult(solveResult);
-        evaluated.push({
-          row: e.row, col: e.col, symRow: e.symRow, symCol: e.symCol,
-          box1: e.box1, box2: e.box2,
-          distance: Math.abs(analysis.score - targetScore),
-        });
+        try {
+          if (!hasUniqueSolution(puzzle, this.size, this.boxSize)) continue;
+          const solveResult = solve(puzzle);
+          if (!solveResult.solved) continue;
+          const analysis = analyzeSolveResult(solveResult);
+          evaluated.push({
+            row: e.row, col: e.col, symRow: e.symRow, symCol: e.symCol,
+            box1: e.box1, box2: e.box2,
+            distance: Math.abs(analysis.score - targetScore),
+          });
+        } finally {
+          puzzle[e.row]![e.col] = backupRow;
+          puzzle[e.symRow]![e.symCol] = backupSym;
+        }
       }
 
       if (evaluated.length > 0) {
@@ -468,27 +472,27 @@ export class SudokuGenerator {
 
     // ── Fallback: evaluate all sampled candidates via HumanSolver ─────────
     const evaluated: Evaluation[] = [];
-    const temp = Array.from({ length: this.size }, () => Array(this.size).fill(0));
 
     for (const { row, col, symRow, symCol, box1, box2 } of sampled) {
-      for (let r = 0; r < this.size; r++) {
-        for (let c = 0; c < this.size; c++) {
-          temp[r]![c] = puzzle[r]![c];
-        }
+      const backupRow = puzzle[row]![col]!;
+      const backupSym = puzzle[symRow]![symCol]!;
+      puzzle[row]![col] = 0;
+      puzzle[symRow]![symCol] = 0;
+
+      try {
+        if (!hasUniqueSolution(puzzle, this.size, this.boxSize)) continue;
+
+        const solveResult = solve(puzzle);
+        if (!solveResult.solved) continue;
+
+        const analysis = analyzeSolveResult(solveResult);
+        const distance = Math.abs(analysis.score - this.getTargetScore());
+
+        evaluated.push({ row, col, symRow, symCol, box1, box2, distance });
+      } finally {
+        puzzle[row]![col] = backupRow;
+        puzzle[symRow]![symCol] = backupSym;
       }
-
-      temp[row]![col] = 0;
-      temp[symRow]![symCol] = 0;
-
-      if (!hasUniqueSolution(temp, this.size, this.boxSize)) continue;
-
-      const solveResult = solve(temp);
-      if (!solveResult.solved) continue;
-
-      const analysis = analyzeSolveResult(solveResult);
-      const distance = Math.abs(analysis.score - this.getTargetScore());
-
-      evaluated.push({ row, col, symRow, symCol, box1, box2, distance });
     }
 
     if (evaluated.length === 0) return null;
@@ -574,29 +578,39 @@ export class SudokuGenerator {
           if (candidateCount >= SudokuGenerator.LOCAL_SEARCH_CANDIDATES) break;
           candidateCount++;
 
-          const temp = puzzle.map((row) => [...row]);
+          const backupRestoreR = puzzle[rp.r]![rp.c]!;
+          const backupRestoreSymR = puzzle[rp.symR]![rp.symC]!;
+          const backupRemoveR = puzzle[fp.r]![fp.c]!;
+          const backupRemoveSymR = puzzle[fp.symR]![fp.symC]!;
 
-          temp[rp.r]![rp.c] = solution[rp.r]![rp.c]!;
-          temp[rp.symR]![rp.symC] = solution[rp.symR]![rp.symC]!;
-          temp[fp.r]![fp.c] = 0;
-          temp[fp.symR]![fp.symC] = 0;
+          puzzle[rp.r]![rp.c] = solution[rp.r]![rp.c]!;
+          puzzle[rp.symR]![rp.symC] = solution[rp.symR]![rp.symC]!;
+          puzzle[fp.r]![fp.c] = 0;
+          puzzle[fp.symR]![fp.symC] = 0;
 
-          if (!hasUniqueSolution(temp, this.size, this.boxSize)) continue;
+          try {
+            if (!hasUniqueSolution(puzzle, this.size, this.boxSize)) continue;
 
-          const solveResult = solve(temp);
-          if (!solveResult.solved) continue;
+            const solveResult = solve(puzzle);
+            if (!solveResult.solved) continue;
 
-          const analysis = analyzeSolveResult(solveResult);
-          const distance = Math.abs(analysis.score - targetScore);
+            const analysis = analyzeSolveResult(solveResult);
+            const distance = Math.abs(analysis.score - targetScore);
 
-          if (distance < bestDist) {
-            bestDist = distance;
-            bestEval = {
-              restoreR: rp.r, restoreC: rp.c, restoreSymR: rp.symR, restoreSymC: rp.symC,
-              removeR: fp.r, removeC: fp.c, removeSymR: fp.symR, removeSymC: fp.symC,
-              score: analysis.score,
-            };
-            lastAnalysis = analysis;
+            if (distance < bestDist) {
+              bestDist = distance;
+              bestEval = {
+                restoreR: rp.r, restoreC: rp.c, restoreSymR: rp.symR, restoreSymC: rp.symC,
+                removeR: fp.r, removeC: fp.c, removeSymR: fp.symR, removeSymC: fp.symC,
+                score: analysis.score,
+              };
+              lastAnalysis = analysis;
+            }
+          } finally {
+            puzzle[rp.r]![rp.c] = backupRestoreR;
+            puzzle[rp.symR]![rp.symC] = backupRestoreSymR;
+            puzzle[fp.r]![fp.c] = backupRemoveR;
+            puzzle[fp.symR]![fp.symC] = backupRemoveSymR;
           }
         }
         if (candidateCount >= SudokuGenerator.LOCAL_SEARCH_CANDIDATES) break;

@@ -1,9 +1,10 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { SudokuGenerator } from "./SudokuGenerator";
 import type { GridSize, GeneratedPuzzle } from "./SudokuGenerator";
 import type { AnyDifficulty } from "../../shared/types/api";
 import { isValidSolution, areCluesConsistent, difficultyTargets } from "./SudokuValidator";
 import { countSolutions, difficultyCellsRemoved } from "./test-utils";
+import * as SudokuSolver from "./SudokuSolver";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -1212,5 +1213,142 @@ describe("Predictor-aware budget — backward compatibility", () => {
     expect(isValidSolution(r2.solution, 9)).toBe(true);
     expect(areCluesConsistent(r1.puzzle, r1.solution)).toBe(true);
     expect(areCluesConsistent(r2.puzzle, r2.solution)).toBe(true);
+  });
+});
+
+// ── R3 Backup/Restore Optimisation — Regression Tests ─────────────────────
+
+describe("R3 backup/restore", () => {
+  const MODES: Array<{
+    name: string;
+    useGuidedRemoval: boolean;
+    usePredictor: boolean;
+    usePredictorAwareBudget: boolean;
+  }> = [
+    { name: "guided", useGuidedRemoval: true, usePredictor: false, usePredictorAwareBudget: false },
+    { name: "predictor", useGuidedRemoval: true, usePredictor: true, usePredictorAwareBudget: false },
+    { name: "predictor-budget", useGuidedRemoval: true, usePredictor: true, usePredictorAwareBudget: true },
+  ];
+
+  for (const mode of MODES) {
+    describe(`mode: ${mode.name}`, () => {
+      it("generates a valid puzzle with unique solution", () => {
+        const gen = new SudokuGenerator({
+          size: 9, boxSize: 3, difficulty: "hard",
+          matchDifficulty: false,
+          useGuidedRemoval: mode.useGuidedRemoval,
+          usePredictor: mode.usePredictor,
+          usePredictorAwareBudget: mode.usePredictorAwareBudget,
+        });
+        const result = gen.generate();
+        expect(isValidSolution(result.solution, 9)).toBe(true);
+        expect(areCluesConsistent(result.puzzle, result.solution)).toBe(true);
+        const solutions = countSolutions(result.puzzle, 9, 2, 500_000);
+        expect(solutions).toBe(1);
+      });
+
+      it("puzzle clues are subset of solution", () => {
+        const gen = new SudokuGenerator({
+          size: 9, boxSize: 3, difficulty: "medium",
+          matchDifficulty: false,
+          useGuidedRemoval: mode.useGuidedRemoval,
+          usePredictor: mode.usePredictor,
+          usePredictorAwareBudget: mode.usePredictorAwareBudget,
+        });
+        const result = gen.generate();
+        expect(areCluesConsistent(result.puzzle, result.solution)).toBe(true);
+      });
+
+      it("cellsRemoved is within expected range", () => {
+        const gen = new SudokuGenerator({
+          size: 9, boxSize: 3, difficulty: "easy",
+          matchDifficulty: false,
+          useGuidedRemoval: mode.useGuidedRemoval,
+          usePredictor: mode.usePredictor,
+          usePredictorAwareBudget: mode.usePredictorAwareBudget,
+        });
+        const result = gen.generate();
+        const removed = result.cellsRemoved;
+        expect(removed).toBeGreaterThanOrEqual(20);
+        expect(removed).toBeLessThanOrEqual(60);
+      });
+    });
+  }
+
+  describe("exception safety", () => {
+    it("recovers from thrown error during hasUniqueSolution", () => {
+      const gen = new SudokuGenerator({
+        size: 9, boxSize: 3, difficulty: "easy",
+        matchDifficulty: false,
+        useGuidedRemoval: true,
+      });
+
+      const spy = vi.spyOn(SudokuSolver, "hasUniqueSolution");
+      spy.mockImplementation(() => { throw new Error("simulated uniqueness failure"); });
+
+      let threw = false;
+      try {
+        gen.generate();
+      } catch {
+        threw = true;
+      }
+
+      spy.mockRestore();
+
+      expect(threw).toBe(true);
+      const result = gen.generate();
+      expect(isValidSolution(result.solution, 9)).toBe(true);
+      expect(areCluesConsistent(result.puzzle, result.solution)).toBe(true);
+    });
+  });
+
+  describe("determinism", () => {
+    const difficulties: AnyDifficulty[] = ["easy", "medium", "hard"];
+
+    for (const difficulty of difficulties) {
+      it(`same seed produces identical puzzle for ${difficulty}`, () => {
+        let seed = 12345;
+        const originalRandom = Math.random;
+        const seededRandom = () => {
+          seed = (seed * 1664525 + 1013904223) & 0x7fffffff;
+          return seed / 0x7fffffff;
+        };
+
+        Math.random = seededRandom;
+
+        const gen1 = new SudokuGenerator({
+          size: 9, boxSize: 3, difficulty,
+          matchDifficulty: false,
+          useGuidedRemoval: true,
+          usePredictor: true,
+        });
+        let r1: GeneratedPuzzle;
+        try {
+          r1 = gen1.generate();
+        } finally {
+          Math.random = originalRandom;
+        }
+
+        seed = 12345;
+        Math.random = seededRandom;
+
+        const gen2 = new SudokuGenerator({
+          size: 9, boxSize: 3, difficulty,
+          matchDifficulty: false,
+          useGuidedRemoval: true,
+          usePredictor: true,
+        });
+        let r2: GeneratedPuzzle;
+        try {
+          r2 = gen2.generate();
+        } finally {
+          Math.random = originalRandom;
+        }
+
+        expect(r1.puzzle).toEqual(r2.puzzle);
+        expect(r1.solution).toEqual(r2.solution);
+        expect(r1.cellsRemoved).toBe(r2.cellsRemoved);
+      });
+    }
   });
 });

@@ -371,6 +371,25 @@ Validation:
 - Build: PASS
 - Tests: 414/414 PASS
 - Independent engineering review: APPROVED
+
+## Phase 14.1 — Backup/Restore Optimization ✅
+
+Status: COMPLETE
+
+Implemented:
+- Removed deep board cloning from guided removal
+- Removed deep board cloning from local search
+- Added try/finally board restoration
+- Added exception safety
+- Added determinism regression tests
+- Added board restoration regression tests
+
+Validation:
+- Type-check: PASS
+- Build: PASS
+- Tests: 427/427 PASS
+- Benchmark: PASS
+- Independent review: APPROVED
 ### Future techniques (not yet scheduled)
 
 - Jellyfish
