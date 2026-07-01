@@ -1,12 +1,4 @@
-import type { GridSize } from "./types";
-
-export interface PropertyTestConfig {
-  sizes: GridSize[];
-  iterationsPerSize: number;
-  seed: number;
-  stopOnFirstFailure: boolean;
-  timeoutMs: number;
-}
+import type { PropertyTestConfig } from "./types";
 
 export const DEFAULT_CONFIG: PropertyTestConfig = {
   sizes: [4, 9],
