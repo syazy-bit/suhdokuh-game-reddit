@@ -74,13 +74,57 @@ function buildContext(
   return { board, size, boxSize, candidateMap };
 }
 
-function findNextMove(
-  board: number[][],
-  size: GridSize,
-  boxSize: number,
-  pendingEliminations: Map<string, { row: number; col: number; value: number }>
-): LogicalMove | null {
-  const ctx = buildContext(board, size, boxSize, pendingEliminations);
+function applyAssignment(ctx: HumanSolverContext, row: number, col: number, value: number): void {
+  ctx.board[row]![col] = value;
+  ctx.candidateMap[row]![col] = [];
+
+  const { size, boxSize, candidateMap } = ctx;
+  const br = Math.floor(row / boxSize) * boxSize;
+  const bc = Math.floor(col / boxSize) * boxSize;
+
+  // Row peers — skip the assigned cell itself
+  for (let c = 0; c < size; c++) {
+    if (c === col) continue;
+    if (ctx.board[row]![c] !== 0) continue;
+    const list = candidateMap[row]![c]!;
+    const idx = list.indexOf(value);
+    if (idx !== -1) list.splice(idx, 1);
+  }
+
+  // Column peers — skip the assigned cell itself
+  for (let r = 0; r < size; r++) {
+    if (r === row) continue;
+    if (ctx.board[r]![col] !== 0) continue;
+    const list = candidateMap[r]![col]!;
+    const idx = list.indexOf(value);
+    if (idx !== -1) list.splice(idx, 1);
+  }
+
+  // Box peers — skip the assigned cell itself
+  // Overlaps with row/column are safe: indexOf → splice is idempotent
+  for (let r = br; r < br + boxSize; r++) {
+    for (let c = bc; c < bc + boxSize; c++) {
+      if (r === row && c === col) continue;
+      if (ctx.board[r]![c] !== 0) continue;
+      const list = candidateMap[r]![c]!;
+      const idx = list.indexOf(value);
+      if (idx !== -1) list.splice(idx, 1);
+    }
+  }
+}
+
+function applyEliminations(
+  ctx: HumanSolverContext,
+  eliminations: Array<{ row: number; col: number; value: number }>
+): void {
+  for (const { row, col, value } of eliminations) {
+    const list = ctx.candidateMap[row]![col]!;
+    const idx = list.indexOf(value);
+    if (idx !== -1) list.splice(idx, 1);
+  }
+}
+
+function findNextMove(ctx: HumanSolverContext): LogicalMove | null {
   for (const { fn } of FINDERS) {
     const moves = fn(ctx);
     if (moves.length > 0) {
@@ -102,17 +146,24 @@ export function solveStep(
       elimMap.set(eliminationKey(e.row, e.col, e.value), e);
     }
   }
-  return findNextMove(board, size, boxSize, elimMap);
+  const ctx = buildContext(board, size, boxSize, elimMap);
+  return findNextMove(ctx);
 }
 
 export function solve(board: number[][]): SolveResult {
   const size = getSize(board);
   const boxSize = getBoxSize(size);
   const working = cloneBoard(board);
-  const pendingEliminations = new Map<string, { row: number; col: number; value: number }>();
   const moves: LogicalMove[] = [];
   const techniquesUsed = new Set<Technique>();
   let hardestIdx = 0;
+
+  const ctx: HumanSolverContext = {
+    board: working,
+    size,
+    boxSize,
+    candidateMap: buildCandidateMap(working, size, boxSize),
+  };
 
   while (true) {
     if (isBoardSolved(working)) {
@@ -125,7 +176,7 @@ export function solve(board: number[][]): SolveResult {
       };
     }
 
-    const move = findNextMove(working, size, boxSize, pendingEliminations);
+    const move = findNextMove(ctx);
     if (!move) {
       return {
         solved: false,
@@ -144,14 +195,9 @@ export function solve(board: number[][]): SolveResult {
     }
 
     if (move.type === "assignment") {
-      working[move.row]![move.col] = move.value;
+      applyAssignment(ctx, move.row, move.col, move.value);
     } else {
-      for (const e of move.eliminations) {
-        const ek = eliminationKey(e.row, e.col, e.value);
-        if (!pendingEliminations.has(ek)) {
-          pendingEliminations.set(ek, e);
-        }
-      }
+      applyEliminations(ctx, move.eliminations);
     }
   }
 }

@@ -390,6 +390,26 @@ Validation:
 - Tests: 427/427 PASS
 - Benchmark: PASS
 - Independent review: APPROVED
+
+## Phase 14.2 — Incremental Candidate Map ✅
+
+Status: COMPLETE
+
+Implemented:
+- Replaced repeated candidate-map rebuilds with incremental updates.
+- Removed pendingEliminations architecture.
+- Added idempotent elimination handling.
+- Optimized applyAssignment() to avoid temporary Set<string> allocations.
+- Added randomized regression tests.
+- Added duplicate-elimination equivalence tests.
+
+Validation:
+- Type-check: PASS
+- Build: PASS
+- Tests: 441/441 PASS
+- Independent implementation review: APPROVED
+- Independent architecture review: APPROVED
+
 ### Future techniques (not yet scheduled)
 
 - Jellyfish
