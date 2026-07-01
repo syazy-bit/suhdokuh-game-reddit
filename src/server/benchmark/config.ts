@@ -26,11 +26,11 @@ export interface BenchmarkConfig {
 }
 
 export interface AcceptanceGates {
-  generationTimeMs: { max: Partial<Record<string, number>> };
-  difficultyMatchRate: { min: Partial<Record<string, number>> };
-  humanSolverCalls: { max: Partial<Record<string, number>> };
-  predictorOverheadMs: { max: number };
-  successRate: { min: number };
+  generationTimeMs: { max: Partial<Record<string, number>>; severity?: "blocking" | "advisory" };
+  difficultyMatchRate: { min: Partial<Record<string, number>>; severity?: "blocking" | "advisory" };
+  humanSolverCalls: { max: Partial<Record<string, number>>; severity?: "blocking" | "advisory" };
+  predictorOverheadMs: { max: number; severity?: "blocking" | "advisory" };
+  successRate: { min: number; severity?: "blocking" | "advisory" };
 }
 
 export const DEFAULT_CONFIG: BenchmarkConfig = {

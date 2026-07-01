@@ -99,9 +99,11 @@ describe("result types — backward compatibility", () => {
       threshold: 100,
       mode: "baseline",
       difficulty: "easy",
+      severity: "blocking",
     };
     expect(check.status).toBe("pass");
     expect(check.name).toBe("generationTimeMs");
+    expect(check.severity).toBe("blocking");
   });
 
   it("AcceptanceResult aggregates checks", () => {
@@ -252,19 +254,15 @@ describe("result types — Phase 15.1 additions", () => {
     expect(result.advisory).toHaveLength(1);
   });
 
-  it("CertificationVerdict has all required fields", () => {
+  it("CertificationVerdict has status and regression arrays", () => {
     const verdict: CertificationVerdict = {
-      certified: true,
-      blockingPassed: 4,
-      blockingFailed: 0,
-      advisoryPassed: 5,
-      advisoryFailed: 1,
-      blockingRegressions: 0,
-      advisoryRegressions: 2,
+      status: "PASS",
+      blockingRegressions: [],
+      advisoryRegressions: [],
     };
-    expect(verdict.certified).toBe(true);
-    expect(verdict.blockingPassed).toBe(4);
-    expect(verdict.advisoryFailed).toBe(1);
+    expect(verdict.status).toBe("PASS");
+    expect(verdict.blockingRegressions).toHaveLength(0);
+    expect(verdict.advisoryRegressions).toHaveLength(0);
   });
 
   it("CertificationReport contains all sub-reports", () => {
@@ -283,18 +281,14 @@ describe("result types — Phase 15.1 additions", () => {
       comparison: null,
       regressions: null,
       verdict: {
-        certified: true,
-        blockingPassed: 4,
-        blockingFailed: 0,
-        advisoryPassed: 5,
-        advisoryFailed: 1,
-        blockingRegressions: 0,
-        advisoryRegressions: 2,
+        status: "PASS",
+        blockingRegressions: [],
+        advisoryRegressions: [],
       },
     };
     expect(report.version).toBe("0.0.29");
     expect(report.determinism!.overall).toBe(1);
-    expect(report.verdict.certified).toBe(true);
+    expect(report.verdict.status).toBe("PASS");
   });
 
   it("MemorySnapshot records before/after/delta", () => {
@@ -403,27 +397,19 @@ describe("result types — Phase 15.1 additions", () => {
       version: "0.0.29",
       timestamp: "2026-07-01T00:00:00Z",
       profile: "ci",
-      certified: true,
-      blockingPassed: 4,
-      blockingFailed: 0,
-      advisoryPassed: 5,
-      advisoryFailed: 1,
-      regressions: {
+      status: "PASS_WITH_WARNINGS",
+      counts: {
+        acceptancePassed: 10,
+        acceptanceFailed: 1,
         blocking: 0,
         advisory: 2,
       },
-      determinism: {
-        overall: 1,
-        artifacts: {
-          puzzle: 1,
-          solution: 1,
-          removalSequence: 1,
-          analysis: 1,
-        },
-      },
+      determinism: null,
     };
-    expect(report.certified).toBe(true);
+    expect(report.status).toBe("PASS_WITH_WARNINGS");
     expect(report.profile).toBe("ci");
-    expect(report.regressions.blocking).toBe(0);
+    expect(report.counts.blocking).toBe(0);
+    expect(report.counts.advisory).toBe(2);
+    expect(report.counts.acceptancePassed).toBe(10);
   });
 });

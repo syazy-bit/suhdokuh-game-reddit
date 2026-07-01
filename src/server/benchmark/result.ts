@@ -72,6 +72,7 @@ export interface AcceptanceCheck {
   threshold: number;
   mode: string;
   difficulty: string | null;
+  severity: GateSeverity;
 }
 
 // ── Phase 15.1 Stage 1 types ─────────────────────────────────────────────────
@@ -145,14 +146,12 @@ export interface RegressionResult {
   advisory: RegressionItem[];
 }
 
+export type CertificationStatus = "PASS" | "PASS_WITH_WARNINGS" | "FAIL";
+
 export interface CertificationVerdict {
-  certified: boolean;
-  blockingPassed: number;
-  blockingFailed: number;
-  advisoryPassed: number;
-  advisoryFailed: number;
-  blockingRegressions: number;
-  advisoryRegressions: number;
+  status: CertificationStatus;
+  blockingRegressions: RegressionItem[];
+  advisoryRegressions: RegressionItem[];
 }
 
 export interface CertificationReport {
@@ -172,19 +171,22 @@ export interface CIReport {
   version: string;
   timestamp: string;
   profile: string;
-  certified: boolean;
-  blockingPassed: number;
-  blockingFailed: number;
-  advisoryPassed: number;
-  advisoryFailed: number;
-  regressions: {
+  status: CertificationStatus;
+  counts: {
+    acceptancePassed: number;
+    acceptanceFailed: number;
     blocking: number;
     advisory: number;
   };
-  determinism: {
-    overall: number;
-    artifacts: DeterminismArtifacts;
-  };
+  determinism: DeterminismResult | null;
+}
+
+export interface CertifyOptions {
+  baseline?: BenchmarkReport;
+  thresholds?: import("./config").SeverityThresholds;
+  polarity?: Record<string, MetricPolarity>;
+  determinism?: DeterminismResult | null;
+  profile?: string;
 }
 
 // ── Phase 15.1 Stage 2 types ─────────────────────────────────────────────────

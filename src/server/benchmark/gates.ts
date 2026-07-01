@@ -18,6 +18,7 @@ export function checkAcceptance(report: BenchmarkReport, gates: AcceptanceGates)
             threshold,
             mode: mode.mode,
             difficulty: diff.difficulty,
+            severity: gates.generationTimeMs.severity ?? "blocking",
           });
         }
       }
@@ -32,6 +33,7 @@ export function checkAcceptance(report: BenchmarkReport, gates: AcceptanceGates)
             threshold,
             mode: mode.mode,
             difficulty: diff.difficulty,
+            severity: gates.difficultyMatchRate.severity ?? "blocking",
           });
         }
       }
@@ -46,6 +48,7 @@ export function checkAcceptance(report: BenchmarkReport, gates: AcceptanceGates)
             threshold,
             mode: mode.mode,
             difficulty: diff.difficulty,
+            severity: gates.humanSolverCalls.severity ?? "blocking",
           });
         }
       }
@@ -58,6 +61,7 @@ export function checkAcceptance(report: BenchmarkReport, gates: AcceptanceGates)
           threshold: gates.successRate.min,
           mode: mode.mode,
           difficulty: diff.difficulty,
+          severity: gates.successRate.severity ?? "blocking",
         });
       }
     }
@@ -78,6 +82,7 @@ export function checkAcceptance(report: BenchmarkReport, gates: AcceptanceGates)
           threshold: gates.predictorOverheadMs.max,
           mode: mode.mode,
           difficulty: diff.difficulty,
+          severity: gates.predictorOverheadMs.severity ?? "blocking",
         });
       }
     }
