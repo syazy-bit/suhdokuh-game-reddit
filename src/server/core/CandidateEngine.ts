@@ -1,4 +1,5 @@
 import { isValidPlacement, type GridSize } from "./SudokuValidator";
+import type { CandidateMaskMap } from "./CandidateMaskMap";
 
 export type CandidateMap = number[][][];
 
@@ -21,6 +22,25 @@ export function buildCandidateMap(
   return map;
 }
 
+export function buildMaskMap(
+  board: number[][],
+  size: GridSize,
+  boxSize: number
+): CandidateMaskMap {
+  const map: CandidateMaskMap = [];
+  for (let r = 0; r < size; r++) {
+    map[r] = [];
+    for (let c = 0; c < size; c++) {
+      if (board[r]![c] === 0) {
+        map[r]![c] = getMaskCandidates(board, r, c, size, boxSize);
+      } else {
+        map[r]![c] = 0;
+      }
+    }
+  }
+  return map;
+}
+
 export function getCandidates(
   board: number[][],
   row: number,
@@ -35,6 +55,22 @@ export function getCandidates(
     }
   }
   return candidates;
+}
+
+export function getMaskCandidates(
+  board: number[][],
+  row: number,
+  col: number,
+  size: GridSize,
+  boxSize: number
+): number {
+  let mask = 0;
+  for (let num = 1; num <= size; num++) {
+    if (isValidPlacement(board, row, col, num, size, boxSize)) {
+      mask |= 1 << (num - 1);
+    }
+  }
+  return mask;
 }
 
 export function getCandidateCount(

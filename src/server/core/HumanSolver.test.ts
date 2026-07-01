@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { buildCandidateMap } from "./CandidateEngine";
+import { buildMaskMap } from "./CandidateEngine";
+import { hasCandidate, candidateKey, candidateCount, iterateCandidates, firstCandidate } from "./CandidateMask";
+import type { CandidateMaskMap } from "./CandidateMaskMap";
 import {
   findNakedSingles,
   findHiddenSingles,
@@ -16,6 +18,8 @@ import {
 } from "./HumanSolver";
 import type { GridSize } from "./SudokuValidator";
 
+const bit = (v: number): number => 1 << (v - 1);
+
 function createCtx(
   board: number[][],
   size: GridSize,
@@ -25,7 +29,7 @@ function createCtx(
     board,
     size,
     boxSize,
-    candidateMap: buildCandidateMap(board, size, boxSize),
+    candidateMap: buildMaskMap(board, size, boxSize),
   };
 }
 
@@ -1488,7 +1492,7 @@ describe("findSwordfish — patternCells correctness", () => {
       const v = move.eliminations[0]!.value;
       for (const cell of move.patternCells) {
         expect(board[cell.row]![cell.col]!).toBe(0);
-        expect(ctx.candidateMap[cell.row]![cell.col]!).toContain(v);
+        expect(hasCandidate(ctx.candidateMap[cell.row]![cell.col]!, v)).toBe(true);
       }
     }
   });
@@ -1630,7 +1634,7 @@ describe("findSwordfish — CandidateMap immutability", () => {
       [0, 0, 0, 0],
     ];
     const ctx = createCtx(board, 4, 2);
-    const snapshot = ctx.candidateMap.map((row) => row.map((col) => [...col]));
+    const snapshot = ctx.candidateMap.map((row) => [...row]);
 
     findSwordfish(ctx);
 
@@ -1837,7 +1841,7 @@ describe("findXYWing — CandidateMap immutability", () => {
       [0, 0, 0, 2, 4, 8, 6, 3, 9],
     ];
     const ctx = createCtx(board, 9, 3);
-    const snapshot = ctx.candidateMap.map((row) => row.map((col) => [...col]));
+    const snapshot = ctx.candidateMap.map((row) => [...row]);
 
     findXYWing(ctx);
 
@@ -2019,7 +2023,7 @@ describe("findSkyscraper — CandidateMap immutability", () => {
       [2, 0, 0, 0],
     ];
     const ctx = createCtx(board, 4, 2);
-    const snapshot = ctx.candidateMap.map((row) => row.map((col) => [...col]));
+    const snapshot = ctx.candidateMap.map((row) => [...row]);
 
     findSkyscraper(ctx);
 
@@ -2070,12 +2074,12 @@ describe("findTwoStringKite — zero Two-String Kite", () => {
     const size = 4;
     const boxSize = 2;
     const board = Array.from({ length: size }, () => Array(size).fill(0));
-    const candidateMap: number[][][] = Array.from({ length: size }, () =>
-      Array.from({ length: size }, () => [])
+    const candidateMap: number[][] = Array.from({ length: size }, () =>
+      Array(size).fill(0)
     );
-    candidateMap[0][0] = [1];
-    candidateMap[0][2] = [1];
-    candidateMap[0][3] = [1];
+    candidateMap[0][0] = bit(1);
+    candidateMap[0][2] = bit(1);
+    candidateMap[0][3] = bit(1);
     const ctx: HumanSolverContext = { board, size: size as GridSize, boxSize, candidateMap };
     expect(findTwoStringKite(ctx)).toEqual([]);
   });
@@ -2088,13 +2092,13 @@ describe("findTwoStringKite — zero Two-String Kite", () => {
     const size = 4;
     const boxSize = 2;
     const board = Array.from({ length: size }, () => Array(size).fill(0));
-    const candidateMap: number[][][] = Array.from({ length: size }, () =>
-      Array.from({ length: size }, () => [])
+    const candidateMap: number[][] = Array.from({ length: size }, () =>
+      Array(size).fill(0)
     );
-    candidateMap[0][0] = [1];
-    candidateMap[0][2] = [1];
-    candidateMap[1][3] = [1];
-    candidateMap[2][3] = [1];
+    candidateMap[0][0] = bit(1);
+    candidateMap[0][2] = bit(1);
+    candidateMap[1][3] = bit(1);
+    candidateMap[2][3] = bit(1);
 
     const ctx: HumanSolverContext = { board, size: size as GridSize, boxSize, candidateMap };
     expect(findTwoStringKite(ctx)).toEqual([]);
@@ -2114,18 +2118,18 @@ describe("findTwoStringKite — HoDoKu example 1 (col 6 \u00d7 row 7)", () => {
     const size = 9;
     const boxSize = 3;
     const board = Array.from({ length: size }, () => Array(size).fill(0));
-    const candidateMap: number[][][] = Array.from({ length: size }, () =>
-      Array.from({ length: size }, () => [])
+    const candidateMap: number[][] = Array.from({ length: size }, () =>
+      Array(size).fill(0)
     );
 
     // Col 6 strong link: (1,6) and (8,6) have 5
-    candidateMap[1][6] = [5];
-    candidateMap[8][6] = [5];
+    candidateMap[1][6] = bit(5);
+    candidateMap[8][6] = bit(5);
     // Row 7 strong link: (7,3) and (7,8) have 5
-    candidateMap[7][3] = [5];
-    candidateMap[7][8] = [5];
+    candidateMap[7][3] = bit(5);
+    candidateMap[7][8] = bit(5);
     // Elimination target
-    candidateMap[1][3] = [5];
+    candidateMap[1][3] = bit(5);
     // No other cell has 5
 
     const ctx: HumanSolverContext = { board, size: size as GridSize, boxSize, candidateMap };
@@ -2151,18 +2155,18 @@ describe("findTwoStringKite — HoDoKu example 2 (row 5 \u00d7 col 1)", () => {
     const size = 9;
     const boxSize = 3;
     const board = Array.from({ length: size }, () => Array(size).fill(0));
-    const candidateMap: number[][][] = Array.from({ length: size }, () =>
-      Array.from({ length: size }, () => [])
+    const candidateMap: number[][] = Array.from({ length: size }, () =>
+      Array(size).fill(0)
     );
 
     // Row 5 strong link: (5,0) and (5,5) have 9
-    candidateMap[5][0] = [9];
-    candidateMap[5][5] = [9];
+    candidateMap[5][0] = bit(9);
+    candidateMap[5][5] = bit(9);
     // Col 1 strong link: (3,1) and (6,1) have 9
-    candidateMap[3][1] = [9];
-    candidateMap[6][1] = [9];
+    candidateMap[3][1] = bit(9);
+    candidateMap[6][1] = bit(9);
     // Elimination target
-    candidateMap[6][5] = [9];
+    candidateMap[6][5] = bit(9);
     // No other cell has 9
 
     const ctx: HumanSolverContext = { board, size: size as GridSize, boxSize, candidateMap };
@@ -2198,13 +2202,13 @@ describe("findTwoStringKite — invalid box relationship", () => {
     const size = 9;
     const boxSize = 3;
     const board = Array.from({ length: size }, () => Array(size).fill(0));
-    const candidateMap: number[][][] = Array.from({ length: size }, () =>
-      Array.from({ length: size }, () => [])
+    const candidateMap: number[][] = Array.from({ length: size }, () =>
+      Array(size).fill(0)
     );
-    candidateMap[0][0] = [2];
-    candidateMap[0][7] = [2];
-    candidateMap[3][1] = [2];
-    candidateMap[5][1] = [2];
+    candidateMap[0][0] = bit(2);
+    candidateMap[0][7] = bit(2);
+    candidateMap[3][1] = bit(2);
+    candidateMap[5][1] = bit(2);
     const ctx: HumanSolverContext = { board, size: size as GridSize, boxSize, candidateMap };
     expect(findTwoStringKite(ctx)).toEqual([]);
   });
@@ -2216,12 +2220,12 @@ describe("findTwoStringKite — invalid box relationship", () => {
     const size = 9;
     const boxSize = 3;
     const board = Array.from({ length: size }, () => Array(size).fill(0));
-    const candidateMap: number[][][] = Array.from({ length: size }, () =>
-      Array.from({ length: size }, () => [])
+    const candidateMap: number[][] = Array.from({ length: size }, () =>
+      Array(size).fill(0)
     );
-    candidateMap[2][4] = [3];
-    candidateMap[2][7] = [3];
-    candidateMap[6][4] = [3];
+    candidateMap[2][4] = bit(3);
+    candidateMap[2][7] = bit(3);
+    candidateMap[6][4] = bit(3);
     const ctx: HumanSolverContext = { board, size: size as GridSize, boxSize, candidateMap };
     expect(findTwoStringKite(ctx)).toEqual([]);
   });
@@ -2233,13 +2237,13 @@ describe("findTwoStringKite — no eliminations", () => {
     const size = 9;
     const boxSize = 3;
     const board = Array.from({ length: size }, () => Array(size).fill(0));
-    const candidateMap: number[][][] = Array.from({ length: size }, () =>
-      Array.from({ length: size }, () => [])
+    const candidateMap: number[][] = Array.from({ length: size }, () =>
+      Array(size).fill(0)
     );
-    candidateMap[1][6] = [5];
-    candidateMap[8][6] = [5];
-    candidateMap[7][3] = [5];
-    candidateMap[7][8] = [5];
+    candidateMap[1][6] = bit(5);
+    candidateMap[8][6] = bit(5);
+    candidateMap[7][3] = bit(5);
+    candidateMap[7][8] = bit(5);
     const ctx: HumanSolverContext = { board, size: size as GridSize, boxSize, candidateMap };
     expect(findTwoStringKite(ctx)).toEqual([]);
   });
@@ -2251,14 +2255,14 @@ describe("findTwoStringKite — duplicate prevention", () => {
     const size = 9;
     const boxSize = 3;
     const board = Array.from({ length: size }, () => Array(size).fill(0));
-    const candidateMap: number[][][] = Array.from({ length: size }, () =>
-      Array.from({ length: size }, () => [])
+    const candidateMap: number[][] = Array.from({ length: size }, () =>
+      Array(size).fill(0)
     );
-    candidateMap[1][6] = [5];
-    candidateMap[8][6] = [5];
-    candidateMap[7][3] = [5];
-    candidateMap[7][8] = [5];
-    candidateMap[1][3] = [5];
+    candidateMap[1][6] = bit(5);
+    candidateMap[8][6] = bit(5);
+    candidateMap[7][3] = bit(5);
+    candidateMap[7][8] = bit(5);
+    candidateMap[1][3] = bit(5);
 
     const ctx: HumanSolverContext = { board, size: size as GridSize, boxSize, candidateMap };
     const result = findTwoStringKite(ctx);
@@ -2282,14 +2286,14 @@ describe("findTwoStringKite — board immutability", () => {
     const size = 9;
     const boxSize = 3;
     const board = Array.from({ length: size }, () => Array(size).fill(0));
-    const candidateMap: number[][][] = Array.from({ length: size }, () =>
-      Array.from({ length: size }, () => [])
+    const candidateMap: number[][] = Array.from({ length: size }, () =>
+      Array(size).fill(0)
     );
-    candidateMap[1][6] = [5];
-    candidateMap[8][6] = [5];
-    candidateMap[7][3] = [5];
-    candidateMap[7][8] = [5];
-    candidateMap[1][3] = [5];
+    candidateMap[1][6] = bit(5);
+    candidateMap[8][6] = bit(5);
+    candidateMap[7][3] = bit(5);
+    candidateMap[7][8] = bit(5);
+    candidateMap[1][3] = bit(5);
 
     const snapshot = cloneBoard(board);
     const ctx: HumanSolverContext = { board, size: size as GridSize, boxSize, candidateMap };
@@ -2303,17 +2307,17 @@ describe("findTwoStringKite — CandidateMap immutability", () => {
     const size = 9;
     const boxSize = 3;
     const board = Array.from({ length: size }, () => Array(size).fill(0));
-    const candidateMap: number[][][] = Array.from({ length: size }, () =>
-      Array.from({ length: size }, () => [])
+    const candidateMap: number[][] = Array.from({ length: size }, () =>
+      Array(size).fill(0)
     );
-    candidateMap[1][6] = [5];
-    candidateMap[8][6] = [5];
-    candidateMap[7][3] = [5];
-    candidateMap[7][8] = [5];
-    candidateMap[1][3] = [5];
+    candidateMap[1][6] = bit(5);
+    candidateMap[8][6] = bit(5);
+    candidateMap[7][3] = bit(5);
+    candidateMap[7][8] = bit(5);
+    candidateMap[1][3] = bit(5);
 
     const ctx: HumanSolverContext = { board, size: size as GridSize, boxSize, candidateMap };
-    const snapshot = ctx.candidateMap.map((row) => row.map((col) => [...col]));
+    const snapshot = ctx.candidateMap.map((row) => [...row]);
     findTwoStringKite(ctx);
 
     for (let r = 0; r < 9; r++) {

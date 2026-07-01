@@ -1,4 +1,5 @@
-import { buildCandidateMap } from "./CandidateEngine";
+import { buildMaskMap } from "./CandidateEngine";
+import { hasCandidate, removeCandidate } from "./CandidateMask";
 import {
   findNakedSingles,
   findHiddenSingles,
@@ -66,25 +67,23 @@ function buildContext(
   boxSize: number,
   pendingEliminations: Map<string, { row: number; col: number; value: number }>
 ): HumanSolverContext {
-  const candidateMap = buildCandidateMap(board, size, boxSize);
+  const candidateMap = buildMaskMap(board, size, boxSize);
   for (const [, e] of pendingEliminations) {
-    const list = candidateMap[e.row]![e.col]!;
-    const idx = list.indexOf(e.value);
-    if (idx !== -1) list.splice(idx, 1);
+    candidateMap[e.row]![e.col] = removeCandidate(candidateMap[e.row]![e.col]!, e.value);
   }
   return { board, size, boxSize, candidateMap };
 }
 
 function applyAssignment(ctx: HumanSolverContext, row: number, col: number, value: number): void {
   ctx.board[row]![col] = value;
-  ctx.candidateMap[row]![col] = [];
+  ctx.candidateMap[row]![col] = 0;
 
   const { candidateMap } = ctx;
   for (const [r, c] of getPeerCells(ctx.size, row, col)) {
     if (ctx.board[r]![c] !== 0) continue;
-    const list = candidateMap[r]![c]!;
-    const idx = list.indexOf(value);
-    if (idx !== -1) list.splice(idx, 1);
+    if (hasCandidate(candidateMap[r]![c]!, value)) {
+      candidateMap[r]![c] = removeCandidate(candidateMap[r]![c]!, value);
+    }
   }
 }
 
@@ -93,9 +92,9 @@ function applyEliminations(
   eliminations: Array<{ row: number; col: number; value: number }>
 ): void {
   for (const { row, col, value } of eliminations) {
-    const list = ctx.candidateMap[row]![col]!;
-    const idx = list.indexOf(value);
-    if (idx !== -1) list.splice(idx, 1);
+    if (hasCandidate(ctx.candidateMap[row]![col]!, value)) {
+      ctx.candidateMap[row]![col] = removeCandidate(ctx.candidateMap[row]![col]!, value);
+    }
   }
 }
 
@@ -137,7 +136,7 @@ export function solve(board: number[][]): SolveResult {
     board: working,
     size,
     boxSize,
-    candidateMap: buildCandidateMap(working, size, boxSize),
+    candidateMap: buildMaskMap(working, size, boxSize),
   };
 
   while (true) {

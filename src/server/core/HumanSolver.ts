@@ -1,12 +1,13 @@
-import type { CandidateMap } from "./CandidateEngine";
+import type { CandidateMaskMap } from "./CandidateMaskMap";
 import type { GridSize } from "./SudokuValidator";
 import type { Technique } from "./HumanSolverTypes";
+import { hasCandidate, candidateCount, candidateKey, iterateCandidates, firstCandidate, toArray, maskFromValues, intersectionCount } from "./CandidateMask";
 
 export interface HumanSolverContext {
   board: number[][];
   size: GridSize;
   boxSize: number;
-  candidateMap: CandidateMap;
+  candidateMap: CandidateMaskMap;
 }
 
 export type LogicalMove =
@@ -36,14 +37,14 @@ export function findNakedSingles(ctx: HumanSolverContext): LogicalMove[] {
     for (let col = 0; col < size; col++) {
       if (board[row]![col] !== 0) continue;
 
-      const candidates = candidateMap[row]![col]!;
+      const mask = candidateMap[row]![col]!;
 
-      if (candidates.length === 1) {
+      if (candidateCount(mask) === 1) {
         moves.push({
           type: "assignment",
           row,
           col,
-          value: candidates[0]!,
+          value: firstCandidate(mask)!,
           technique: "Naked Single",
         });
       }
@@ -68,42 +69,34 @@ export function findHiddenSingles(ctx: HumanSolverContext): LogicalMove[] {
   // Scan rows
   for (let row = 0; row < size; row++) {
     const counts = new Map<number, number>();
-    const cellCandidates: { row: number; col: number; list: number[] }[] = [];
+    const cellMasks: Array<{ row: number; col: number; mask: number }> = [];
 
     for (let col = 0; col < size; col++) {
       if (board[row]![col] !== 0) continue;
-      const list = candidateMap[row]![col]!;
-      cellCandidates.push({ row, col, list });
-      for (const v of list) {
-        counts.set(v, (counts.get(v) ?? 0) + 1);
-      }
+      const mask = candidateMap[row]![col]!;
+      cellMasks.push({ row, col, mask });
+      iterateCandidates(mask, v => counts.set(v, (counts.get(v) ?? 0) + 1));
     }
 
-    for (const { row, col, list } of cellCandidates) {
-      for (const v of list) {
-        if (counts.get(v) === 1) tryAdd(row, col, v);
-      }
+    for (const { row, col, mask } of cellMasks) {
+      iterateCandidates(mask, v => { if (counts.get(v) === 1) tryAdd(row, col, v); });
     }
   }
 
   // Scan columns
   for (let col = 0; col < size; col++) {
     const counts = new Map<number, number>();
-    const cellCandidates: { row: number; col: number; list: number[] }[] = [];
+    const cellMasks: Array<{ row: number; col: number; mask: number }> = [];
 
     for (let row = 0; row < size; row++) {
       if (board[row]![col] !== 0) continue;
-      const list = candidateMap[row]![col]!;
-      cellCandidates.push({ row, col, list });
-      for (const v of list) {
-        counts.set(v, (counts.get(v) ?? 0) + 1);
-      }
+      const mask = candidateMap[row]![col]!;
+      cellMasks.push({ row, col, mask });
+      iterateCandidates(mask, v => counts.set(v, (counts.get(v) ?? 0) + 1));
     }
 
-    for (const { row, col, list } of cellCandidates) {
-      for (const v of list) {
-        if (counts.get(v) === 1) tryAdd(row, col, v);
-      }
+    for (const { row, col, mask } of cellMasks) {
+      iterateCandidates(mask, v => { if (counts.get(v) === 1) tryAdd(row, col, v); });
     }
   }
 
@@ -111,32 +104,24 @@ export function findHiddenSingles(ctx: HumanSolverContext): LogicalMove[] {
   for (let boxRow = 0; boxRow < size; boxRow += boxSize) {
     for (let boxCol = 0; boxCol < size; boxCol += boxSize) {
       const counts = new Map<number, number>();
-      const cellCandidates: { row: number; col: number; list: number[] }[] = [];
+      const cellMasks: Array<{ row: number; col: number; mask: number }> = [];
 
       for (let r = boxRow; r < boxRow + boxSize; r++) {
         for (let c = boxCol; c < boxCol + boxSize; c++) {
           if (board[r]![c] !== 0) continue;
-          const list = candidateMap[r]![c]!;
-          cellCandidates.push({ row: r, col: c, list });
-          for (const v of list) {
-            counts.set(v, (counts.get(v) ?? 0) + 1);
-          }
+          const mask = candidateMap[r]![c]!;
+          cellMasks.push({ row: r, col: c, mask });
+          iterateCandidates(mask, v => counts.set(v, (counts.get(v) ?? 0) + 1));
         }
       }
 
-      for (const { row, col, list } of cellCandidates) {
-        for (const v of list) {
-          if (counts.get(v) === 1) tryAdd(row, col, v);
-        }
+      for (const { row, col, mask } of cellMasks) {
+        iterateCandidates(mask, v => { if (counts.get(v) === 1) tryAdd(row, col, v); });
       }
     }
   }
 
   return moves;
-}
-
-function candidateKey(list: number[]): string {
-  return [...list].sort((a, b) => a - b).join(",");
 }
 
 function pairDedupKey(
@@ -186,9 +171,9 @@ export function findNakedPairs(ctx: HumanSolverContext): LogicalMove[] {
     const groups = new Map<string, Array<{ row: number; col: number }>>();
 
     for (const { row, col } of cells) {
-      const list = candidateMap[row]![col]!;
-      if (list.length !== 2) continue;
-      const key = candidateKey(list);
+      const mask = candidateMap[row]![col]!;
+      if (candidateCount(mask) !== 2) continue;
+      const key = candidateKey(mask);
       const group = groups.get(key) ?? [];
       group.push({ row, col });
       groups.set(key, group);
@@ -220,9 +205,9 @@ export function findNakedPairs(ctx: HumanSolverContext): LogicalMove[] {
         )
           continue;
 
-        const list = candidateMap[row]![col]!;
+        const mask = candidateMap[row]![col]!;
         for (const v of values) {
-          if (list.includes(v)) {
+          if (hasCandidate(mask, v)) {
             const ek = eliminationCellKey(row, col, v);
             if (!entry.eliminations.has(ek)) {
               entry.eliminations.set(ek, { row, col, value: v });
@@ -288,20 +273,20 @@ export function findHiddenPairs(ctx: HumanSolverContext): LogicalMove[] {
   >();
 
   function processUnit(cells: Array<{ row: number; col: number }>): void {
-    // Build value → cells map from candidate lists
+    // Build value → cells map from candidate masks
     const valueCells = new Map<
       number,
       Array<{ row: number; col: number }>
     >();
 
     for (const { row, col } of cells) {
-      const list = candidateMap[row]![col]!;
-      if (list.length < 2) continue;
-      for (const v of list) {
+      const mask = candidateMap[row]![col]!;
+      if (candidateCount(mask) < 2) continue;
+      iterateCandidates(mask, v => {
         const arr = valueCells.get(v) ?? [];
         arr.push({ row, col });
         valueCells.set(v, arr);
-      }
+      });
     }
 
     // Values that appear in exactly two cells
@@ -353,8 +338,8 @@ export function findHiddenPairs(ctx: HumanSolverContext): LogicalMove[] {
         const hiddenValues = new Set([v1, v2]);
 
         for (const cell of [a, b]) {
-          const list = candidateMap[cell.row]![cell.col]!;
-          for (const candidate of list) {
+          const mask = candidateMap[cell.row]![cell.col]!;
+          iterateCandidates(mask, candidate => {
             if (!hiddenValues.has(candidate)) {
               const ek = eliminationCellKey(cell.row, cell.col, candidate);
               if (!entry.eliminations.has(ek)) {
@@ -365,7 +350,7 @@ export function findHiddenPairs(ctx: HumanSolverContext): LogicalMove[] {
                 });
               }
             }
-          }
+          });
         }
       }
     }
@@ -435,12 +420,12 @@ export function findPointingPairs(ctx: HumanSolverContext): LogicalMove[] {
       for (let r = boxRow; r < boxRow + boxSize; r++) {
         for (let c = boxCol; c < boxCol + boxSize; c++) {
           if (board[r]![c] !== 0) continue;
-          const list = candidateMap[r]![c]!;
-          for (const v of list) {
+          const mask = candidateMap[r]![c]!;
+          iterateCandidates(mask, v => {
             const arr = valueCells.get(v) ?? [];
             arr.push({ row: r, col: c });
             valueCells.set(v, arr);
-          }
+          });
         }
       }
 
@@ -465,8 +450,8 @@ export function findPointingPairs(ctx: HumanSolverContext): LogicalMove[] {
           for (let col = 0; col < size; col++) {
             if (col >= boxCol && col < boxCol + boxSize) continue;
             if (board[row]![col] !== 0) continue;
-            const list = candidateMap[row]![col]!;
-            if (list.includes(v)) {
+            const mask = candidateMap[row]![col]!;
+            if (hasCandidate(mask, v)) {
               const ek = eliminationCellKey(row, col, v);
               if (!eliminations.has(ek)) {
                 eliminations.set(ek, { row, col, value: v });
@@ -499,8 +484,8 @@ export function findPointingPairs(ctx: HumanSolverContext): LogicalMove[] {
           for (let row = 0; row < size; row++) {
             if (row >= boxRow && row < boxRow + boxSize) continue;
             if (board[row]![col] !== 0) continue;
-            const list = candidateMap[row]![col]!;
-            if (list.includes(v)) {
+            const mask = candidateMap[row]![col]!;
+            if (hasCandidate(mask, v)) {
               const ek = eliminationCellKey(row, col, v);
               if (!eliminations.has(ek)) {
                 eliminations.set(ek, { row, col, value: v });
@@ -556,12 +541,12 @@ export function findClaimingPairs(ctx: HumanSolverContext): LogicalMove[] {
 
     for (let col = 0; col < size; col++) {
       if (board[row]![col] !== 0) continue;
-      const list = candidateMap[row]![col]!;
-      for (const v of list) {
+      const mask = candidateMap[row]![col]!;
+      iterateCandidates(mask, v => {
         const arr = valueCells.get(v) ?? [];
         arr.push({ row, col });
         valueCells.set(v, arr);
-      }
+      });
     }
 
     for (const [v, cells] of valueCells) {
@@ -585,8 +570,8 @@ export function findClaimingPairs(ctx: HumanSolverContext): LogicalMove[] {
         if (r === row) continue;
         for (let c = boxCol; c < boxCol + boxSize; c++) {
           if (board[r]![c] !== 0) continue;
-          const list = candidateMap[r]![c]!;
-          if (list.includes(v)) {
+          const mask = candidateMap[r]![c]!;
+          if (hasCandidate(mask, v)) {
             const ek = eliminationCellKey(r, c, v);
             if (!eliminations.has(ek)) {
               eliminations.set(ek, { row: r, col: c, value: v });
@@ -616,12 +601,12 @@ export function findClaimingPairs(ctx: HumanSolverContext): LogicalMove[] {
 
     for (let row = 0; row < size; row++) {
       if (board[row]![col] !== 0) continue;
-      const list = candidateMap[row]![col]!;
-      for (const v of list) {
+      const mask = candidateMap[row]![col]!;
+      iterateCandidates(mask, v => {
         const arr = valueCells.get(v) ?? [];
         arr.push({ row, col });
         valueCells.set(v, arr);
-      }
+      });
     }
 
     for (const [v, cells] of valueCells) {
@@ -645,8 +630,8 @@ export function findClaimingPairs(ctx: HumanSolverContext): LogicalMove[] {
         for (let c = boxCol; c < boxCol + boxSize; c++) {
           if (c === col) continue;
           if (board[r]![c] !== 0) continue;
-          const list = candidateMap[r]![c]!;
-          if (list.includes(v)) {
+          const mask = candidateMap[r]![c]!;
+          if (hasCandidate(mask, v)) {
             const ek = eliminationCellKey(r, c, v);
             if (!eliminations.has(ek)) {
               eliminations.set(ek, { row: r, col: c, value: v });
@@ -697,8 +682,8 @@ export function findXWings(ctx: HumanSolverContext): LogicalMove[] {
       const cols: number[] = [];
       for (let col = 0; col < size; col++) {
         if (board[row]![col] !== 0) continue;
-        const list = candidateMap[row]![col]!;
-        if (list.includes(v)) {
+        const mask = candidateMap[row]![col]!;
+        if (hasCandidate(mask, v)) {
           cols.push(col);
         }
       }
@@ -728,8 +713,8 @@ export function findXWings(ctx: HumanSolverContext): LogicalMove[] {
             if (row === r1 || row === r2) continue;
             for (const c of [c1, c2]) {
               if (board[row]![c] !== 0) continue;
-              const list = candidateMap[row]![c]!;
-              if (list.includes(v)) {
+              const mask = candidateMap[row]![c]!;
+              if (hasCandidate(mask, v)) {
                 const ek = eliminationCellKey(row, c, v);
                 if (!eliminations.has(ek)) {
                   eliminations.set(ek, { row, col: c, value: v });
@@ -770,8 +755,8 @@ export function findXWings(ctx: HumanSolverContext): LogicalMove[] {
       const rows: number[] = [];
       for (let row = 0; row < size; row++) {
         if (board[row]![col] !== 0) continue;
-        const list = candidateMap[row]![col]!;
-        if (list.includes(v)) {
+        const mask = candidateMap[row]![col]!;
+        if (hasCandidate(mask, v)) {
           rows.push(row);
         }
       }
@@ -801,8 +786,8 @@ export function findXWings(ctx: HumanSolverContext): LogicalMove[] {
             if (col === c1 || col === c2) continue;
             for (const r of [r1, r2]) {
               if (board[r]![col] !== 0) continue;
-              const list = candidateMap[r]![col]!;
-              if (list.includes(v)) {
+              const mask = candidateMap[r]![col]!;
+              if (hasCandidate(mask, v)) {
                 const ek = eliminationCellKey(r, col, v);
                 if (!eliminations.has(ek)) {
                   eliminations.set(ek, { row: r, col, value: v });
@@ -856,7 +841,7 @@ export function findXYWing(ctx: HumanSolverContext): LogicalMove[] {
   for (let r = 0; r < size; r++) {
     for (let c = 0; c < size; c++) {
       if (board[r]![c] !== 0) continue;
-      if (candidateMap[r]![c]!.length === 2) {
+      if (candidateCount(candidateMap[r]![c]!) === 2) {
         biValueCells.push({ row: r, col: c });
       }
     }
@@ -871,8 +856,8 @@ export function findXYWing(ctx: HumanSolverContext): LogicalMove[] {
   >();
 
   for (const pivot of biValueCells) {
-    const pivotCands = candidateMap[pivot.row]![pivot.col]!;
-    const [x, y] = pivotCands;
+    const pivotMask = candidateMap[pivot.row]![pivot.col]!;
+    const [x, y] = toArray(pivotMask) as [number, number];
 
     // Find potential wings: bi-value cells that see the pivot and share exactly one candidate
     const wings: Array<{ row: number; col: number }> = [];
@@ -880,9 +865,9 @@ export function findXYWing(ctx: HumanSolverContext): LogicalMove[] {
       if (cell.row === pivot.row && cell.col === pivot.col) continue;
       if (!seeEachOther(pivot.row, pivot.col, cell.row, cell.col, boxSize)) continue;
  
-      const cands = candidateMap[cell.row]![cell.col]!;
-      const shared = cands.filter((c) => c === x || c === y);
-      if (shared.length !== 1) continue;
+      const candMask = candidateMap[cell.row]![cell.col]!;
+      const pattern = maskFromValues([x, y]);
+      if (intersectionCount(candMask, pattern) !== 1) continue;
 
       wings.push(cell);
     }
@@ -896,18 +881,19 @@ export function findXYWing(ctx: HumanSolverContext): LogicalMove[] {
         // Wings must not see each other
         if (seeEachOther(wingA.row, wingA.col, wingB.row, wingB.col, boxSize)) continue;
  
-        const candsA = candidateMap[wingA.row]![wingA.col]!;
-        const candsB = candidateMap[wingB.row]![wingB.col]!;
+        const maskA = candidateMap[wingA.row]![wingA.col]!;
+        const maskB = candidateMap[wingB.row]![wingB.col]!;
 
-        const sharedA = candsA.find((c) => c === x || c === y)!;
-        const sharedB = candsB.find((c) => c === x || c === y)!;
+        const sharedA = hasCandidate(maskA, x) ? x : y;
+        const sharedB = hasCandidate(maskB, x) ? x : y;
 
         // Shared candidates must differ (one must be X, the other Y)
         if (sharedA === sharedB) continue;
 
         // Both wings must share the same Z value
-        const zA = candsA.find((c) => c !== sharedA)!;
-        const zB = candsB.find((c) => c !== sharedB)!;
+        let zA = 0, zB = 0;
+        iterateCandidates(maskA, v => { if (v !== sharedA) zA = v; });
+        iterateCandidates(maskB, v => { if (v !== sharedB) zB = v; });
         if (zA !== zB) continue;
 
         const z = zA;
@@ -928,8 +914,8 @@ export function findXYWing(ctx: HumanSolverContext): LogicalMove[] {
             )
               continue;
 
-            const cellCands = candidateMap[r]![c]!;
-            if (!cellCands.includes(z)) continue;
+            const cellMask = candidateMap[r]![c]!;
+            if (!hasCandidate(cellMask, z)) continue;
 
             if (
               seeEachOther(r, c, wingA.row, wingA.col, boxSize) &&
@@ -996,8 +982,8 @@ export function findSwordfish(ctx: HumanSolverContext): LogicalMove[] {
       const cols: number[] = [];
       for (let col = 0; col < size; col++) {
         if (board[row]![col] !== 0) continue;
-        const list = candidateMap[row]![col]!;
-        if (list.includes(v)) {
+        const mask = candidateMap[row]![col]!;
+        if (hasCandidate(mask, v)) {
           cols.push(col);
         }
       }
@@ -1034,8 +1020,8 @@ export function findSwordfish(ctx: HumanSolverContext): LogicalMove[] {
             for (let row = 0; row < size; row++) {
               if (row === r1 || row === r2 || row === r3) continue;
               if (board[row]![c] !== 0) continue;
-              const list = candidateMap[row]![c]!;
-              if (list.includes(v)) {
+              const mask = candidateMap[row]![c]!;
+              if (hasCandidate(mask, v)) {
                 const ek = eliminationCellKey(row, c, v);
                 if (!eliminations.has(ek)) {
                   eliminations.set(ek, { row, col: c, value: v });
@@ -1078,8 +1064,8 @@ export function findSwordfish(ctx: HumanSolverContext): LogicalMove[] {
       const rows: number[] = [];
       for (let row = 0; row < size; row++) {
         if (board[row]![col] !== 0) continue;
-        const list = candidateMap[row]![col]!;
-        if (list.includes(v)) {
+        const mask = candidateMap[row]![col]!;
+        if (hasCandidate(mask, v)) {
           rows.push(row);
         }
       }
@@ -1116,8 +1102,8 @@ export function findSwordfish(ctx: HumanSolverContext): LogicalMove[] {
             for (let col = 0; col < size; col++) {
               if (col === c1 || col === c2 || col === c3) continue;
               if (board[r]![col] !== 0) continue;
-              const list = candidateMap[r]![col]!;
-              if (list.includes(v)) {
+              const mask = candidateMap[r]![col]!;
+              if (hasCandidate(mask, v)) {
                 const ek = eliminationCellKey(r, col, v);
                 if (!eliminations.has(ek)) {
                   eliminations.set(ek, { row: r, col, value: v });
@@ -1182,7 +1168,7 @@ export function findSkyscraper(ctx: HumanSolverContext): LogicalMove[] {
       const cols: number[] = [];
       for (let col = 0; col < size; col++) {
         if (board[row]![col] !== 0) continue;
-        if (candidateMap[row]![col]!.includes(v)) {
+        if (hasCandidate(candidateMap[row]![col]!, v)) {
           cols.push(col);
         }
       }
@@ -1232,7 +1218,7 @@ export function findSkyscraper(ctx: HumanSolverContext): LogicalMove[] {
             if (r === r1 && c === topCol1) continue;
             if (r === r2 && c === topCol2) continue;
 
-            if (!candidateMap[r]![c]!.includes(v)) continue;
+            if (!hasCandidate(candidateMap[r]![c]!, v)) continue;
 
             if (
               seeEachOther(r, c, r1, topCol1, boxSize) &&
@@ -1278,7 +1264,7 @@ export function findSkyscraper(ctx: HumanSolverContext): LogicalMove[] {
       const rows: number[] = [];
       for (let row = 0; row < size; row++) {
         if (board[row]![col] !== 0) continue;
-        if (candidateMap[row]![col]!.includes(v)) {
+        if (hasCandidate(candidateMap[row]![col]!, v)) {
           rows.push(row);
         }
       }
@@ -1327,7 +1313,7 @@ export function findSkyscraper(ctx: HumanSolverContext): LogicalMove[] {
             if (r === topRow1 && c === c1) continue;
             if (r === topRow2 && c === c2) continue;
 
-            if (!candidateMap[r]![c]!.includes(v)) continue;
+            if (!hasCandidate(candidateMap[r]![c]!, v)) continue;
 
             if (
               seeEachOther(r, c, topRow1, c1, boxSize) &&
@@ -1395,7 +1381,7 @@ export function findTwoStringKite(ctx: HumanSolverContext): LogicalMove[] {
       const cols: number[] = [];
       for (let c = 0; c < size; c++) {
         if (board[r]![c] !== 0) continue;
-        if (candidateMap[r]![c]!.includes(v)) {
+        if (hasCandidate(candidateMap[r]![c]!, v)) {
           cols.push(c);
         }
       }
@@ -1411,7 +1397,7 @@ export function findTwoStringKite(ctx: HumanSolverContext): LogicalMove[] {
       const rows: number[] = [];
       for (let r = 0; r < size; r++) {
         if (board[r]![c] !== 0) continue;
-        if (candidateMap[r]![c]!.includes(v)) {
+        if (hasCandidate(candidateMap[r]![c]!, v)) {
           rows.push(r);
         }
       }
@@ -1466,7 +1452,7 @@ export function findTwoStringKite(ctx: HumanSolverContext): LogicalMove[] {
                 // Skip the 4 pattern cells
                 if (patternSet.has(`${er},${ec}`)) continue;
 
-                if (!candidateMap[er]![ec]!.includes(v)) continue;
+                if (!hasCandidate(candidateMap[er]![ec]!, v)) continue;
 
                 if (
                   seeEachOther(er, ec, tipR, rowTipC, boxSize) &&
