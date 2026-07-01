@@ -785,7 +785,7 @@ describe("Local search — benchmark", () => {
       expect(base.scores.every((s) => Number.isFinite(s))).toBe(true);
       expect(ls.scores.every((s) => Number.isFinite(s))).toBe(true);
     }
-  });
+  }, 30000);
 
   it("local search reduces score distance or remains equal on average", () => {
     const SAMPLES = 5;

@@ -410,6 +410,18 @@ Validation:
 - Independent implementation review: APPROVED
 - Independent architecture review: APPROVED
 
+Phase 14.3
+Status: ✅ Complete
+
+Highlights
+- Added immutable PeerCache keyed by GridSize
+- Cached full, row, column and box peer lists
+- applyAssignment() now uses cached peer iteration
+- Zero runtime allocations after cache initialization
+- Behaviour preserved
+- 463/463 tests passing
+- Clean build
+
 ### Future techniques (not yet scheduled)
 
 - Jellyfish

@@ -14,6 +14,7 @@ import {
   type HumanSolverContext,
   type LogicalMove,
 } from "./HumanSolver";
+import { getPeerCells } from "./PeerCache";
 import type { GridSize } from "./SudokuValidator";
 import { type Technique, TECHNIQUE_PRIORITY } from "./HumanSolverTypes";
 
@@ -78,38 +79,12 @@ function applyAssignment(ctx: HumanSolverContext, row: number, col: number, valu
   ctx.board[row]![col] = value;
   ctx.candidateMap[row]![col] = [];
 
-  const { size, boxSize, candidateMap } = ctx;
-  const br = Math.floor(row / boxSize) * boxSize;
-  const bc = Math.floor(col / boxSize) * boxSize;
-
-  // Row peers — skip the assigned cell itself
-  for (let c = 0; c < size; c++) {
-    if (c === col) continue;
-    if (ctx.board[row]![c] !== 0) continue;
-    const list = candidateMap[row]![c]!;
+  const { candidateMap } = ctx;
+  for (const [r, c] of getPeerCells(ctx.size, row, col)) {
+    if (ctx.board[r]![c] !== 0) continue;
+    const list = candidateMap[r]![c]!;
     const idx = list.indexOf(value);
     if (idx !== -1) list.splice(idx, 1);
-  }
-
-  // Column peers — skip the assigned cell itself
-  for (let r = 0; r < size; r++) {
-    if (r === row) continue;
-    if (ctx.board[r]![col] !== 0) continue;
-    const list = candidateMap[r]![col]!;
-    const idx = list.indexOf(value);
-    if (idx !== -1) list.splice(idx, 1);
-  }
-
-  // Box peers — skip the assigned cell itself
-  // Overlaps with row/column are safe: indexOf → splice is idempotent
-  for (let r = br; r < br + boxSize; r++) {
-    for (let c = bc; c < bc + boxSize; c++) {
-      if (r === row && c === col) continue;
-      if (ctx.board[r]![c] !== 0) continue;
-      const list = candidateMap[r]![c]!;
-      const idx = list.indexOf(value);
-      if (idx !== -1) list.splice(idx, 1);
-    }
   }
 }
 

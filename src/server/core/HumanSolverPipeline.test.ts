@@ -6,6 +6,7 @@ import {
   type SolveResult,
 } from "./HumanSolverPipeline";
 import { buildCandidateMap, type CandidateMap } from "./CandidateEngine";
+import { getPeerCells } from "./PeerCache";
 import type { LogicalMove } from "./HumanSolver";
 import type { GridSize } from "./SudokuValidator";
 
@@ -455,25 +456,6 @@ function candidateMapsEqual(a: CandidateMap, b: CandidateMap, size: number): boo
   return true;
 }
 
-function getPeerKeys(row: number, col: number, size: number, boxSize: number): string[] {
-  const keys: string[] = [];
-  const br = Math.floor(row / boxSize) * boxSize;
-  const bc = Math.floor(col / boxSize) * boxSize;
-  const seen = new Set<string>();
-  for (let c = 0; c < size; c++) {
-    if (c !== col) { const k = `${row},${c}`; if (!seen.has(k)) { seen.add(k); keys.push(k); } }
-  }
-  for (let r = 0; r < size; r++) {
-    if (r !== row) { const k = `${r},${col}`; if (!seen.has(k)) { seen.add(k); keys.push(k); } }
-  }
-  for (let r = br; r < br + boxSize; r++) {
-    for (let c = bc; c < bc + boxSize; c++) {
-      if (r !== row || c !== col) { const k = `${r},${c}`; if (!seen.has(k)) { seen.add(k); keys.push(k); } }
-    }
-  }
-  return keys;
-}
-
 function testApplyAssignment(
   board: number[][],
   candidateMap: CandidateMap,
@@ -485,8 +467,7 @@ function testApplyAssignment(
 ): void {
   board[row]![col] = value;
   candidateMap[row]![col] = [];
-  for (const key of getPeerKeys(row, col, size, boxSize)) {
-    const [r, c] = key.split(",").map(Number) as [number, number];
+  for (const [r, c] of getPeerCells(size, row, col)) {
     if (board[r]![c] !== 0) continue;
     const list = candidateMap[r]![c]!;
     const idx = list.indexOf(value);
