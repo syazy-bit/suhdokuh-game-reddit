@@ -38,6 +38,9 @@ export interface ModeResult {
   // Phase 15.1 Stage 2 extensions (optional — backward compatible)
   memoryUsage?: MetricStats;
   predictorAccuracy?: PredictorAccuracyStats;
+
+  // Phase 15.2 Stage 1 — raw sample arrays for statistical comparison
+  rawSamples?: Record<string, number[]>;
 }
 
 export interface DifficultyReport {

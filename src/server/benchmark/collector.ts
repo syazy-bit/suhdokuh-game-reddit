@@ -190,6 +190,28 @@ export class BenchmarkCollector {
         }
       : undefined;
 
+    // Phase 15.2 Stage 1 — preserve raw sample arrays for comparison
+    const rawSamples: Record<string, number[]> = {};
+    const recordRaw = (name: string, samples: number[]): void => {
+      if (samples.length > 0) rawSamples[name] = [...samples];
+    };
+    recordRaw("generationTimeMs", this.collection.timeSamples.get("generate") ?? []);
+    recordRaw("clueRemovalTimeMs", this.collection.timeSamples.get("removeClues") ?? []);
+    recordRaw("humanSolverTimeMs", this.collection.timeSamples.get("solve") ?? []);
+    recordRaw("uniquenessCheckTimeMs", this.collection.timeSamples.get("hasUniqueSolution") ?? []);
+    recordRaw("predictorEvalTimeMs", this.collection.timeSamples.get("evaluateCandidates") ?? []);
+    recordRaw("predictorDeltaTimeMs", this.collection.timeSamples.get("estimateDelta") ?? []);
+    recordRaw("predictorBudgetTimeMs", this.collection.timeSamples.get("computeEligibleSet") ?? []);
+    recordRaw("analysisTimeMs", this.collection.timeSamples.get("analyzeSolveResult") ?? []);
+    recordRaw("localSearchTimeMs", this.collection.timeSamples.get("localSearch") ?? []);
+    recordRaw("candidateEvalTimeMs", this.collection.timeSamples.get("candidateEval") ?? []);
+    recordRaw("retries", retriesSamples);
+    recordRaw("humanSolverCalls", this.collection.counterSamples.get("solveCalls") ?? []);
+    recordRaw("predictorEvaluations", this.collection.counterSamples.get("predictorEvals") ?? []);
+    recordRaw("scoreDistribution", scoreArray);
+    recordRaw("clueCount", clueArray);
+    if (memDeltas.length > 0) recordRaw("memoryUsage", memDeltas);
+
     return {
       generationTimeMs: buildMetric("generate"),
       clueRemovalTimeMs: buildMetric("removeClues"),
@@ -212,6 +234,8 @@ export class BenchmarkCollector {
       // Phase 15.1 Stage 2 — conditional spread for exactOptionalPropertyTypes
       ...(memoryUsage !== undefined ? { memoryUsage } : {}),
       ...(predictorAccuracy !== undefined ? { predictorAccuracy } : {}),
+      // Phase 15.2 Stage 1 — raw samples
+      ...(Object.keys(rawSamples).length > 0 ? { rawSamples } : {}),
     };
   }
 }

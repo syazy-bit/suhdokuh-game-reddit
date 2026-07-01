@@ -1,5 +1,5 @@
-export type { BenchmarkConfig, AcceptanceGates } from "./config";
-export { DEFAULT_CONFIG } from "./config";
+export type { BenchmarkConfig, AcceptanceGates, SeverityThresholds } from "./config";
+export { DEFAULT_CONFIG, DEFAULT_SEVERITY_THRESHOLDS } from "./config";
 export type { ModeDef } from "./modes";
 export { MODES } from "./modes";
 export type { MetricStats, HistogramBin, ModeResult, DifficultyReport, ModeReport, BenchmarkReport, AcceptanceResult, AcceptanceCheck, GateSeverity, DeterminismArtifacts, DeterminismResult, MetricComparison, ComparisonReport, RegressionItem, RegressionResult, CertificationVerdict, CertificationReport, CIReport, MemorySnapshot, PredictorCallRecord, PredictorAccuracyStats, DeterminismRecord } from "./result";

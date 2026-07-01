@@ -17,6 +17,7 @@ export interface GeneratorConfig {
   useGuidedRemoval?: boolean;
   usePredictor?: boolean;
   usePredictorAwareBudget?: boolean;
+  rng?: () => number;
 }
 
 export interface GeneratedPuzzle {
@@ -36,6 +37,7 @@ export class SudokuGenerator {
   private useGuidedRemoval: boolean;
   private usePredictor: boolean;
   private usePredictorAwareBudget: boolean;
+  private rng: () => number;
 
   constructor(config: GeneratorConfig) {
     this.size = config.size;
@@ -46,6 +48,7 @@ export class SudokuGenerator {
     this.useGuidedRemoval = config.useGuidedRemoval ?? false;
     this.usePredictor = config.usePredictor ?? false;
     this.usePredictorAwareBudget = config.usePredictorAwareBudget ?? false;
+    this.rng = config.rng ?? Math.random;
 
     if (this.maxAttempts < 1) {
       throw new Error(
@@ -459,7 +462,7 @@ export class SudokuGenerator {
         const tied = evaluated.filter(
           (e) => Math.abs(e.distance - minDistance) <= SudokuGenerator.DISTANCE_THRESHOLD
         );
-        const picked = tied[Math.floor(Math.random() * tied.length)]!;
+        const picked = tied[Math.floor(this.rng() * tied.length)]!;
         puzzle[picked.row]![picked.col] = 0;
         puzzle[picked.symRow]![picked.symCol] = 0;
         const delta = (picked.row === picked.symRow && picked.col === picked.symCol) ? 1 : 2;
@@ -502,7 +505,7 @@ export class SudokuGenerator {
     const tied = evaluated.filter(
       (e) => Math.abs(e.distance - minDistance) <= SudokuGenerator.DISTANCE_THRESHOLD
     );
-    const picked = tied[Math.floor(Math.random() * tied.length)]!;
+    const picked = tied[Math.floor(this.rng() * tied.length)]!;
 
     puzzle[picked.row]![picked.col] = 0;
     puzzle[picked.symRow]![picked.symCol] = 0;
@@ -864,7 +867,7 @@ export class SudokuGenerator {
   private shuffleArray<T>(array: T[]): T[] {
     const shuffled = [...array];
     for (let i = shuffled.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
+      const j = Math.floor(this.rng() * (i + 1));
       const temp = shuffled[i];
       shuffled[i] = shuffled[j]!;
       shuffled[j] = temp!;

@@ -1,3 +1,17 @@
+export interface SeverityThresholds {
+  blockingEffectSize: number;
+  blockingPValue: number;
+  advisoryEffectSize: number;
+  advisoryPValue: number;
+}
+
+export const DEFAULT_SEVERITY_THRESHOLDS: SeverityThresholds = {
+  blockingEffectSize: 0.8,
+  blockingPValue: 0.01,
+  advisoryEffectSize: 0.5,
+  advisoryPValue: 0.05,
+};
+
 export interface BenchmarkConfig {
   samples: number;
   warmup: number;
@@ -8,6 +22,7 @@ export interface BenchmarkConfig {
   outputDir: string;
   generatePlots: boolean;
   acceptanceGates: AcceptanceGates | null;
+  severityThresholds?: SeverityThresholds;
 }
 
 export interface AcceptanceGates {
