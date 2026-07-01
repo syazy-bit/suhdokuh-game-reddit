@@ -2,7 +2,7 @@ export type { BenchmarkConfig, AcceptanceGates, SeverityThresholds } from "./con
 export { DEFAULT_CONFIG, DEFAULT_SEVERITY_THRESHOLDS } from "./config";
 export type { ModeDef } from "./modes";
 export { MODES } from "./modes";
-export type { MetricStats, HistogramBin, ModeResult, DifficultyReport, ModeReport, BenchmarkReport, AcceptanceResult, AcceptanceCheck, GateSeverity, DeterminismArtifacts, DeterminismResult, MetricComparison, ComparisonReport, RegressionItem, RegressionResult, CertificationVerdict, CertificationReport, CIReport, MemorySnapshot, PredictorCallRecord, PredictorAccuracyStats, DeterminismRecord } from "./result";
+export type { MetricStats, HistogramBin, ModeResult, DifficultyReport, ModeReport, BenchmarkReport, AcceptanceResult, AcceptanceCheck, GateSeverity, MetricPolarity, MetricSummary, MetricStatistics, MetricComparison, ComparisonReport, RegressionItem, RegressionResult, CertificationVerdict, CertificationReport, CIReport, MemorySnapshot, PredictorCallRecord, PredictorAccuracyStats, DeterminismRecord } from "./result";
 export { BenchmarkCollector } from "./collector";
 export { installProbes, removeProbes } from "./probes";
 export type { SpyHandle } from "./probes";
@@ -13,3 +13,4 @@ export { checkAcceptance } from "./gates";
 export { generatePlots, writePlots } from "./visualizer";
 export { mannWhitneyU, welchTTest, cohensD, confidenceInterval } from "./significance";
 export type { MannWhitneyUResult, WelchTTestResult, CohenDResult, ConfidenceIntervalResult } from "./significance";
+export { compareReports, DEFAULT_METRIC_POLARITY } from "./comparison";

@@ -91,13 +91,15 @@ export interface DeterminismResult {
   sampleCount: number;
 }
 
-export interface MetricComparison {
-  mode: string;
-  difficulty: string;
-  metric: string;
-  baselineMean: number;
-  currentMean: number;
+export type MetricPolarity = "lower_is_better" | "higher_is_better" | "unknown";
+
+export interface MetricSummary {
+  baseline: number;
+  current: number;
   deltaPercent: number;
+}
+
+export interface MetricStatistics {
   mwUStatistic: number;
   mwUPValue: number;
   welchTStat: number | null;
@@ -105,6 +107,21 @@ export interface MetricComparison {
   welchPValue: number | null;
   cohensD: number;
   significant: boolean;
+}
+
+export interface MetricComparison {
+  mode: string;
+  difficulty: string;
+  metric: string;
+  polarity: MetricPolarity;
+  summary: {
+    mean: MetricSummary;
+    median: MetricSummary;
+    p90: MetricSummary;
+    p95: MetricSummary;
+  };
+  statistics: MetricStatistics;
+  regression: GateSeverity | null;
 }
 
 export interface ComparisonReport {

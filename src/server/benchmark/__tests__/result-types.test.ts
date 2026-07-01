@@ -11,6 +11,7 @@ import type {
   GateSeverity,
   DeterminismArtifacts,
   DeterminismResult,
+  MetricSummary,
   MetricComparison,
   ComparisonReport,
   RegressionItem,
@@ -151,43 +152,61 @@ describe("result types — Phase 15.1 additions", () => {
   });
 
   it("MetricComparison has all required fields", () => {
+    const mkSummary = (b: number, c: number, d: number): MetricSummary => ({ baseline: b, current: c, deltaPercent: d });
     const comp: MetricComparison = {
       mode: "full",
       difficulty: "hard",
       metric: "generationTimeMs",
-      baselineMean: 54.7,
-      currentMean: 36.1,
-      deltaPercent: -34.0,
-      mwUStatistic: 1200,
-      mwUPValue: 0.001,
-      welchTStat: 4.5,
-      welchDf: 38.2,
-      welchPValue: 0.0001,
-      cohensD: 1.21,
-      significant: true,
+      polarity: "lower_is_better",
+      summary: {
+        mean: mkSummary(54.7, 36.1, -34.0),
+        median: mkSummary(52.0, 35.0, -32.7),
+        p90: mkSummary(80.0, 60.0, -25.0),
+        p95: mkSummary(90.0, 70.0, -22.2),
+      },
+      statistics: {
+        mwUStatistic: 1200,
+        mwUPValue: 0.001,
+        welchTStat: 4.5,
+        welchDf: 38.2,
+        welchPValue: 0.0001,
+        cohensD: 1.21,
+        significant: true,
+      },
+      regression: "blocking",
     };
-    expect(comp.deltaPercent).toBe(-34.0);
-    expect(comp.significant).toBe(true);
+    expect(comp.summary.mean.deltaPercent).toBe(-34.0);
+    expect(comp.statistics.significant).toBe(true);
+    expect(comp.regression).toBe("blocking");
   });
 
-  it("MetricComparison allows null Welch fields", () => {
+  it("MetricComparison allows null Welch fields and null regression", () => {
+    const mkSummary = (b: number, c: number, d: number): MetricSummary => ({ baseline: b, current: c, deltaPercent: d });
     const comp: MetricComparison = {
       mode: "baseline",
       difficulty: "easy",
       metric: "retries",
-      baselineMean: 0.1,
-      currentMean: 0.2,
-      deltaPercent: 100,
-      mwUStatistic: 50,
-      mwUPValue: 0.5,
-      welchTStat: null,
-      welchDf: null,
-      welchPValue: null,
-      cohensD: 0.1,
-      significant: false,
+      polarity: "unknown",
+      summary: {
+        mean: mkSummary(0.1, 0.2, 100),
+        median: mkSummary(0.1, 0.2, 100),
+        p90: mkSummary(0.5, 0.8, 60),
+        p95: mkSummary(0.8, 1.0, 25),
+      },
+      statistics: {
+        mwUStatistic: 50,
+        mwUPValue: 0.5,
+        welchTStat: null,
+        welchDf: null,
+        welchPValue: null,
+        cohensD: 0.1,
+        significant: false,
+      },
+      regression: null,
     };
-    expect(comp.welchTStat).toBeNull();
-    expect(comp.welchPValue).toBeNull();
+    expect(comp.statistics.welchTStat).toBeNull();
+    expect(comp.statistics.welchPValue).toBeNull();
+    expect(comp.regression).toBeNull();
   });
 
   it("ComparisonReport contains comparisons array", () => {
