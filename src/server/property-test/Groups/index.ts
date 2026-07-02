@@ -4,6 +4,7 @@ import { peerCacheGroup } from "./PeerCacheProperties";
 import { puzzleGeneratorGroup } from "./PuzzleGeneratorProperties";
 import { boardGroup } from "./BoardProperties";
 import { solverGroup } from "./SolverProperties";
+import { candidateEngineGroup } from "./CandidateEngineProperties";
 
 export const allGroups: PropertyGroup[] = [
   candidateMaskGroup,
@@ -11,6 +12,7 @@ export const allGroups: PropertyGroup[] = [
   puzzleGeneratorGroup,
   boardGroup,
   solverGroup,
+  candidateEngineGroup,
 ];
 
 export { candidateMaskGroup } from "./CandidateMaskProperties";
@@ -18,3 +20,4 @@ export { peerCacheGroup } from "./PeerCacheProperties";
 export { puzzleGeneratorGroup } from "./PuzzleGeneratorProperties";
 export { boardGroup } from "./BoardProperties";
 export { solverGroup } from "./SolverProperties";
+export { candidateEngineGroup } from "./CandidateEngineProperties";
