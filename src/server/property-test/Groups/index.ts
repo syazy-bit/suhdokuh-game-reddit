@@ -6,6 +6,7 @@ import { boardGroup } from "./BoardProperties";
 import { solverGroup } from "./SolverProperties";
 import { candidateEngineGroup } from "./CandidateEngineProperties";
 import { difficultyAnalyzerGroup } from "./DifficultyAnalyzerProperties";
+import { difficultyPredictorGroup } from "./DifficultyPredictorProperties";
 
 export const allGroups: PropertyGroup[] = [
   candidateMaskGroup,
@@ -15,6 +16,7 @@ export const allGroups: PropertyGroup[] = [
   solverGroup,
   candidateEngineGroup,
   difficultyAnalyzerGroup,
+  difficultyPredictorGroup,
 ];
 
 export { candidateMaskGroup } from "./CandidateMaskProperties";
@@ -24,3 +26,4 @@ export { boardGroup } from "./BoardProperties";
 export { solverGroup } from "./SolverProperties";
 export { candidateEngineGroup } from "./CandidateEngineProperties";
 export { difficultyAnalyzerGroup } from "./DifficultyAnalyzerProperties";
+export { difficultyPredictorGroup } from "./DifficultyPredictorProperties";
