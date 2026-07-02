@@ -8,6 +8,7 @@ import { candidateEngineGroup } from "./CandidateEngineProperties";
 import { difficultyAnalyzerGroup } from "./DifficultyAnalyzerProperties";
 import { difficultyPredictorGroup } from "./DifficultyPredictorProperties";
 import { hintEngineGroup } from "./HintEngineProperties";
+import { techniqueDescriptionsGroup } from "./TechniqueDescriptionsProperties";
 
 export const allGroups: PropertyGroup[] = [
   candidateMaskGroup,
@@ -19,6 +20,7 @@ export const allGroups: PropertyGroup[] = [
   difficultyAnalyzerGroup,
   difficultyPredictorGroup,
   hintEngineGroup,
+  techniqueDescriptionsGroup,
 ];
 
 export { candidateMaskGroup } from "./CandidateMaskProperties";
@@ -30,3 +32,5 @@ export { candidateEngineGroup } from "./CandidateEngineProperties";
 export { difficultyAnalyzerGroup } from "./DifficultyAnalyzerProperties";
 export { difficultyPredictorGroup } from "./DifficultyPredictorProperties";
 export { hintEngineGroup } from "./HintEngineProperties";
+export { techniqueDescriptionsGroup } from "./TechniqueDescriptionsProperties";
+
