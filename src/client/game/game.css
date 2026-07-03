@@ -1321,6 +1321,7 @@ h2 {
 .leaderboard-table td {
   padding: 8px;
   border-bottom: 1px solid var(--border);
+  color: var(--text-primary);
 }
 
 .leaderboard-table tbody tr:hover {
