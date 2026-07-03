@@ -1,7 +1,10 @@
 import { navigateTo, requestExpandedMode } from "@devvit/web/client";
+import { injectIcons } from "../game/icons";
 
 // Wait for DOM to be fully loaded
 document.addEventListener("DOMContentLoaded", () => {
+  injectIcons();
+
   const startButton = document.getElementById(
     "start-button",
   ) as HTMLButtonElement;
@@ -27,7 +30,7 @@ document.addEventListener("DOMContentLoaded", () => {
   function init() {
     // Text content is now set in HTML, but keeping this for potential dynamic updates
     if (titleElement && !titleElement.textContent) {
-      titleElement.textContent = `Ready to Solve? 🧩`;
+      titleElement.textContent = `Ready to Solve?`;
     }
     if (descriptionElement && !descriptionElement.innerHTML) {
       descriptionElement.innerHTML = `Play <strong>4×4</strong> and <strong>9×9</strong> Sudoku puzzles.<br/>Test your logic. Beat the clock. Top the leaderboard!`;

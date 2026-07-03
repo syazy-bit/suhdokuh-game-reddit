@@ -21,10 +21,10 @@
 <body class="app">
   <div class="container">
     <div class="title-row">
-      <h1>🧩 Suhdokuh</h1>
-      <button id="appearance-btn" class="help-btn" aria-label="Change Theme">◐</button>
-      <button id="help-btn" class="help-btn" aria-label="Help and Rules">❓</button>
-      <button id="stats-btn" class="help-btn" aria-label="View Statistics">📊</button>
+      <h1><span class="icon" data-icon="puzzle" aria-hidden="true"></span>Suhdokuh</h1>
+      <button id="appearance-btn" class="help-btn" aria-label="Change Theme"><span class="icon" data-icon="appearance" aria-hidden="true"></span></button>
+      <button id="help-btn" class="help-btn" aria-label="Help and Rules"><span class="icon" data-icon="help" aria-hidden="true"></span></button>
+      <button id="stats-btn" class="help-btn" aria-label="View Statistics"><span class="icon" data-icon="stats" aria-hidden="true"></span></button>
     </div>
 
     <!-- Game Mode Selector -->
@@ -53,7 +53,7 @@
     <div class="status-bar">
       <span class="status-difficulty" id="difficulty-label">Difficulty: Medium</span>
       <div class="status-timer">
-        <span class="timer-icon" aria-hidden="true">⏱</span>
+        <span class="timer-icon" aria-hidden="true"><span class="icon" data-icon="clock" aria-hidden="true"></span></span>
         <span id="timer">0:00</span>
       </div>
     </div>
@@ -66,15 +66,15 @@
     <div id="numbers" class="numbers"></div>
 
     <div class="action-buttons">
-      <button id="undo-btn" class="undo-btn" disabled aria-label="Undo last move">↩ Undo</button>
-      <button id="redo-btn" class="redo-btn" disabled aria-label="Redo last undo">↪ Redo</button>
-      <button id="hint-btn" class="hint-btn" aria-label="Get a hint">💡 ×3</button>
-      <button id="reset-btn" class="reset-btn" aria-label="Start a new puzzle">↻ New Puzzle</button>
+      <button id="undo-btn" class="undo-btn" disabled aria-label="Undo last move"><span class="icon" data-icon="undo" aria-hidden="true"></span> Undo</button>
+      <button id="redo-btn" class="redo-btn" disabled aria-label="Redo last undo"><span class="icon" data-icon="redo" aria-hidden="true"></span> Redo</button>
+      <button id="hint-btn" class="hint-btn" aria-label="Get a hint"><span class="icon" data-icon="hint" aria-hidden="true"></span> ×3</button>
+      <button id="reset-btn" class="reset-btn" aria-label="Start a new puzzle"><span class="icon" data-icon="refresh" aria-hidden="true"></span> New Puzzle</button>
     </div>
 
     <!-- Leaderboard Section -->
     <div class="leaderboard-container">
-      <h2 id="leaderboard-title">🏆 Leaderboard</h2>
+      <h2 id="leaderboard-title"><span class="icon" data-icon="trophy" aria-hidden="true"></span> Leaderboard</h2>
       <div id="leaderboard" class="leaderboard" aria-busy="true">
         <table class="leaderboard-table" aria-hidden="true">
           <thead>
@@ -111,9 +111,9 @@
   <!-- Help Dialog -->
   <dialog id="help-dialog" aria-labelledby="help-dialog-title">
     <div class="modal-content">
-      <button id="close-modal-btn" class="close-btn" aria-label="Close Help">&times;</button>
+      <button id="close-modal-btn" class="close-btn" aria-label="Close Help"><span class="icon" data-icon="close" aria-hidden="true"></span></button>
 
-      <h2 id="help-dialog-title">📖 How to Play</h2>
+      <h2 id="help-dialog-title"><span class="icon" data-icon="book" aria-hidden="true"></span> How to Play</h2>
       <p>Fill every empty cell. Each number may appear only once in:</p>
       <ul>
         <li>Every row</li>
@@ -121,14 +121,14 @@
         <li>Every box</li>
       </ul>
 
-      <h2>🔢 Game Modes</h2>
+      <h2><span class="icon" data-icon="grid" aria-hidden="true"></span> Game Modes</h2>
       <h3>4&times;4 Sudoku</h3>
       <p>Uses numbers 1&ndash;4. Fast and beginner friendly.</p>
       <h3>9&times;9 Sudoku</h3>
       <p>Uses numbers 1&ndash;9. Classic Sudoku experience.</p>
       <p>Choose <strong>Beginner</strong> or <strong>Advanced</strong> for 4&times;4, or <strong>Easy</strong> through <strong>Expert</strong> for 9&times;9.</p>
 
-      <h2>🎮 Controls</h2>
+      <h2><span class="icon" data-icon="gamepad" aria-hidden="true"></span> Controls</h2>
       <ul>
         <li>Click cells to select</li>
         <li>Use number buttons or keyboard</li>
@@ -141,7 +141,7 @@
         <li>Press H for Hint</li>
       </ul>
 
-      <h2>✨ Features</h2>
+      <h2><span class="icon" data-icon="sparkles" aria-hidden="true"></span> Features</h2>
       <ul>
         <li>Cell highlighting</li>
         <li>Conflict detection</li>
@@ -157,8 +157,8 @@
   <!-- Statistics Dialog -->
   <dialog id="stats-dialog" aria-labelledby="stats-dialog-title">
     <div class="modal-content">
-      <button id="close-stats-btn" class="close-btn" aria-label="Close Statistics">&times;</button>
-      <h2 id="stats-dialog-title">📊 Player Statistics</h2>
+      <button id="close-stats-btn" class="close-btn" aria-label="Close Statistics"><span class="icon" data-icon="close" aria-hidden="true"></span></button>
+      <h2 id="stats-dialog-title"><span class="icon" data-icon="stats" aria-hidden="true"></span> Player Statistics</h2>
       <div id="stats-accordion" class="accordion"></div>
     </div>
   </dialog>
@@ -166,7 +166,7 @@
   <!-- Appearance Dialog -->
   <dialog id="appearance-dialog" aria-labelledby="appearance-dialog-title">
     <div class="modal-content">
-      <button id="close-appearance-btn" class="close-btn" aria-label="Close Appearance">&times;</button>
+      <button id="close-appearance-btn" class="close-btn" aria-label="Close Appearance"><span class="icon" data-icon="close" aria-hidden="true"></span></button>
       <h2 id="appearance-dialog-title">Appearance</h2>
       <div id="theme-list" class="theme-list" role="radiogroup" aria-label="Select theme"></div>
     </div>
@@ -175,7 +175,7 @@
   <!-- Completion Dialog -->
   <dialog id="completion-dialog" aria-labelledby="completion-dialog-title">
     <div class="completion-content">
-      <button id="completion-dismiss-btn" class="completion-btn-close" aria-label="Close">&times;</button>
+      <button id="completion-dismiss-btn" class="completion-btn-close" aria-label="Close"><span class="icon" data-icon="close" aria-hidden="true"></span></button>
 
       <div class="completion-hero">
         <div class="completion-sparkles">
@@ -183,7 +183,7 @@
           <span class="sparkle sparkle-blue"></span>
           <span class="sparkle sparkle-pink"></span>
         </div>
-        <div class="completion-trophy">🏆</div>
+        <div class="completion-trophy"><span class="icon" data-icon="trophy" aria-hidden="true"></span></div>
       </div>
 
       <h2 id="completion-dialog-title" class="completion-title">Puzzle Complete</h2>
@@ -192,7 +192,7 @@
 
       <div id="completion-badge-container" class="completion-badge-container" aria-live="polite">
         <span class="completion-badge">
-          <span class="badge-icon" aria-hidden="true">✨</span>
+          <span class="badge-icon" aria-hidden="true"><span class="icon" data-icon="sparkles" aria-hidden="true"></span></span>
           <span class="badge-text">Perfect Run</span>
         </span>
       </div>
@@ -206,53 +206,28 @@
       <div class="completion-stats">
         <div class="completion-stat">
           <div class="completion-stat-left">
-            <span class="completion-stat-icon icon-time">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="10"/>
-                <polyline points="12 6 12 12 16 14"/>
-              </svg>
-            </span>
+            <span class="completion-stat-icon icon-time"><span class="icon" data-icon="clock" aria-hidden="true"></span></span>
             <span class="completion-stat-label">Time</span>
           </div>
           <span class="completion-stat-value" id="completion-time">—</span>
         </div>
         <div class="completion-stat">
           <div class="completion-stat-left">
-            <span class="completion-stat-icon icon-difficulty">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="4" y1="21" x2="4" y2="14"/>
-                <line x1="9" y1="21" x2="9" y2="10"/>
-                <line x1="14" y1="21" x2="14" y2="6"/>
-                <line x1="19" y1="21" x2="19" y2="2"/>
-              </svg>
-            </span>
+            <span class="completion-stat-icon icon-difficulty"><span class="icon" data-icon="difficulty" aria-hidden="true"></span></span>
             <span class="completion-stat-label">Difficulty</span>
           </div>
           <span class="completion-stat-value" id="completion-difficulty">—</span>
         </div>
         <div class="completion-stat">
           <div class="completion-stat-left">
-            <span class="completion-stat-icon icon-grid">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="3" width="7" height="7"/>
-                <rect x="14" y="3" width="7" height="7"/>
-                <rect x="3" y="14" width="7" height="7"/>
-                <rect x="14" y="14" width="7" height="7"/>
-              </svg>
-            </span>
+            <span class="completion-stat-icon icon-grid"><span class="icon" data-icon="grid" aria-hidden="true"></span></span>
             <span class="completion-stat-label">Grid Size</span>
           </div>
           <span class="completion-stat-value" id="completion-grid-size">—</span>
         </div>
         <div class="completion-stat">
           <div class="completion-stat-left">
-            <span class="completion-stat-icon icon-hints">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M9 18h6"/>
-                <path d="M10 22h4"/>
-                <path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/>
-              </svg>
-            </span>
+            <span class="completion-stat-icon icon-hints"><span class="icon" data-icon="hint" aria-hidden="true"></span></span>
             <span class="completion-stat-label">Hints</span>
           </div>
           <span class="completion-stat-value" id="completion-hints">—</span>
@@ -260,8 +235,8 @@
       </div>
 
       <div class="completion-actions">
-        <button id="completion-new-btn" class="completion-btn completion-btn-primary">↻ New Puzzle</button>
-        <button id="completion-lb-btn" class="completion-btn completion-btn-secondary">🏆 View Leaderboard</button>
+        <button id="completion-new-btn" class="completion-btn completion-btn-primary"><span class="icon" data-icon="refresh" aria-hidden="true"></span> New Puzzle</button>
+        <button id="completion-lb-btn" class="completion-btn completion-btn-secondary"><span class="icon" data-icon="trophy" aria-hidden="true"></span> View Leaderboard</button>
         <button id="completion-close-btn" class="completion-btn completion-btn-ghost">Close</button>
       </div>
     </div>

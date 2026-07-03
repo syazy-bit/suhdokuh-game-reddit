@@ -404,12 +404,55 @@ h1 {
   margin-bottom: 0;
 }
 
+/* ── Icon injection ─────────────────────────────────── */
+.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+h1 .icon,
+h2 .icon,
+.modal-content h2 .icon,
+.footer-link .icon {
+  vertical-align: -0.125em;
+  margin-right: 6px;
+}
+
+.action-buttons .icon {
+  vertical-align: -0.125em;
+  margin-right: 4px;
+}
+
+.completion-btn .icon,
+.completion-actions .icon {
+  vertical-align: -0.125em;
+  margin-right: 6px;
+}
+
+.help-btn .icon svg {
+  width: 1.3em;
+  height: 1.3em;
+}
+
+/* Completion stat icons were originally 20×20 px */
+.completion-stat-icon .icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* Completion dismiss button icon was originally 1.5em */
+.completion-btn-close .icon svg {
+  width: 1.5em;
+  height: 1.5em;
+}
+
 .help-btn {
   min-width: 44px;
   min-height: 44px;
   width: 40px;
   height: 40px;
-  font-size: 1.3em;
+  font-size: 1.25em;
   border: 2px solid var(--border);
   border-radius: 50%;
   background-color: var(--bg-surface);
@@ -973,8 +1016,10 @@ h2 {
 }
 
 .timer-icon {
-  font-size: 1.3em;
+  font-size: 1.25em;
   line-height: 1;
+  display: flex;
+  align-items: center;
 }
 
 #timer {
@@ -1087,8 +1132,10 @@ h2 {
 
 /* Rank medals */
 .leaderboard-medal {
-  font-size: 1.2em;
+  font-size: 1.15em;
   line-height: 1;
+  display: inline-flex;
+  align-items: center;
 }
 
 /* Personal best card — achievement card layout */
@@ -1210,6 +1257,9 @@ h2 {
   font-size: 2.5em;
   margin-bottom: 8px;
   opacity: 0.6;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .empty-state-title {
@@ -1855,6 +1905,9 @@ html {
 .completion-trophy {
   font-size: 56px;
   line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* Title */
@@ -1907,6 +1960,8 @@ html {
 
 .badge-icon {
   line-height: 1;
+  display: inline-flex;
+  align-items: center;
 }
 
 @media (prefers-reduced-motion: no-preference) {

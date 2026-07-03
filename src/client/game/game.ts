@@ -1,7 +1,7 @@
 import type { PlayerStats, LeaderboardEntry, CurrentPlayerInfo, LeaderboardResponse } from "../../shared/types/api";
+import { ICON_TROPHY, ICON_MEDAL_GOLD, ICON_MEDAL_SILVER, ICON_MEDAL_BRONZE, ICON_LIGHTBULB, ICON_SPARKLES, ICON_PENCIL, ICON_CHEVRON_RIGHT, ICON_CHECK, injectIcons } from "./icons";
 
 const DEFAULT_HINTS = 3;
-const MEDALS = ["🥇", "🥈", "🥉"];
 
 const THEMES = [
   { id: "classic", label: "Classic" },
@@ -796,8 +796,8 @@ document.addEventListener("DOMContentLoaded", () => {
       const modeDisplay = state.mode === "4x4" ? "4×4" : "9×9";
       const difficultyDisplay =
         state.difficulty.charAt(0).toUpperCase() + state.difficulty.slice(1);
-      leaderboardTitle.textContent =
-        `🏆 ${modeDisplay} ${difficultyDisplay} Leaderboard`;
+      leaderboardTitle.innerHTML =
+        `${ICON_TROPHY} ${modeDisplay} ${difficultyDisplay} Leaderboard`;
     }
   }
 
@@ -836,7 +836,8 @@ document.addEventListener("DOMContentLoaded", () => {
   function renderLeaderboardTable(entries: LeaderboardEntry[], currentUsername: string): string {
     const rows = entries.map((entry, index) => {
       const rank = index + 1;
-      const rankDisplay = rank <= 3 ? MEDALS[rank - 1] : `${rank}`;
+      const medalIcon = rank === 1 ? ICON_MEDAL_GOLD : rank === 2 ? ICON_MEDAL_SILVER : ICON_MEDAL_BRONZE;
+      const rankDisplay = rank <= 3 ? medalIcon : `${rank}`;
       const rankAria = rank <= 3
         ? `Rank ${rank}: ${["Gold", "Silver", "Bronze"][rank - 1]} medal`
         : `Rank ${rank}`;
@@ -877,7 +878,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (personalBest === null) {
       return `<div class="personal-best-card pb-empty">
-          <div class="pb-title">🏆 Personal Best</div>
+          <div class="pb-title">${ICON_TROPHY} Personal Best</div>
           <div class="pb-message">Complete this puzzle to record your fastest time.</div>
         </div>`;
     }
@@ -885,19 +886,19 @@ document.addEventListener("DOMContentLoaded", () => {
     let rankText = "";
     if (globalRank !== null) {
       if (globalRank <= 3) {
-        const medals = ["🥇", "🥈", "🥉"];
-        rankText = `<div class="pb-rank" aria-label="Global Rank ${globalRank}"><span aria-hidden="true">${medals[globalRank - 1]} </span>Global #${globalRank.toLocaleString()}</div>`;
+        const pbMedal = globalRank === 1 ? ICON_MEDAL_GOLD : globalRank === 2 ? ICON_MEDAL_SILVER : ICON_MEDAL_BRONZE;
+        rankText = `<div class="pb-rank" aria-label="Global Rank ${globalRank}"><span aria-hidden="true">${pbMedal} </span>Global #${globalRank.toLocaleString()}</div>`;
       } else {
         rankText = `<div class="pb-rank">Global #${globalRank.toLocaleString()}</div>`;
       }
     }
 
     return `<div class="personal-best-card">
-        <div class="pb-title">🏆 Personal Best</div>
+        <div class="pb-title">${ICON_TROPHY} Personal Best</div>
         <div class="pb-time">${formatTime(personalBest)}</div>
         ${rankText}
         <div class="badge-container">
-          ${inTop50 ? '<span class="badge-item">🏆 Top 50 Player</span>' : ""}
+          ${inTop50 ? `<span class="badge-item">${ICON_TROPHY} Top 50 Player</span>` : ""}
         </div>
       </div>`;
   }
@@ -907,7 +908,7 @@ document.addEventListener("DOMContentLoaded", () => {
    */
   function renderEmptyState(): string {
     return `<div class="empty-state">
-        <div class="empty-state-icon" aria-hidden="true">🏆</div>
+        <div class="empty-state-icon" aria-hidden="true">${ICON_TROPHY}</div>
         <p class="empty-state-title">No times recorded yet</p>
         <p class="empty-state-description">Be the first to solve this puzzle and claim the top spot!</p>
       </div>`;
@@ -1239,7 +1240,7 @@ document.addEventListener("DOMContentLoaded", () => {
     updateHintButton();
 
     message.className = "message success";
-    message.textContent = `💡 Hint used. ${state.hintsRemaining} hint${state.hintsRemaining === 1 ? "" : "s"} remaining.`;
+    message.innerHTML = `${ICON_LIGHTBULB} Hint used. ${state.hintsRemaining} hint${state.hintsRemaining === 1 ? "" : "s"} remaining.`;
   }
 
   /**
@@ -1456,7 +1457,7 @@ document.addEventListener("DOMContentLoaded", () => {
       });
 
       message.classList.add("success");
-      message.textContent = "🎉 Puzzle complete.";
+      message.innerHTML = `${ICON_SPARKLES} Puzzle complete.`;
 
       // Submit score and refresh leaderboard in the background.
       // Decoupled from the dialog — success/failure does not block UI.
@@ -1590,7 +1591,7 @@ document.addEventListener("DOMContentLoaded", () => {
         triggerVictoryAnimation({ r: move.row, c: move.col });
       });
       message.classList.add("success");
-      message.textContent = "🎉 Puzzle complete.";
+      message.innerHTML = `${ICON_SPARKLES} Puzzle complete.`;
       // Score was already submitted during the original placement.
       // No duplicate network request.
       winResetTimeout = window.setTimeout(() => {
@@ -1610,11 +1611,11 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!hintBtn) return;
     if (state.hintsRemaining === 0) {
       hintBtn.disabled = true;
-      hintBtn.textContent = "💡 ×0";
+      hintBtn.innerHTML = `${ICON_LIGHTBULB} ×0`;
       hintBtn.setAttribute("aria-label", "No hints remaining");
     } else {
       hintBtn.disabled = false;
-      hintBtn.textContent = `💡 ×${state.hintsRemaining}`;
+      hintBtn.innerHTML = `${ICON_LIGHTBULB} ×${state.hintsRemaining}`;
       hintBtn.setAttribute(
         "aria-label",
         `${state.hintsRemaining} hint${state.hintsRemaining === 1 ? "" : "s"} remaining`,
@@ -1804,7 +1805,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // Notes toggle button
     const nBtn = document.createElement("button");
     nBtn.className = state.notesMode ? "notes-btn active" : "notes-btn";
-    nBtn.textContent = "✏️ Notes";
+    nBtn.innerHTML = `${ICON_PENCIL} Notes`;
     nBtn.setAttribute("aria-pressed", state.notesMode ? "true" : "false");
     nBtn.addEventListener("click", toggleNotesMode);
     numbers.appendChild(nBtn);
@@ -1966,7 +1967,7 @@ document.addEventListener("DOMContentLoaded", () => {
     themeListEl.innerHTML = THEMES.map(
       (t) => `
         <button class="theme-option" role="radio" aria-checked="${t.id === currentTheme}" aria-current="${t.id === currentTheme}" data-theme-id="${t.id}">
-          <span class="theme-check" aria-hidden="true">✓</span>
+          <span class="theme-check" aria-hidden="true">${ICON_CHECK}</span>
           ${t.label}
         </button>`,
     ).join("");
@@ -2093,7 +2094,7 @@ document.addEventListener("DOMContentLoaded", () => {
     accordion.innerHTML = `
       <div class="accordion-section active">
         <button class="accordion-header" type="button">
-          <span class="accordion-icon">▶</span>
+          <span class="accordion-icon">${ICON_CHEVRON_RIGHT}</span>
           Overall
         </button>
         <div class="accordion-content">
@@ -2105,7 +2106,7 @@ document.addEventListener("DOMContentLoaded", () => {
       </div>
       <div class="accordion-section">
         <button class="accordion-header" type="button">
-          <span class="accordion-icon">▶</span>
+          <span class="accordion-icon">${ICON_CHEVRON_RIGHT}</span>
           Records
         </button>
         <div class="accordion-content">
@@ -2121,7 +2122,7 @@ document.addEventListener("DOMContentLoaded", () => {
       </div>
       <div class="accordion-section">
         <button class="accordion-header" type="button">
-          <span class="accordion-icon">▶</span>
+          <span class="accordion-icon">${ICON_CHEVRON_RIGHT}</span>
           Progress
         </button>
         <div class="accordion-content">
@@ -2325,6 +2326,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Initial setup
   (async () => {
+    // Inject SVG icons from data-icon placeholders
+    injectIcons();
+
     // Load saved theme (with validation)
     let savedTheme = "classic";
     try {
