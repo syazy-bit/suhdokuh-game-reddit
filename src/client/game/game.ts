@@ -7,7 +7,6 @@ const GAME_OVER_DELAY_MS = 800;
 const WIN_COMPLETION_DELAY_MS = 1500;
 const GAME_OVER_MESSAGE = "Game Over — 3 mistakes.";
 const GAME_OVER_SR_ANNOUNCEMENT = "Mistake. Game over.";
-const MISTAKE_LABEL_PREFIX = "Mistakes";
 const TIMER_RESET = "0:00";
 
 const THEMES = [
@@ -552,8 +551,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const gameoverDialog = document.getElementById(
     "gameover-dialog",
   ) as HTMLDialogElement | null;
-  const mistakesLabel = document.getElementById(
-    "mistakes-label",
+  const mistakesCurrent = document.getElementById(
+    "mistakes-current",
   ) as HTMLSpanElement | null;
   const gameoverDifficulty = document.getElementById(
     "gameover-difficulty",
@@ -875,10 +874,13 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function updateMistakeDisplay(): void {
-    if (!mistakesLabel) return;
-    mistakesLabel.textContent = `${MISTAKE_LABEL_PREFIX} ${mistakeCount}/${MAX_MISTAKES}`;
-    mistakesLabel.className = "status-mistakes";
-    mistakesLabel.classList.add(`mistakes-${mistakeCount}`);
+    if (!mistakesCurrent) return;
+    mistakesCurrent.textContent = `${mistakeCount}`;
+    mistakesCurrent.className = "mistakes-current";
+    mistakesCurrent.classList.add(`mistakes-${mistakeCount}`);
+    mistakesCurrent.classList.remove("mistakes-pulse");
+    void mistakesCurrent.offsetWidth;
+    mistakesCurrent.classList.add("mistakes-pulse");
   }
 
   function resetGameState(newGrid: number[][]): void {
@@ -1526,7 +1528,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const isCorrect = solution[r]?.[c] === num;
       if (isCorrect) {
         mistakenCells.delete(cellKey);
-      } else if (!mistakenCells.has(cellKey)) {
+      } else {
         mistakenCells.add(cellKey);
         mistakeCount++;
       }

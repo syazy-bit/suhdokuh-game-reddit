@@ -398,7 +398,7 @@ html[data-theme="lavender"] {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 20px;
+  gap: 12px;
   max-width: 600px;
   width: 100%;
   margin: 0 auto;
@@ -513,16 +513,16 @@ h2 {
 /* Status bar */
 .status-bar {
   display: flex;
-  justify-content: center;
   align-items: center;
-  gap: 24px;
   width: 100%;
-  max-width: 460px;
-  padding: 16px 0;
+  max-width: 500px;
+  padding: 16px 0 0 0;
 }
 
 .status-difficulty {
-  font-size: 1.15em;
+  flex: 1;
+  text-align: center;
+  font-size: 1em;
   font-weight: 600;
   color: var(--text-primary);
   letter-spacing: 0.02em;
@@ -530,25 +530,61 @@ h2 {
 
 /* ── Mistakes Indicator ────────────────────────────── */
 .status-mistakes {
-  font-size: 1.1em;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  white-space: nowrap;
+  gap: 4px;
+}
+
+.mistakes-label {
+  font-size: 1em;
   font-weight: 600;
+  color: var(--text-primary);
+}
+
+.mistakes-current {
+  font-size: 1em;
+  font-weight: 600;
+  display: inline-block;
+  color: var(--text-primary);
   transition: color 0.4s ease;
 }
 
-.status-mistakes.mistakes-0 {
-  color: var(--text-muted);
+.mistakes-current.mistakes-1,
+.mistakes-current.mistakes-2,
+.mistakes-current.mistakes-3 {
+  font-size: 1.15em;
+  font-weight: 700;
 }
 
-.status-mistakes.mistakes-1 {
+.mistakes-current.mistakes-1 {
   color: var(--mistake-1-color);
 }
 
-.status-mistakes.mistakes-2 {
+.mistakes-current.mistakes-2 {
   color: var(--mistake-2-color);
 }
 
-.status-mistakes.mistakes-3 {
+.mistakes-current.mistakes-3 {
   color: var(--mistake-3-color);
+}
+
+.mistakes-max {
+  font-size: 1em;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+@keyframes mistakes-pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.25); }
+  100% { transform: scale(1); }
+}
+
+.mistakes-current.mistakes-pulse {
+  animation: mistakes-pulse 200ms ease-out;
 }
 
 /* Mode selector */
@@ -1217,11 +1253,11 @@ h2 {
 
 /* Status timer */
 .status-timer {
+  flex: 1;
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 6px;
-  min-width: 80px;
-  justify-content: center;
 }
 
 .timer-icon {
@@ -1233,8 +1269,8 @@ h2 {
 
 #timer {
   font-family: "Courier New", monospace;
-  font-size: 1.5em;
-  font-weight: 700;
+  font-size: 1.05em;
+  font-weight: 600;
   color: var(--color-primary);
   letter-spacing: 0.08em;
 }
@@ -1526,8 +1562,7 @@ h2 {
   }
 
   .status-bar {
-    padding: 8px 0;
-    gap: 12px;
+    padding: 8px 0 0 0;
   }
 
   .status-mistakes {
@@ -1719,8 +1754,7 @@ h2 {
   }
 
   .status-bar {
-    padding: 4px 0;
-    gap: 8px;
+    padding: 4px 0 0 0;
   }
 
   .status-difficulty {
