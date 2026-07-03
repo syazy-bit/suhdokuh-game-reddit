@@ -22,6 +22,74 @@ import {
 import { createPost } from "./core/post";
 import { SudokuGenerator, GridSize } from "./core/SudokuGenerator";
 
+function getDefaultStats(username: string): PlayerStats {
+  return {
+    username,
+    totalWins: 0,
+    totalPlayTime: 0,
+    records: {
+      "4x4": { beginner: null, advanced: null },
+      "9x9": { easy: null, medium: null, hard: null, expert: null },
+    },
+    progress: {
+      "4x4": 0,
+      "9x9": 0,
+      beginner: 0,
+      advanced: 0,
+      easy: 0,
+      medium: 0,
+      hard: 0,
+      expert: 0,
+    },
+  };
+}
+
+function migrateStats(parsed: any, defaults: PlayerStats): PlayerStats {
+  if (!parsed || typeof parsed !== "object") return defaults;
+
+  const sanitizeProgress = (val: any) => {
+    if (typeof val === "number" && Number.isFinite(val) && !Number.isNaN(val)) {
+      return val;
+    }
+    return 0;
+  };
+
+  const sanitizeRecord = (val: any) => {
+    if (typeof val === "number" && Number.isFinite(val) && !Number.isNaN(val)) {
+      return val;
+    }
+    return null;
+  };
+
+  return {
+    username: typeof parsed.username === "string" ? parsed.username : defaults.username,
+    totalWins: sanitizeProgress(parsed.totalWins),
+    totalPlayTime: sanitizeProgress(parsed.totalPlayTime),
+    records: {
+      "4x4": {
+        beginner: sanitizeRecord(parsed.records?.["4x4"]?.beginner),
+        advanced: sanitizeRecord(parsed.records?.["4x4"]?.advanced),
+      },
+      "9x9": {
+        easy: sanitizeRecord(parsed.records?.["9x9"]?.easy),
+        medium: sanitizeRecord(parsed.records?.["9x9"]?.medium),
+        hard: sanitizeRecord(parsed.records?.["9x9"]?.hard),
+        expert: sanitizeRecord(parsed.records?.["9x9"]?.expert),
+      },
+    },
+    progress: {
+      "4x4": sanitizeProgress(parsed.progress?.["4x4"]),
+      "9x9": sanitizeProgress(parsed.progress?.["9x9"]),
+      beginner: sanitizeProgress(parsed.progress?.beginner),
+      advanced: sanitizeProgress(parsed.progress?.advanced),
+      easy: sanitizeProgress(parsed.progress?.easy),
+      medium: sanitizeProgress(parsed.progress?.medium),
+      hard: sanitizeProgress(parsed.progress?.hard),
+      expert: sanitizeProgress(parsed.progress?.expert),
+    },
+  };
+}
+
 const app = express();
 
 // Middleware for JSON body parsing
@@ -291,27 +359,10 @@ router.post<{ postId: string }, SubmitScoreResponse, SubmitScoreRequest>(
       try {
         const statsKey = `stats:${username}`;
         const rawStats = await redis.get(statsKey);
+        const defaults = getDefaultStats(username);
         const stats: PlayerStats = rawStats
-          ? JSON.parse(rawStats)
-          : {
-              username,
-              totalWins: 0,
-              totalPlayTime: 0,
-              records: {
-                "4x4": { beginner: null, advanced: null },
-                "9x9": { easy: null, medium: null, hard: null, expert: null },
-              },
-              progress: {
-                "4x4": 0,
-                "9x9": 0,
-                beginner: 0,
-                advanced: 0,
-                easy: 0,
-                medium: 0,
-                hard: 0,
-                expert: 0,
-              },
-            };
+          ? migrateStats(JSON.parse(rawStats), defaults)
+          : defaults;
 
         stats.totalWins++;
         stats.totalPlayTime += time;
@@ -432,7 +483,8 @@ router.get<
       try {
         const rawStats = await redis.get(`stats:${username}`);
         if (rawStats) {
-          const stats = JSON.parse(rawStats) as PlayerStats;
+          const parsed = JSON.parse(rawStats);
+          const stats = migrateStats(parsed, getDefaultStats(username));
           const modeRecords = stats.records[mode as keyof typeof stats.records] as Record<string, number | null> | undefined;
           personalBest = modeRecords?.[difficulty] ?? null;
         }
@@ -469,33 +521,14 @@ router.get<
     }
 
     const raw = await redis.get(`stats:${username}`);
+    const defaults = getDefaultStats(username);
     if (raw) {
-      const stats = JSON.parse(raw) as PlayerStats;
+      const stats = migrateStats(JSON.parse(raw), defaults);
       res.json({ type: "stats", stats });
       return;
     }
 
-    const emptyStats: PlayerStats = {
-      username,
-      totalWins: 0,
-      totalPlayTime: 0,
-      records: {
-        "4x4": { beginner: null, advanced: null },
-        "9x9": { easy: null, medium: null, hard: null, expert: null },
-      },
-      progress: {
-        "4x4": 0,
-        "9x9": 0,
-        beginner: 0,
-        advanced: 0,
-        easy: 0,
-        medium: 0,
-        hard: 0,
-        expert: 0,
-      },
-    };
-
-    res.json({ type: "stats", stats: emptyStats });
+    res.json({ type: "stats", stats: defaults });
   } catch (error) {
     console.error("Error fetching stats:", error);
     res.status(500).json({ status: "error", message: "Failed to fetch stats" });

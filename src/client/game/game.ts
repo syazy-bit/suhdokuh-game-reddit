@@ -2084,11 +2084,15 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    function recordRow(label: string, value: number | null): string {
-      const display = value !== null
+    function recordRow(label: string, value: any): string {
+      const display = typeof value === "number" && Number.isFinite(value) && !Number.isNaN(value)
         ? formatTime(value)
         : '<span class="stats-record-null">—</span>';
       return `<tr><td>${label}</td><td>${display}</td></tr>`;
+    }
+
+    function safeNum(value: any): number {
+      return typeof value === "number" && Number.isFinite(value) && !Number.isNaN(value) ? value : 0;
     }
 
     accordion.innerHTML = `
@@ -2127,14 +2131,14 @@ document.addEventListener("DOMContentLoaded", () => {
         </button>
         <div class="accordion-content">
           <table class="stats-table">
-            <tr><td>4×4 Wins</td><td>${stats.progress["4x4"]}</td></tr>
-            <tr><td>9×9 Wins</td><td>${stats.progress["9x9"]}</td></tr>
-            <tr><td>Beginner Wins</td><td>${stats.progress.beginner}</td></tr>
-            <tr><td>Advanced Wins</td><td>${stats.progress.advanced}</td></tr>
-            <tr><td>Easy Wins</td><td>${stats.progress.easy}</td></tr>
-            <tr><td>Medium Wins</td><td>${stats.progress.medium}</td></tr>
-            <tr><td>Hard Wins</td><td>${stats.progress.hard}</td></tr>
-            <tr><td>Expert Wins</td><td>${stats.progress.expert}</td></tr>
+            <tr><td>4×4 Wins</td><td>${safeNum(stats.progress["4x4"])}</td></tr>
+            <tr><td>9×9 Wins</td><td>${safeNum(stats.progress["9x9"])}</td></tr>
+            <tr><td>Beginner Wins</td><td>${safeNum(stats.progress.beginner)}</td></tr>
+            <tr><td>Advanced Wins</td><td>${safeNum(stats.progress.advanced)}</td></tr>
+            <tr><td>Easy Wins</td><td>${safeNum(stats.progress.easy)}</td></tr>
+            <tr><td>Medium Wins</td><td>${safeNum(stats.progress.medium)}</td></tr>
+            <tr><td>Hard Wins</td><td>${safeNum(stats.progress.hard)}</td></tr>
+            <tr><td>Expert Wins</td><td>${safeNum(stats.progress.expert)}</td></tr>
           </table>
         </div>
       </div>
