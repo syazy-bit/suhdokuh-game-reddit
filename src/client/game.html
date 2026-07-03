@@ -51,11 +51,12 @@
     <p class="instructions" id="instructions">Click a cell, then use number buttons or keyboard (1-4) to fill</p>
 
     <div class="status-bar">
-      <span class="status-difficulty" id="difficulty-label">Difficulty: Medium</span>
       <div class="status-timer">
         <span class="timer-icon" aria-hidden="true"><span class="icon" data-icon="clock" aria-hidden="true"></span></span>
         <span id="timer">0:00</span>
       </div>
+      <span class="status-difficulty" id="difficulty-label">Medium</span>
+      <span class="status-mistakes" id="mistakes-label">Mistakes 0/3</span>
     </div>
 
     <div id="grid" class="grid" role="grid" tabindex="0" aria-label="Sudoku board"></div>
@@ -238,6 +239,31 @@
         <button id="completion-new-btn" class="completion-btn completion-btn-primary"><span class="icon" data-icon="refresh" aria-hidden="true"></span> New Puzzle</button>
         <button id="completion-lb-btn" class="completion-btn completion-btn-secondary"><span class="icon" data-icon="trophy" aria-hidden="true"></span> View Leaderboard</button>
         <button id="completion-close-btn" class="completion-btn completion-btn-ghost">Close</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Game Over Dialog -->
+  <dialog id="gameover-dialog" aria-labelledby="gameover-dialog-title">
+    <div class="gameover-content">
+      <div class="gameover-hero">
+        <span class="gameover-icon">!</span>
+      </div>
+      <h2 id="gameover-dialog-title">Game Over</h2>
+      <p class="gameover-body">You made 3 mistakes.</p>
+      <div class="gameover-stats">
+        <div class="gameover-stat">
+          <span class="gameover-stat-label">Difficulty</span>
+          <span class="gameover-stat-value" id="gameover-difficulty">—</span>
+        </div>
+        <div class="gameover-stat">
+          <span class="gameover-stat-label">Time Played</span>
+          <span class="gameover-stat-value" id="gameover-time">—</span>
+        </div>
+      </div>
+      <div class="gameover-actions">
+        <button id="gameover-restart-btn" class="gameover-btn gameover-btn-primary">Restart Puzzle</button>
+        <button id="gameover-new-btn" class="gameover-btn gameover-btn-secondary">New Puzzle</button>
       </div>
     </div>
   </dialog>

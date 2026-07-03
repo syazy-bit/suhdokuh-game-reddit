@@ -2,6 +2,13 @@ import type { PlayerStats, LeaderboardEntry, CurrentPlayerInfo, LeaderboardRespo
 import { ICON_TROPHY, ICON_MEDAL_GOLD, ICON_MEDAL_SILVER, ICON_MEDAL_BRONZE, ICON_LIGHTBULB, ICON_SPARKLES, ICON_PENCIL, ICON_CHEVRON_RIGHT, ICON_CHECK, injectIcons } from "./icons";
 
 const DEFAULT_HINTS = 3;
+const MAX_MISTAKES = 3;
+const GAME_OVER_DELAY_MS = 800;
+const WIN_COMPLETION_DELAY_MS = 1500;
+const GAME_OVER_MESSAGE = "Game Over — 3 mistakes.";
+const GAME_OVER_SR_ANNOUNCEMENT = "Mistake. Game over.";
+const MISTAKE_LABEL_PREFIX = "Mistakes";
+const TIMER_RESET = "0:00";
 
 const THEMES = [
   { id: "classic", label: "Classic" },
@@ -22,7 +29,7 @@ interface GameState {
   grid: number[][];
   notes: Set<number>[][];
   notesMode: boolean;
-  gameWon: boolean;
+  gameStatus: GameStatus;
   mode: GameMode;
   difficulty: Difficulty;
   startTime: number | null;
@@ -33,6 +40,7 @@ interface GameState {
 
 type GameMode = "4x4" | "9x9";
 type Difficulty = "easy" | "medium" | "hard" | "expert" | "beginner" | "advanced";
+type GameStatus = "playing" | "won" | "lost";
 
 interface PuzzleData {
   puzzle: number[][];
@@ -56,11 +64,15 @@ interface Move {
   selectionAfterMove: { r: number; c: number } | null;
   completedPuzzle: boolean;
   clearedNotes: ClearedNote[];
+  mistakeCountBefore: number;
+  mistakenCellsBefore: string[];
+  mistakeCountAfter: number;
+  mistakenCellsAfter: string[];
 }
 
 interface CellRenderEffect {
   cell: { r: number; c: number };
-  type: "place" | "hint" | "conflict" | "success";
+  type: "place" | "hint" | "conflict" | "success" | "mistake";
 }
 
 
@@ -537,6 +549,24 @@ document.addEventListener("DOMContentLoaded", () => {
   const srAnnouncer = document.getElementById(
     "sr-announcer",
   ) as HTMLDivElement | null;
+  const gameoverDialog = document.getElementById(
+    "gameover-dialog",
+  ) as HTMLDialogElement | null;
+  const mistakesLabel = document.getElementById(
+    "mistakes-label",
+  ) as HTMLSpanElement | null;
+  const gameoverDifficulty = document.getElementById(
+    "gameover-difficulty",
+  ) as HTMLSpanElement | null;
+  const gameoverTime = document.getElementById(
+    "gameover-time",
+  ) as HTMLSpanElement | null;
+  const gameoverRestartBtn = document.getElementById(
+    "gameover-restart-btn",
+  ) as HTMLButtonElement | null;
+  const gameoverNewBtn = document.getElementById(
+    "gameover-new-btn",
+  ) as HTMLButtonElement | null;
 
   // Validate all required elements exist
   if (!gridEl || !numbersEl || !messageEl || !modeSelect || !leaderboardEl || !personalBestSectionEl) {
@@ -577,7 +607,7 @@ document.addEventListener("DOMContentLoaded", () => {
     grid: [],
     notes: [],
     notesMode: false,
-    gameWon: false,
+    gameStatus: "playing",
     mode: "4x4",
     difficulty: "medium",
     startTime: null,
@@ -585,6 +615,10 @@ document.addEventListener("DOMContentLoaded", () => {
     username: "Anonymous Player",
     hintsRemaining: DEFAULT_HINTS,
   };
+
+  let mistakeCount = 0;
+  let mistakenCells: Set<string> = new Set();
+  let gameOverTimeout: number | null = null;
 
   let puzzle: number[][] = [];
   let solution: number[][] = [];
@@ -760,6 +794,38 @@ document.addEventListener("DOMContentLoaded", () => {
     completionNewBtn?.focus();
   }
 
+  function triggerGameOver(row: number, col: number): void {
+    state.gameStatus = "lost";
+    state.selected = null;
+    renderGrid();
+
+    const cellEl = document.getElementById(`cell-${row}-${col}`);
+    cellEl?.classList.add("gameover-flash");
+
+    showGameOverDialog();
+  }
+
+  function showGameOverDialog(): void {
+    if (!gameoverDialog) return;
+
+    const difficultyDisplay =
+      state.difficulty.charAt(0).toUpperCase() + state.difficulty.slice(1);
+
+    if (gameoverDifficulty) gameoverDifficulty.textContent = difficultyDisplay;
+    if (gameoverTime) gameoverTime.textContent = formatPlayTime(state.elapsedTime);
+
+    announceToSR(GAME_OVER_SR_ANNOUNCEMENT);
+
+    gameoverDialog.showModal();
+    gameoverRestartBtn?.focus();
+  }
+
+  function restartSamePuzzle(): void {
+    gameoverDialog?.close();
+    resetGameState(puzzle.map((r) => [...r]));
+    updateMessage("");
+  }
+
   /**
    * Submit score to leaderboard
    */
@@ -804,8 +870,51 @@ document.addEventListener("DOMContentLoaded", () => {
   function updateDifficultyDisplay(): void {
     if (difficultyLabelEl) {
       const display = state.difficulty.charAt(0).toUpperCase() + state.difficulty.slice(1);
-      difficultyLabelEl.textContent = `Difficulty: ${display}`;
+      difficultyLabelEl.textContent = display;
     }
+  }
+
+  function updateMistakeDisplay(): void {
+    if (!mistakesLabel) return;
+    mistakesLabel.textContent = `${MISTAKE_LABEL_PREFIX} ${mistakeCount}/${MAX_MISTAKES}`;
+    mistakesLabel.className = "status-mistakes";
+    mistakesLabel.classList.add(`mistakes-${mistakeCount}`);
+  }
+
+  function resetGameState(newGrid: number[][]): void {
+    state.grid = newGrid;
+    state.notes = Array.from({ length: newGrid.length }, () =>
+      Array.from({ length: newGrid.length }, () => new Set<number>())
+    );
+    state.notesMode = false;
+    state.selected = null;
+    state.gameStatus = "playing";
+    state.hintsRemaining = DEFAULT_HINTS;
+    state.startTime = null;
+    state.elapsedTime = 0;
+    totalPausedTime = 0;
+    pausedAt = null;
+    mistakeCount = 0;
+    mistakenCells = new Set();
+    stopTimer();
+    moveHistory.length = 0;
+    redoHistory.length = 0;
+    if (winResetTimeout !== null) {
+      clearTimeout(winResetTimeout);
+      winResetTimeout = null;
+    }
+    if (gameOverTimeout !== null) {
+      clearTimeout(gameOverTimeout);
+      gameOverTimeout = null;
+    }
+    if (timer) timer.textContent = TIMER_RESET;
+    updateDifficultyDisplay();
+    updateMistakeDisplay();
+    renderGrid();
+    renderNumbers();
+    updateUndoButton();
+    updateRedoButton();
+    updateHintButton();
   }
 
   /**
@@ -1058,15 +1167,24 @@ document.addEventListener("DOMContentLoaded", () => {
             valueSpan.textContent = value.toString();
             const effect = renderEffect;
             if (effect && effect.cell.r === r && effect.cell.c === c) {
-              if (effect.type === "hint") {
-                valueSpan.classList.add("value-pop");
-                cell.classList.add("hint-flash");
-              } else if (effect.type === "place") {
-                valueSpan.classList.add("value-pop");
-              } else if (effect.type === "conflict") {
-                valueSpan.classList.add("value-shake");
-              } else if (effect.type === "success") {
-                valueSpan.classList.add("value-success");
+              switch (effect.type) {
+                case "hint":
+                  valueSpan.classList.add("value-pop");
+                  cell.classList.add("hint-flash");
+                  break;
+                case "place":
+                  valueSpan.classList.add("value-pop");
+                  break;
+                case "conflict":
+                  valueSpan.classList.add("value-shake");
+                  break;
+                case "mistake":
+                  valueSpan.classList.add("value-shake");
+                  cell.classList.add("mistake-flash");
+                  break;
+                case "success":
+                  valueSpan.classList.add("value-success");
+                  break;
               }
             }
             cell.appendChild(valueSpan);
@@ -1104,7 +1222,7 @@ document.addEventListener("DOMContentLoaded", () => {
         // All cells can be selected for highlighting. Locked clues remain
         // protected from edits by placeNumber() and clearCell().
         cell.addEventListener("click", () => {
-          if (state.gameWon) return;
+          if (state.gameStatus !== "playing") return;
           state.selected = { r, c };
           highlightSelected();
         });
@@ -1200,7 +1318,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function useHint(): void {
-    if (state.gameWon) return;
+    if (state.gameStatus !== "playing") return;
 
     if (!state.selected) {
       message.className = "message error";
@@ -1303,7 +1421,7 @@ document.addEventListener("DOMContentLoaded", () => {
    * must clear/correct conflicting cells before checkWin() can return true.
    */
   function placeNumber(num: number): void {
-    if (state.gameWon || !state.selected) return;
+    if (state.gameStatus !== "playing" || !state.selected) return;
 
     const { r, c } = state.selected;
 
@@ -1345,6 +1463,10 @@ document.addEventListener("DOMContentLoaded", () => {
         selectionAfterMove: state.selected ? { ...state.selected } : null,
         completedPuzzle: false,
         clearedNotes: [],
+        mistakeCountBefore: mistakeCount,
+        mistakenCellsBefore: Array.from(mistakenCells),
+        mistakeCountAfter: mistakeCount,
+        mistakenCellsAfter: Array.from(mistakenCells),
       });
 
       startTimer();
@@ -1356,18 +1478,20 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Normal mode: place number
     let isWon = false;
+    let isGameOver = false;
     if (gridRow) {
       const oldValue = gridRow[c] ?? 0;
       if (oldValue === num) return;
       const oldNotesArr = Array.from(state.notes[r]?.[c] ?? []);
 
+      // Snapshot mistake state before the move
+      const mcBefore = mistakeCount;
+      const mcCellsBefore = Array.from(mistakenCells);
+
       gridRow[c] = num;
       state.notes[r]![c]!.clear();
 
       // Intelligent note cleanup — only for objectively valid placements.
-      // Removes the placed number from pencil marks in the same row,
-      // column, and box. Invalid/conflicting placements are treated as
-      // deliberate mistakes and must not destroy the player's notes.
       const clearedNotes: ClearedNote[] = [];
       if (isValidMove(r, c, num)) {
         const size = getGridSize();
@@ -1397,11 +1521,27 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       }
 
+      // Mistake detection
+      const cellKey = `${r},${c}`;
+      const isCorrect = solution[r]?.[c] === num;
+      if (isCorrect) {
+        mistakenCells.delete(cellKey);
+      } else if (!mistakenCells.has(cellKey)) {
+        mistakenCells.add(cellKey);
+        mistakeCount++;
+      }
+
+      const mcAfter = mistakeCount;
+      const mcCellsAfter = Array.from(mistakenCells);
+
       redoHistory.length = 0;
       isWon = checkWin();
+      isGameOver = mistakeCount >= MAX_MISTAKES;
       const nextSelection = isWon
         ? null
-        : findNextEditableCell(r, c) ?? state.selected;
+        : isGameOver
+          ? null
+          : findNextEditableCell(r, c) ?? state.selected;
 
       moveHistory.push({
         row: r,
@@ -1414,44 +1554,42 @@ document.addEventListener("DOMContentLoaded", () => {
         selectionAfterMove: nextSelection,
         completedPuzzle: isWon,
         clearedNotes,
+        mistakeCountBefore: mcBefore,
+        mistakenCellsBefore: mcCellsBefore,
+        mistakeCountAfter: mcAfter,
+        mistakenCellsAfter: mcCellsAfter,
       });
 
-      // Apply auto-advance to live state before render.
-      // On the winning move, stay put — the victory handler sets
-      // state.selected = null independently.
-      if (!isWon) {
+      if (!isWon && !isGameOver) {
         state.selected = nextSelection;
+      } else {
+        state.selected = null;
       }
     }
 
-    // Start the timer on the first placement (valid or conflicting).
-    // startTimer() is a no-op if the timer is already running.
     startTimer();
 
     const isConflict = !isValidMove(r, c, num);
-    renderEffect = {
-      cell: { r, c },
-      type: isConflict ? "conflict" : "success",
-    };
-    if (isConflict) {
+    if (isGameOver) {
+      renderEffect = { cell: { r, c }, type: "mistake" };
+      announceToSR(GAME_OVER_SR_ANNOUNCEMENT);
+    } else if (isConflict) {
+      renderEffect = { cell: { r, c }, type: "conflict" };
       announceToSR("Conflict detected.");
+    } else {
+      renderEffect = { cell: { r, c }, type: "success" };
     }
     renderGrid();
     updateUndoButton();
     updateRedoButton();
+    updateMistakeDisplay();
 
     if (isWon) {
-      state.gameWon = true;
+      state.gameStatus = "won";
       stopTimer();
 
-      // 1. Deactivate the board state
-      state.selected = null;
-
-      // 2. Re-run the native pipeline to produce the pristine inactive board
-      // (This inherently destroys all cursors, hints, and crosshairs)
       renderGrid();
 
-      // 3. Schedule the visual overlay on the next frame so the DOM is settled
       requestAnimationFrame(() => {
         triggerVictoryAnimation({ r, c });
       });
@@ -1459,15 +1597,20 @@ document.addEventListener("DOMContentLoaded", () => {
       message.classList.add("success");
       message.innerHTML = `${ICON_SPARKLES} Puzzle complete.`;
 
-      // Submit score and refresh leaderboard in the background.
-      // Decoupled from the dialog — success/failure does not block UI.
       submitScore();
 
-      // Show the completion dialog after the victory animation plays.
-      // The solved board remains visible until the player acts.
       winResetTimeout = window.setTimeout(() => {
         showCompletionDialog();
-      }, 1500);
+      }, WIN_COMPLETION_DELAY_MS);
+    } else if (isGameOver) {
+      state.gameStatus = "lost";
+      stopTimer();
+      message.classList.add("error");
+      message.textContent = GAME_OVER_MESSAGE;
+
+      gameOverTimeout = window.setTimeout(() => {
+        triggerGameOver(r, c);
+      }, GAME_OVER_DELAY_MS);
     } else {
       updateMessage("");
     }
@@ -1478,7 +1621,7 @@ document.addEventListener("DOMContentLoaded", () => {
    */
   function clearCell(): void {
     if (!state.selected) return;
-    if (state.gameWon) return;
+    if (state.gameStatus !== "playing") return;
 
     const { r, c } = state.selected;
     const puzzleCell = puzzle[r]?.[c];
@@ -1489,6 +1632,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const oldValue = gridRow[c] ?? 0;
     const cellNotes = state.notes[r]?.[c];
+
+    const mcBefore = mistakeCount;
+    const mcCellsBefore = Array.from(mistakenCells);
 
     if (oldValue !== 0) {
       // Cell has a value — clear it
@@ -1504,11 +1650,16 @@ document.addEventListener("DOMContentLoaded", () => {
         selectionAfterMove: state.selected ? { ...state.selected } : null,
         completedPuzzle: false,
         clearedNotes: [],
+        mistakeCountBefore: mcBefore,
+        mistakenCellsBefore: mcCellsBefore,
+        mistakeCountAfter: mistakeCount,
+        mistakenCellsAfter: Array.from(mistakenCells),
       });
       gridRow[c] = 0;
       renderGrid();
       updateUndoButton();
       updateRedoButton();
+      updateMistakeDisplay();
       updateMessage("");
     } else if (cellNotes && cellNotes.size > 0) {
       // Cell has notes but no value — clear notes
@@ -1525,24 +1676,29 @@ document.addEventListener("DOMContentLoaded", () => {
         selectionAfterMove: state.selected ? { ...state.selected } : null,
         completedPuzzle: false,
         clearedNotes: [],
+        mistakeCountBefore: mcBefore,
+        mistakenCellsBefore: mcCellsBefore,
+        mistakeCountAfter: mistakeCount,
+        mistakenCellsAfter: Array.from(mistakenCells),
       });
       cellNotes.clear();
       renderGrid();
       updateUndoButton();
       updateRedoButton();
+      updateMistakeDisplay();
       updateMessage("");
     }
   }
 
   function updateUndoButton(): void {
     if (undoBtn) {
-      undoBtn.disabled = moveHistory.length === 0;
+      undoBtn.disabled = moveHistory.length === 0 || state.gameStatus === "lost";
     }
   }
 
   function updateRedoButton(): void {
     if (redoBtn) {
-      redoBtn.disabled = redoHistory.length === 0;
+      redoBtn.disabled = redoHistory.length === 0 || state.gameStatus === "lost";
     }
   }
 
@@ -1552,6 +1708,7 @@ document.addEventListener("DOMContentLoaded", () => {
    */
   function redoMove(): void {
     if (redoHistory.length === 0) return;
+    if (state.gameStatus === "lost") return;
 
     const move = redoHistory.pop()!;
 
@@ -1577,13 +1734,19 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
 
+    // Restore mistake state
+    mistakeCount = move.mistakeCountAfter;
+    mistakenCells = new Set(move.mistakenCellsAfter);
+
     state.selected = move.selectionAfterMove;
 
     moveHistory.push(move);
 
+    const isRedoGameOver = mistakeCount >= MAX_MISTAKES;
+
     // Restore victory state if the move completed the puzzle
     if (move.completedPuzzle) {
-      state.gameWon = true;
+      state.gameStatus = "won";
       stopTimer();
       state.selected = null;
       renderGrid();
@@ -1592,12 +1755,23 @@ document.addEventListener("DOMContentLoaded", () => {
       });
       message.classList.add("success");
       message.innerHTML = `${ICON_SPARKLES} Puzzle complete.`;
-      // Score was already submitted during the original placement.
-      // No duplicate network request.
       winResetTimeout = window.setTimeout(() => {
         showCompletionDialog();
-      }, 1500);
+      }, WIN_COMPLETION_DELAY_MS);
+    } else if (isRedoGameOver) {
+      state.gameStatus = "lost";
+      stopTimer();
+      state.selected = null;
+      renderEffect = { cell: { r: move.row, c: move.col }, type: "mistake" };
+      renderGrid();
+      message.classList.add("error");
+      message.textContent = GAME_OVER_MESSAGE;
+      
+      gameOverTimeout = window.setTimeout(() => {
+        triggerGameOver(move.row, move.col);
+      }, GAME_OVER_DELAY_MS);
     } else {
+      state.gameStatus = "playing";
       renderEffect = { cell: { r: move.row, c: move.col }, type: "place" };
       renderGrid();
       highlightSelected();
@@ -1605,6 +1779,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     updateUndoButton();
     updateRedoButton();
+    updateMistakeDisplay();
   }
 
   function updateHintButton(): void {
@@ -1625,6 +1800,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function undoMove(): void {
     if (moveHistory.length === 0) return;
+    if (state.gameStatus === "lost") return;
 
     const move = moveHistory.pop()!;
     redoHistory.push(move);
@@ -1648,10 +1824,17 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
 
+    // Restore mistake state
+    mistakeCount = move.mistakeCountBefore;
+    mistakenCells = new Set(move.mistakenCellsBefore);
+
     state.selected = move.selectionBeforeMove;
 
-    if (state.gameWon) {
-      state.gameWon = false;
+    // Close game-over dialog if undoing a game-over state
+    gameoverDialog?.close();
+
+    if (state.gameStatus === "won" && !move.completedPuzzle) {
+      state.gameStatus = "playing";
       completionDialog?.close();
       message.classList.remove("success");
       message.textContent = "";
@@ -1659,9 +1842,6 @@ document.addEventListener("DOMContentLoaded", () => {
         clearTimeout(winResetTimeout);
         winResetTimeout = null;
       }
-      // Resume the timer from the stored elapsed time.
-      // startTimer() recalculates the virtual startTime from
-      // state.elapsedTime, so it correctly continues counting.
       startTimer();
     }
 
@@ -1670,6 +1850,7 @@ document.addEventListener("DOMContentLoaded", () => {
     highlightSelected();
     updateUndoButton();
     updateRedoButton();
+    updateMistakeDisplay();
   }
 
   /**
@@ -1719,33 +1900,12 @@ document.addEventListener("DOMContentLoaded", () => {
     puzzle = currentPuzzle.puzzle.map((r) => [...r]);
     solution = currentPuzzle.solution.map((r) => [...r]);
 
-    // Reset game state
-    state.grid = puzzle.map((r) => [...r]);
-    state.notes = Array.from({ length: puzzle.length }, () =>
-      Array.from({ length: puzzle.length }, () => new Set<number>())
-    );
-    state.notesMode = false;
-    state.selected = null;
-    state.gameWon = false;
-    state.hintsRemaining = DEFAULT_HINTS;
-    state.startTime = null;
-    state.elapsedTime = 0;
-    totalPausedTime = 0;
-    pausedAt = null;
-    stopTimer();
-    moveHistory.length = 0;
-    redoHistory.length = 0;
-    if (winResetTimeout !== null) {
-      clearTimeout(winResetTimeout);
-      winResetTimeout = null;
-    }
+    resetGameState(puzzle.map((r) => [...r]));
 
     message.classList.remove("success", "error", "info");
     if (usingFallback) {
-      // Let the user know they are in offline mode — non-intrusive.
       message.classList.add("info");
       message.textContent = "Playing in offline mode.";
-      // Clear it after 3 s so it doesn't linger during gameplay.
       setTimeout(() => {
         message.classList.remove("info");
         updateMessage("");
@@ -1753,17 +1913,6 @@ document.addEventListener("DOMContentLoaded", () => {
     } else {
       updateMessage("");
     }
-
-    updateDifficultyDisplay();
-
-    if (timer) {
-      timer.textContent = "0:00";
-    }
-    renderGrid();
-    renderNumbers();
-    updateUndoButton();
-    updateRedoButton();
-    updateHintButton();
   }
 
   /**
@@ -2225,6 +2374,34 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  // ── Game Over Dialog ──────────────────────────────────────────────────
+
+  if (gameoverDialog) {
+    gameoverDialog.addEventListener("keydown", (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+      }
+    });
+    gameoverDialog.addEventListener("click", (e: Event) => {
+      if (e.target === gameoverDialog) {
+        e.preventDefault();
+      }
+    });
+  }
+
+  if (gameoverRestartBtn) {
+    gameoverRestartBtn.addEventListener("click", () => {
+      restartSamePuzzle();
+    });
+  }
+
+  if (gameoverNewBtn) {
+    gameoverNewBtn.addEventListener("click", () => {
+      gameoverDialog?.close();
+      resetPuzzle();
+    });
+  }
+
   // ── Accordion focus management ───────────────────────────────────────
   // Clicking an accordion header should not focus the button after
   // rendering — the close button retains focus.
@@ -2269,26 +2446,32 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const maxNumbers = state.mode === "4x4" ? 4 : 9;
 
-    // Ctrl+Z / Cmd+Z — allowed even when game is won
+    // Ctrl+Z / Cmd+Z — blocked when lost, allowed when won
     if ((e.ctrlKey || e.metaKey) && key.toLowerCase() === "z" && !e.shiftKey) {
-      e.preventDefault();
-      undoMove();
+      if (state.gameStatus !== "lost") {
+        e.preventDefault();
+        undoMove();
+      }
       return;
     }
 
-    // Ctrl+Shift+Z / Cmd+Shift+Z or Ctrl+Y / Cmd+Y — allowed even when game is won
+    // Ctrl+Shift+Z / Cmd+Shift+Z or Ctrl+Y / Cmd+Y — blocked when lost, allowed when won
     if ((e.ctrlKey || e.metaKey) && key.toLowerCase() === "y") {
-      e.preventDefault();
-      redoMove();
+      if (state.gameStatus !== "lost") {
+        e.preventDefault();
+        redoMove();
+      }
       return;
     }
     if ((e.ctrlKey || e.metaKey) && key.toLowerCase() === "z" && e.shiftKey) {
-      e.preventDefault();
-      redoMove();
+      if (state.gameStatus !== "lost") {
+        e.preventDefault();
+        redoMove();
+      }
       return;
     }
 
-    if (state.gameWon) return;
+    if (state.gameStatus !== "playing") return;
 
     if (key === "ArrowUp" || key === "ArrowDown" || key === "ArrowLeft" || key === "ArrowRight") {
       e.preventDefault();
@@ -2316,7 +2499,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // Pause timer when page is hidden (Page Visibility API)
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden") {
-      if (state.gameWon || state.startTime === null || timerInterval === null || pausedAt !== null) return;
+      if (state.gameStatus !== "playing" || state.startTime === null || timerInterval === null || pausedAt !== null) return;
       pausedAt = Date.now();
       stopTimer();
     } else if (document.visibilityState === "visible" && pausedAt !== null) {
