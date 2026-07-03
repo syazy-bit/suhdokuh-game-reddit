@@ -684,24 +684,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
   /**
    * Start the game timer
+   * @param resetStartTime - whether to recalculate startTime from elapsedTime (default: true)
    */
-  function startTimer(): void {
+  function startTimer(resetStartTime = true): void {
     if (timerInterval !== null) return;
 
-    state.startTime = Date.now() - state.elapsedTime * 1000;
+    if (resetStartTime) {
+      state.startTime = Date.now() - state.elapsedTime * 1000;
+    }
 
-    timerInterval = window.setInterval(() => {
-      if (state.startTime !== null) {
-        state.elapsedTime = Math.floor((Date.now() - state.startTime - totalPausedTime) / 1000);
-        if (timer) {
-          timer.textContent = formatTime(state.elapsedTime);
-        }
-      }
-    }, 1000);
-  }
-
-  function startTimerInterval(): void {
-    if (timerInterval !== null) return;
     timerInterval = window.setInterval(() => {
       if (state.startTime !== null) {
         state.elapsedTime = Math.floor((Date.now() - state.startTime - totalPausedTime) / 1000);
@@ -2328,7 +2319,7 @@ document.addEventListener("DOMContentLoaded", () => {
       pausedAt = null;
       state.elapsedTime = Math.floor((Date.now() - state.startTime! - totalPausedTime) / 1000);
       if (timer) timer.textContent = formatTime(state.elapsedTime);
-      startTimerInterval();
+      startTimer(false);
     }
   });
 
