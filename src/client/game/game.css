@@ -996,26 +996,29 @@ h2 {
   }
 }
 
-/* ── Note conflict flash (3 pulses, red highlight + scale) ── */
-@keyframes note-conflict-flash {
-  0%, 100% { background-color: transparent; transform: scale(1); }
-  10%      { background-color: var(--error); transform: scale(1.1); }
-  25%      { background-color: transparent; transform: scale(1); }
-  35%      { background-color: var(--error); transform: scale(1.1); }
-  50%      { background-color: transparent; transform: scale(1); }
-  60%      { background-color: var(--error); transform: scale(1.1); }
-  75%      { background-color: transparent; transform: scale(1); }
+/* ── Note conflict flash — animates the digit only, not the cell ──
+ * Three quick red + scale pulses on the <span class="value">.
+ * color: revert at "normal" keyframes restores the element's natural
+ * colour (themed, locked, conflict, etc.) without inherit.          */
+@keyframes value-conflict-flash {
+  0%, 100% { color: revert; transform: scale(1); }
+  10%      { color: var(--error); transform: scale(1.15); }
+  25%      { color: revert; transform: scale(1); }
+  35%      { color: var(--error); transform: scale(1.15); }
+  50%      { color: revert; transform: scale(1); }
+  60%      { color: var(--error); transform: scale(1.15); }
+  75%      { color: revert; transform: scale(1); }
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .cell.note-conflict-flash {
-    animation: note-conflict-flash 0.6s ease;
+  .value-conflict-flash {
+    animation: value-conflict-flash 0.6s ease;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .cell.note-conflict-flash {
-    background-color: var(--cell-bg-conflict);
+  .value-conflict-flash {
+    color: var(--error);
   }
 }
 

@@ -698,7 +698,10 @@ document.addEventListener("DOMContentLoaded", () => {
     for (const { r, c } of cells) {
       const cellEl = document.getElementById(`cell-${r}-${c}`);
       if (cellEl) {
-        cellEl.classList.add("note-conflict-flash");
+        const valueEl = cellEl.querySelector(".value");
+        if (valueEl) {
+          valueEl.classList.add("value-conflict-flash");
+        }
       }
     }
 
@@ -706,7 +709,10 @@ document.addEventListener("DOMContentLoaded", () => {
       for (const { r, c } of cells) {
         const cellEl = document.getElementById(`cell-${r}-${c}`);
         if (cellEl) {
-          cellEl.classList.remove("note-conflict-flash");
+          const valueEl = cellEl.querySelector(".value");
+          if (valueEl) {
+            valueEl.classList.remove("value-conflict-flash");
+          }
         }
       }
     }, NOTE_CONFLICT_ANIMATION_MS);
