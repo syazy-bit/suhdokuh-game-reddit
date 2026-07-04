@@ -383,6 +383,12 @@ html[data-theme="lavender"] {
   --stat-icon-grid-color: #1565c0;
 }
 
+/* Grid sizing constants (not theme-dependent) */
+html {
+  --grid-max-width-9x9: 460px;
+  --grid-max-width-4x4: 400px;
+}
+
 .app {
   display: flex;
   flex-direction: column;
@@ -403,6 +409,10 @@ html[data-theme="lavender"] {
   width: 100%;
   margin: 0 auto;
   padding-bottom: 40px;
+}
+
+.container.container--4x4 {
+  gap: 6px;
 }
 
 h1 {
@@ -634,7 +644,7 @@ h2 {
   box-shadow: var(--grid-shadow);
   width: 100%;
   aspect-ratio: 1;
-  max-width: 460px;
+  max-width: var(--grid-max-width-9x9);
 }
 
 .cell {
@@ -657,6 +667,10 @@ h2 {
 }
 .grid.grid-4x4 .cell {
   font-size: clamp(1.5rem, 9vw, 2.75rem);
+}
+
+.grid.grid-4x4 {
+  max-width: var(--grid-max-width-4x4);
 }
 
 /* Box borders (2x2 or 3x3 divisions) */
@@ -856,6 +870,10 @@ h2 {
   color: var(--color-primary);
   cursor: pointer;
   transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
 }
 
 .notes-btn:hover {
@@ -901,6 +919,10 @@ h2 {
   color: var(--color-primary);
   cursor: pointer;
   transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
 }
 
 .number-btn:hover,
@@ -1603,7 +1625,7 @@ h2 {
 
   /* ── 8.5.2 — Fluid board scaling ───────────────────────────────── */
   .grid {
-    max-width: 460px;
+    max-width: var(--grid-max-width-9x9);
   }
 
   /* ── 8.5.3 — Touch targets ─────────────────────────────────────── */

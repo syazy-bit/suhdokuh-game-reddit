@@ -447,6 +447,7 @@ function getRandomFallbackPuzzle(mode: GameMode, difficulty: string): PuzzleData
 
 document.addEventListener("DOMContentLoaded", () => {
   // Get DOM elements with null checks
+  const containerEl = document.querySelector(".container") as HTMLDivElement | null;
   const gridEl = document.getElementById("grid") as HTMLDivElement | null;
   const numbersEl = document.getElementById("numbers") as HTMLDivElement | null;
   const messageEl = document.getElementById("message") as HTMLDivElement | null;
@@ -570,12 +571,13 @@ document.addEventListener("DOMContentLoaded", () => {
   ) as HTMLButtonElement | null;
 
   // Validate all required elements exist
-  if (!gridEl || !numbersEl || !messageEl || !modeSelect || !leaderboardEl || !personalBestSectionEl) {
+  if (!containerEl || !gridEl || !numbersEl || !messageEl || !modeSelect || !leaderboardEl || !personalBestSectionEl) {
     console.error("Required DOM elements not found");
     return;
   }
 
   // Now we know these are not null
+  const container = containerEl as HTMLDivElement;
   const grid = gridEl as HTMLDivElement;
   const numbers = numbersEl as HTMLDivElement;
   const message = messageEl as HTMLDivElement;
@@ -2053,6 +2055,7 @@ document.addEventListener("DOMContentLoaded", () => {
   async function changeGameMode(newMode: GameMode): Promise<void> {
     state.difficulty = getClosestDifficulty(newMode, state.difficulty);
     state.mode = newMode;
+    container.classList.toggle("container--4x4", newMode === "4x4");
     updateDifficultyOptions(newMode);
     if (difficultySelect) {
       difficultySelect.value = state.difficulty;
