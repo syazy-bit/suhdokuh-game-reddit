@@ -1,10 +1,12 @@
 import type { PlayerStats, LeaderboardEntry, CurrentPlayerInfo, LeaderboardResponse } from "../../shared/types/api";
+import { getConflictingCells } from "../../shared/sudoku";
 import { ICON_TROPHY, ICON_MEDAL_GOLD, ICON_MEDAL_SILVER, ICON_MEDAL_BRONZE, ICON_LIGHTBULB, ICON_SPARKLES, ICON_PENCIL, ICON_CHEVRON_RIGHT, ICON_CHECK, injectIcons } from "./icons";
 
 const DEFAULT_HINTS = 3;
 const MAX_MISTAKES = 3;
 const GAME_OVER_DELAY_MS = 800;
 const WIN_COMPLETION_DELAY_MS = 1500;
+const NOTE_CONFLICT_ANIMATION_MS = 600;
 const GAME_OVER_MESSAGE = "Game Over — 3 mistakes.";
 const GAME_OVER_SR_ANNOUNCEMENT = "Mistake. Game over.";
 const TIMER_RESET = "0:00";
@@ -674,6 +676,40 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     return true;
+  }
+
+  /**
+   * Return coordinates of all cells that conflict with placing `num` at (row, col).
+   * Delegates to the shared SudokuValidator so row/column/box traversal has a
+   * single source of truth.
+   */
+  function getConflictingCellsForDigit(row: number, col: number, num: number): Array<{ r: number; c: number }> {
+    const size = getGridSize() as 4 | 9;
+    const boxSize = state.mode === "4x4" ? 2 : 3;
+    return getConflictingCells(state.grid, row, col, num, size, boxSize);
+  }
+
+  /**
+   * Apply a temporary conflict-flash animation to every conflicting cell
+   * simultaneously, then remove the class from all cells together after
+   * NOTE_CONFLICT_ANIMATION_MS.
+   */
+  function animateNoteConflict(cells: Array<{ r: number; c: number }>): void {
+    for (const { r, c } of cells) {
+      const cellEl = document.getElementById(`cell-${r}-${c}`);
+      if (cellEl) {
+        cellEl.classList.add("note-conflict-flash");
+      }
+    }
+
+    setTimeout(() => {
+      for (const { r, c } of cells) {
+        const cellEl = document.getElementById(`cell-${r}-${c}`);
+        if (cellEl) {
+          cellEl.classList.remove("note-conflict-flash");
+        }
+      }
+    }, NOTE_CONFLICT_ANIMATION_MS);
   }
 
   /**
@@ -1442,6 +1478,14 @@ document.addEventListener("DOMContentLoaded", () => {
       if (oldValue !== 0) return; // Can't note a filled cell
 
       const hadNote = cellNotes.has(num);
+
+      // If adding a new note, validate the candidate first.
+      if (!hadNote && !isValidMove(r, c, num)) {
+        const conflicts = getConflictingCellsForDigit(r, c, num);
+        animateNoteConflict(conflicts);
+        return;
+      }
+
       const oldNotesArr = Array.from(cellNotes);
 
       if (hadNote) {

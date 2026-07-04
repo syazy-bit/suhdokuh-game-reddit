@@ -996,6 +996,29 @@ h2 {
   }
 }
 
+/* ── Note conflict flash (3 pulses, red highlight + scale) ── */
+@keyframes note-conflict-flash {
+  0%, 100% { background-color: transparent; transform: scale(1); }
+  10%      { background-color: var(--error); transform: scale(1.1); }
+  25%      { background-color: transparent; transform: scale(1); }
+  35%      { background-color: var(--error); transform: scale(1.1); }
+  50%      { background-color: transparent; transform: scale(1); }
+  60%      { background-color: var(--error); transform: scale(1.1); }
+  75%      { background-color: transparent; transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .cell.note-conflict-flash {
+    animation: note-conflict-flash 0.6s ease;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cell.note-conflict-flash {
+    background-color: var(--cell-bg-conflict);
+  }
+}
+
 .cell.gameover-flash {
   animation: gameover-flash 0.8s ease;
 }
