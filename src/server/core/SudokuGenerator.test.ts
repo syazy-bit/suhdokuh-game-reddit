@@ -1362,3 +1362,39 @@ describe("R3 backup/restore", () => {
     }
   });
 });
+
+// ── 16. Regression: 4×4 clue-layout diversity (Phase 18 bug) ──────────────
+
+describe("4×4 clue-layout diversity (Phase 18 regression)", () => {
+  // shuffleArray() creates a copy via [...array], shuffles it, and returns the
+  // new array — it never mutates the original.  buildPositionList() relies on
+  // this behaviour to return a randomised removal order.  Prior to the fix,
+  // buildPositionList() was ignoring the return value, so every puzzle used
+  // row-major order, producing 1 clue mask for Beginner and 2 for Advanced.
+  it("shuffleArray returns a new array without mutating the original", () => {
+    const gen = createGenerator(4, "beginner");
+    const original = [1, 2, 3, 4, 5];
+    const copy = [...original];
+    const shuffled = (gen as any).shuffleArray(original);
+    expect(shuffled).not.toBe(original);
+    expect(original).toEqual(copy);
+    expect(shuffled).toHaveLength(original.length);
+  });
+
+  const sizes = [40, 40] as const;
+  const difficulties: Array<{ name: string; difficulty: AnyDifficulty; minDistinct: number }> = [
+    { name: "beginner", difficulty: "beginner", minDistinct: 5 },
+    { name: "advanced", difficulty: "advanced", minDistinct: 5 },
+  ];
+
+  for (const { name, difficulty, minDistinct } of difficulties) {
+    it(`generates at least ${minDistinct} distinct 4×4 ${name} layouts out of ${sizes[0]}`, () => {
+      const puzzles = new Set<string>();
+      for (let i = 0; i < sizes[0]; i++) {
+        const result = createGenerator(4, difficulty).generate();
+        puzzles.add(JSON.stringify(result.puzzle));
+      }
+      expect(puzzles.size).toBeGreaterThanOrEqual(minDistinct);
+    });
+  }
+});

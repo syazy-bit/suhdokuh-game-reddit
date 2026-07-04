@@ -644,8 +644,7 @@ export class SudokuGenerator {
         positions.push([r, c]);
       }
     }
-    this.shuffleArray(positions);
-    return positions;
+    return this.shuffleArray(positions);
   }
 
   private removeClues(puzzle: number[][], positions: Array<[number, number]>, targetRemoval: number): void {
