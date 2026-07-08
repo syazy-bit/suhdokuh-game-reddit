@@ -85,3 +85,8 @@ export type StatsResponse = {
   type: "stats";
   stats: PlayerStats;
 };
+
+export type GlobalStatsResponse = {
+  type: "global-stats";
+  totalSolved: number;
+};

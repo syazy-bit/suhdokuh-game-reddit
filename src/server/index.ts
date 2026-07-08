@@ -11,6 +11,7 @@ import {
   PuzzleResponse,
   PlayerStats,
   StatsResponse,
+  GlobalStatsResponse,
 } from "../shared/types/api";
 import {
   createServer,
@@ -357,6 +358,13 @@ router.post<{ postId: string }, SubmitScoreResponse, SubmitScoreRequest>(
       // ── 5. Update player statistics ─────────────────────────────────
       // Always update stats on completion, regardless of personal best.
       try {
+        // TODO: Implement idempotency token (e.g. game ID) to prevent duplicate requests incrementing stats
+        await redis.incrBy("suhdokuh:stats:totalSolved", 1);
+      } catch (err) {
+        console.warn("[STATS] Failed to increment global totalSolved counter:", err);
+      }
+
+      try {
         const statsKey = `stats:${username}`;
         const rawStats = await redis.get(statsKey);
         const defaults = getDefaultStats(username);
@@ -532,6 +540,19 @@ router.get<
   } catch (error) {
     console.error("Error fetching stats:", error);
     res.status(500).json({ status: "error", message: "Failed to fetch stats" });
+  }
+});
+
+router.get<
+  any,
+  GlobalStatsResponse | { status: string; message: string }
+>("/api/stats/global", async (_req, res): Promise<void> => {
+  try {
+    const raw = await redis.get("suhdokuh:stats:totalSolved");
+    res.json({ type: "global-stats", totalSolved: raw ? parseInt(raw, 10) : 0 });
+  } catch (error) {
+    console.error("Error fetching global stats:", error);
+    res.status(500).json({ status: "error", message: "Failed to fetch global stats" });
   }
 });
 
