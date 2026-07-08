@@ -97,17 +97,6 @@ function migrateStats(parsed: any, defaults: PlayerStats): PlayerStats {
 const PLAYER_STATS_HASH = "suhdokuh:player_stats";
 
 /**
- * Baseline for the global solved counter.
- *
- * The suhdokuh:stats:totalSolved counter was added after approximately 110
- * puzzles had already been solved. Since historical backfill via SCAN/KEYS
- * is impossible on Devvit Redis, this value serves as a floor estimate. It
- * is written only when the key does not exist, after which incrBy on each
- * solve keeps the count moving forward naturally.
- */
-const INITIAL_TOTAL_SOLVED_BASELINE = 110;
-
-/**
  * Read a player's stats from the hash first (new), falling back to the
  * legacy stats:<username> key for backward compatibility with existing data.
  */
@@ -149,19 +138,6 @@ router.get<
       redis.get("count"),
       reddit.getCurrentUsername(),
     ]);
-
-    // ── Global counter initialization (one-time) ──────────────────
-    // Ensures the counter exists with the estimated baseline so it
-    // never stays at 0 on fresh installs or upgrades from before the
-    // counter was introduced.
-    try {
-      const cs = await redis.get("suhdokuh:stats:totalSolved");
-      if (cs == null) {
-        await redis.set("suhdokuh:stats:totalSolved", String(INITIAL_TOTAL_SOLVED_BASELINE));
-      }
-    } catch {
-      // Non-fatal — counter will be initialised on the first solve
-    }
 
     res.json({
       type: "init",
@@ -1051,19 +1027,6 @@ router.post<{ postId: string }, PuzzleResponse, PuzzleRequest>(
 );
 router.post("/internal/on-app-install", async (_req, res): Promise<void> => {
   try {
-    // ── Global counter initialization (one-time) ──────────────────
-    // Sets the approximate baseline so a fresh install starts at 110
-    // rather than 0. Existing installs upgrading are handled by the
-    // same check in /api/init.
-    try {
-      const cs = await redis.get("suhdokuh:stats:totalSolved");
-      if (cs == null) {
-        await redis.set("suhdokuh:stats:totalSolved", String(INITIAL_TOTAL_SOLVED_BASELINE));
-      }
-    } catch {
-      // Non-fatal — counter will be initialised on the first solve
-    }
-
     const post = await createPost();
 
     res.json({
