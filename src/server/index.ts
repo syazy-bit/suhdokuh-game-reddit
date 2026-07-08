@@ -91,6 +91,43 @@ function migrateStats(parsed: any, defaults: PlayerStats): PlayerStats {
   };
 }
 
+// ── Redis key conventions ────────────────────────────────────────────────
+
+/** Hash storing per-user PlayerStats (field = username, value = JSON). */
+const PLAYER_STATS_HASH = "suhdokuh:player_stats";
+
+/**
+ * Baseline for the global solved counter.
+ *
+ * The suhdokuh:stats:totalSolved counter was added after approximately 110
+ * puzzles had already been solved. Since historical backfill via SCAN/KEYS
+ * is impossible on Devvit Redis, this value serves as a floor estimate. It
+ * is written only when the key does not exist, after which incrBy on each
+ * solve keeps the count moving forward naturally.
+ */
+const INITIAL_TOTAL_SOLVED_BASELINE = 110;
+
+/**
+ * Read a player's stats from the hash first (new), falling back to the
+ * legacy stats:<username> key for backward compatibility with existing data.
+ */
+async function getPlayerStats(username: string): Promise<string | null> {
+  const fromHash = await redis.hGet(PLAYER_STATS_HASH, username);
+  if (fromHash !== undefined) return fromHash;
+  return (await redis.get(`stats:${username}`)) ?? null;
+}
+
+/**
+ * Dual-write a player's stats to both the hash and the legacy key so that
+ * readers relying on either storage layer continue to work during rollout.
+ */
+async function setPlayerStats(username: string, serialized: string): Promise<void> {
+  await Promise.all([
+    redis.hSet(PLAYER_STATS_HASH, { [username]: serialized }),
+    redis.set(`stats:${username}`, serialized),
+  ]);
+}
+
 const app = express();
 
 // Middleware for JSON body parsing
@@ -112,6 +149,19 @@ router.get<
       redis.get("count"),
       reddit.getCurrentUsername(),
     ]);
+
+    // ── Global counter initialization (one-time) ──────────────────
+    // Ensures the counter exists with the estimated baseline so it
+    // never stays at 0 on fresh installs or upgrades from before the
+    // counter was introduced.
+    try {
+      const cs = await redis.get("suhdokuh:stats:totalSolved");
+      if (cs === null) {
+        await redis.set("suhdokuh:stats:totalSolved", String(INITIAL_TOTAL_SOLVED_BASELINE));
+      }
+    } catch {
+      // Non-fatal — counter will be initialised on the first solve
+    }
 
     res.json({
       type: "init",
@@ -365,8 +415,7 @@ router.post<{ postId: string }, SubmitScoreResponse, SubmitScoreRequest>(
       }
 
       try {
-        const statsKey = `stats:${username}`;
-        const rawStats = await redis.get(statsKey);
+        const rawStats = await getPlayerStats(username);
         const defaults = getDefaultStats(username);
         const stats: PlayerStats = rawStats
           ? migrateStats(JSON.parse(rawStats), defaults)
@@ -383,7 +432,7 @@ router.post<{ postId: string }, SubmitScoreResponse, SubmitScoreRequest>(
           modeRecords[difficulty] = time;
         }
 
-        await redis.set(statsKey, JSON.stringify(stats));
+        await setPlayerStats(username, JSON.stringify(stats));
       } catch (statsError) {
         console.warn("[STATS] Failed to update player stats (non-fatal):", statsError);
       }
@@ -489,7 +538,7 @@ router.get<
       // Look up personal best from stats
       let personalBest: number | null = null;
       try {
-        const rawStats = await redis.get(`stats:${username}`);
+        const rawStats = await getPlayerStats(username);
         if (rawStats) {
           const parsed = JSON.parse(rawStats);
           const stats = migrateStats(parsed, getDefaultStats(username));
@@ -528,7 +577,7 @@ router.get<
       return;
     }
 
-    const raw = await redis.get(`stats:${username}`);
+    const raw = await getPlayerStats(username);
     const defaults = getDefaultStats(username);
     if (raw) {
       const stats = migrateStats(JSON.parse(raw), defaults);
@@ -1002,6 +1051,19 @@ router.post<{ postId: string }, PuzzleResponse, PuzzleRequest>(
 );
 router.post("/internal/on-app-install", async (_req, res): Promise<void> => {
   try {
+    // ── Global counter initialization (one-time) ──────────────────
+    // Sets the approximate baseline so a fresh install starts at 110
+    // rather than 0. Existing installs upgrading are handled by the
+    // same check in /api/init.
+    try {
+      const cs = await redis.get("suhdokuh:stats:totalSolved");
+      if (cs === null) {
+        await redis.set("suhdokuh:stats:totalSolved", String(INITIAL_TOTAL_SOLVED_BASELINE));
+      }
+    } catch {
+      // Non-fatal — counter will be initialised on the first solve
+    }
+
     const post = await createPost();
 
     res.json({
