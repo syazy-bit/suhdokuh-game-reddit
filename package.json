@@ -20,8 +20,8 @@
     "validate-fallbacks": "npx tsx tools/validateFallbackPuzzles.ts"
   },
   "dependencies": {
-    "@devvit/web": "^0.13.6",
-    "devvit": "^0.13.6",
+    "@devvit/web": "^0.13.7",
+    "devvit": "^0.13.7",
     "express": "5.1.0"
   },
   "devDependencies": {
