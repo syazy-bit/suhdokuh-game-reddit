@@ -156,7 +156,7 @@ router.get<
     // counter was introduced.
     try {
       const cs = await redis.get("suhdokuh:stats:totalSolved");
-      if (cs === null) {
+      if (cs == null) {
         await redis.set("suhdokuh:stats:totalSolved", String(INITIAL_TOTAL_SOLVED_BASELINE));
       }
     } catch {
@@ -1057,7 +1057,7 @@ router.post("/internal/on-app-install", async (_req, res): Promise<void> => {
     // same check in /api/init.
     try {
       const cs = await redis.get("suhdokuh:stats:totalSolved");
-      if (cs === null) {
+      if (cs == null) {
         await redis.set("suhdokuh:stats:totalSolved", String(INITIAL_TOTAL_SOLVED_BASELINE));
       }
     } catch {
