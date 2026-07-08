@@ -23,6 +23,7 @@
     <div class="title-row">
       <h1><span class="icon" data-icon="puzzle" aria-hidden="true"></span>Suhdokuh</h1>
       <button id="appearance-btn" class="help-btn" aria-label="Change Theme"><span class="icon" data-icon="appearance" aria-hidden="true"></span></button>
+      <button id="settings-btn" class="help-btn" aria-label="Settings"><span class="icon" data-icon="settings" aria-hidden="true"></span></button>
       <button id="help-btn" class="help-btn" aria-label="Help and Rules"><span class="icon" data-icon="help" aria-hidden="true"></span></button>
       <button id="stats-btn" class="help-btn" aria-label="View Statistics"><span class="icon" data-icon="stats" aria-hidden="true"></span></button>
     </div>
@@ -173,6 +174,43 @@
       <button id="close-appearance-btn" class="close-btn" aria-label="Close Appearance"><span class="icon" data-icon="close" aria-hidden="true"></span></button>
       <h2 id="appearance-dialog-title">Appearance</h2>
       <div id="theme-list" class="theme-list" role="radiogroup" aria-label="Select theme"></div>
+    </div>
+  </dialog>
+
+  <!-- Settings Dialog -->
+  <dialog id="settings-dialog" aria-labelledby="settings-dialog-title">
+    <div class="modal-content">
+      <button id="close-settings-btn" class="close-btn" aria-label="Close Settings"><span class="icon" data-icon="close" aria-hidden="true"></span></button>
+      <h2 id="settings-dialog-title"><span class="icon" data-icon="settings" aria-hidden="true"></span> Settings</h2>
+      <div id="settings-content">
+        <div class="settings-section">
+          <h3>Gameplay</h3>
+          <label class="settings-toggle">
+            <input type="checkbox" class="toggle-input" data-setting="autoAdvanceCursor">
+            <span class="toggle-track" aria-hidden="true"></span>
+            <span class="toggle-info">
+              <span class="toggle-title">Auto-advance Cursor</span>
+              <span class="toggle-desc">Automatically move to the next empty cell after entering a number.</span>
+            </span>
+          </label>
+          <label class="settings-toggle">
+            <input type="checkbox" class="toggle-input" data-setting="autoClearNotes">
+            <span class="toggle-track" aria-hidden="true"></span>
+            <span class="toggle-info">
+              <span class="toggle-title">Auto-clear Notes</span>
+              <span class="toggle-desc">Automatically remove pencil marks when placing a number.</span>
+            </span>
+          </label>
+          <label class="settings-toggle">
+            <input type="checkbox" class="toggle-input" data-setting="highlightRelatedCells">
+            <span class="toggle-track" aria-hidden="true"></span>
+            <span class="toggle-info">
+              <span class="toggle-title">Highlight Related Cells</span>
+              <span class="toggle-desc">Highlight the selected row, column, box, and matching numbers.</span>
+            </span>
+          </label>
+        </div>
+      </div>
     </div>
   </dialog>
 

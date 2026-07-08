@@ -1,6 +1,7 @@
 import type { PlayerStats, LeaderboardEntry, CurrentPlayerInfo, LeaderboardResponse } from "../../shared/types/api";
 import { getConflictingCells } from "../../shared/sudoku";
 import { ICON_TROPHY, ICON_MEDAL_GOLD, ICON_MEDAL_SILVER, ICON_MEDAL_BRONZE, ICON_LIGHTBULB, ICON_SPARKLES, ICON_PENCIL, ICON_CHEVRON_RIGHT, ICON_CHECK, injectIcons } from "./icons";
+import { getSettings, updateSetting, DEFAULT_SETTINGS } from "./settings";
 
 const DEFAULT_HINTS = 3;
 const MAX_MISTAKES = 3;
@@ -514,6 +515,15 @@ document.addEventListener("DOMContentLoaded", () => {
   ) as HTMLDialogElement | null;
   const closeStatsBtn = document.getElementById(
     "close-stats-btn",
+  ) as HTMLButtonElement | null;
+  const settingsBtn = document.getElementById(
+    "settings-btn",
+  ) as HTMLButtonElement | null;
+  const settingsDialog = document.getElementById(
+    "settings-dialog",
+  ) as HTMLDialogElement | null;
+  const closeSettingsBtn = document.getElementById(
+    "close-settings-btn",
   ) as HTMLButtonElement | null;
   const completionDialog = document.getElementById(
     "completion-dialog",
@@ -1334,6 +1344,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const selectedBoxCol = Math.floor(selectedCol / boxSize);
     const selectedValue = state.grid[selectedRow]?.[selectedCol] ?? 0;
 
+    const highlightRelated = getSettings().highlightRelatedCells;
+
     cells.forEach((cell, index) => {
       cell.classList.remove("selected", "same-row", "same-column", "same-box", "same-number");
       cell.setAttribute("aria-selected", "false");
@@ -1352,7 +1364,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (isSelected) {
         cell.classList.add("selected");
         cell.setAttribute("aria-selected", "true");
-      } else {
+      } else if (highlightRelated) {
         if (isSameRow) cell.classList.add("same-row");
         if (isSameColumn) cell.classList.add("same-column");
         if (isSameBox) cell.classList.add("same-box");
@@ -1547,7 +1559,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // Intelligent note cleanup — only for objectively valid placements.
       const clearedNotes: ClearedNote[] = [];
-      if (isValidMove(r, c, num)) {
+      if (getSettings().autoClearNotes && isValidMove(r, c, num)) {
         const size = getGridSize();
         const boxSize = state.mode === "4x4" ? 2 : 3;
         const seen = new Set<string>();
@@ -1595,7 +1607,9 @@ document.addEventListener("DOMContentLoaded", () => {
         ? null
         : isGameOver
           ? null
-          : findNextEditableCell(r, c) ?? state.selected;
+          : getSettings().autoAdvanceCursor
+            ? (findNextEditableCell(r, c) ?? state.selected)
+            : state.selected;
 
       moveHistory.push({
         row: r,
@@ -2234,6 +2248,74 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       }
     });
+  }
+
+  // ── Settings Dialog ──────────────────────────────────────────────────
+
+  function syncSettingsCheckboxes(): void {
+    const s = getSettings();
+    const inputs = document.querySelectorAll<HTMLInputElement>("#settings-content .toggle-input");
+    inputs.forEach((input) => {
+      const key = input.dataset.setting as keyof typeof DEFAULT_SETTINGS;
+      if (key && key in s) {
+        input.checked = s[key];
+      }
+    });
+  }
+
+  function closeSettings(): void {
+    if (settingsDialog) {
+      settingsDialog.close();
+    }
+    if (previousFocusedElement) {
+      previousFocusedElement.focus();
+      previousFocusedElement = null;
+    }
+  }
+
+  if (settingsBtn && settingsDialog) {
+    settingsBtn.addEventListener("click", () => {
+      previousFocusedElement = document.activeElement as HTMLElement | null;
+      syncSettingsCheckboxes();
+      settingsDialog.showModal();
+      if (closeSettingsBtn) {
+        closeSettingsBtn.focus();
+      }
+    });
+  }
+
+  if (closeSettingsBtn && settingsDialog) {
+    closeSettingsBtn.addEventListener("click", closeSettings);
+  }
+
+  // Click backdrop to close Settings dialog
+  if (settingsDialog) {
+    settingsDialog.addEventListener("click", (event) => {
+      if (event.target === settingsDialog) {
+        settingsDialog.close();
+        if (previousFocusedElement) {
+          previousFocusedElement.focus();
+          previousFocusedElement = null;
+        }
+      }
+    });
+  }
+
+  // Register change listeners once for settings toggle inputs
+  {
+    const inputs = settingsDialog?.querySelectorAll<HTMLInputElement>(".toggle-input");
+    if (inputs) {
+      inputs.forEach((input) => {
+        input.addEventListener("change", () => {
+          const key = input.dataset.setting as keyof typeof DEFAULT_SETTINGS;
+          if (!key) return;
+          updateSetting(key, input.checked);
+          if (key === "highlightRelatedCells") {
+            highlightSelected();
+          }
+        });
+      });
+    }
   }
 
   // ── Statistics Modal ────────────────────────────────────────────────
