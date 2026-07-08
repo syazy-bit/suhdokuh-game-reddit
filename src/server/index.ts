@@ -166,7 +166,7 @@ router.get<
     res.json({
       type: "init",
       postId: "global",
-      count: count ? parseInt(count) : 0,
+      count: count ? parseInt(count, 10) : 0,
       username: username ?? "anonymous",
     });
   } catch (error) {
@@ -486,7 +486,7 @@ router.get<
   try {
     const mode = (req.query.mode as GameMode) || "4x4";
     const difficulty = (req.query.difficulty as string) || "beginner";
-    const limit = Math.min(parseInt(req.query.limit as string) || 10, 50);
+    const limit = Math.min(parseInt(req.query.limit as string, 10) || 10, 50);
 
     if (!VALID_MODES.has(mode)) {
       res.status(400).json({ status: "error", message: "Invalid game mode" });

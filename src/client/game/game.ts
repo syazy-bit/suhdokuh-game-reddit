@@ -1428,8 +1428,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const cells = document.querySelectorAll<HTMLDivElement>(".cell");
 
     cells.forEach(cell => {
-      const row = parseInt(cell.dataset.row!);
-      const col = parseInt(cell.dataset.col!);
+      const row = parseInt(cell.dataset.row!, 10);
+      const col = parseInt(cell.dataset.col!, 10);
       const distance = Math.abs(row - finalCell.r) + Math.abs(col - finalCell.c);
 
       if (distance <= MAX_RADIUS) {
