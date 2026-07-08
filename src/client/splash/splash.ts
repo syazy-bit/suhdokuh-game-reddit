@@ -44,12 +44,12 @@ document.addEventListener("DOMContentLoaded", () => {
       const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
       if (prefersReducedMotion) {
-        statsTextElement.innerHTML = `<strong id="global-stats-number">${formattedTotal}</strong> puzzles solved`;
+        statsTextElement.innerHTML = `<strong id="global-stats-number">${formattedTotal}</strong> <span>puzzles solved</span>`;
         statsSrElement.textContent = `${formattedTotal} puzzles solved`;
         return;
       }
 
-      statsTextElement.innerHTML = `<strong id="global-stats-number">0</strong> puzzles solved`;
+      statsTextElement.innerHTML = `<strong id="global-stats-number">0</strong> <span>puzzles solved</span>`;
       const newStatsNumberElement = document.getElementById("global-stats-number")!;
 
       const duration = 800;
@@ -74,7 +74,7 @@ document.addEventListener("DOMContentLoaded", () => {
       requestAnimationFrame(update);
     } catch (error) {
       console.warn("Could not load global stats:", error);
-      statsTextElement.innerHTML = `<strong id="global-stats-number">—</strong> puzzles solved`;
+      statsTextElement.innerHTML = `<strong id="global-stats-number">—</strong> <span>puzzles solved</span>`;
       statsSrElement!.textContent = `— puzzles solved`;
     }
   }
