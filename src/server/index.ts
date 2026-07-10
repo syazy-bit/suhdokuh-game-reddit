@@ -381,8 +381,66 @@ router.post<{ postId: string }, SubmitScoreResponse, SubmitScoreRequest>(
         return;
       }
 
-      // ── 5. Update player statistics ─────────────────────────────────
-      // Always update stats on completion, regardless of personal best.
+      // ── 5. Ensure the sorted set exists (one-time legacy migration) ───
+      await migrateLegacyIfNeeded(mode, difficulty);
+
+      // ── 6. Check for existing personal best via the sorted set ────────
+      const scoresKey = `leaderboard:${mode}:${difficulty}:scores`;
+      const existingScore = await redis.zScore(scoresKey, username);
+
+      // If they already have a faster (or equal) time, this is a legitimate
+      // puzzle completion but the leaderboard does not need updating.
+      if (existingScore !== undefined && existingScore <= time) {
+        console.log(`[SCORE] ${username} submitted ${time}s for ${mode}, but their personal best (${existingScore}s) is faster.`);
+
+        // Update completion statistics (no leaderboard write needed).
+        try {
+          // TODO: Implement idempotency token (e.g. game ID) to prevent duplicate requests incrementing stats
+          await redis.incrBy("suhdokuh:stats:totalSolved", 1);
+        } catch (err) {
+          console.warn("[STATS] Failed to increment global totalSolved counter:", err);
+        }
+
+        try {
+          const rawStats = await getPlayerStats(username);
+          const defaults = getDefaultStats(username);
+          const stats: PlayerStats = rawStats
+            ? migrateStats(JSON.parse(rawStats), defaults)
+            : defaults;
+
+          stats.totalWins++;
+          stats.totalPlayTime += time;
+          stats.progress[mode as keyof typeof stats.progress]++;
+          stats.progress[difficulty as keyof typeof stats.progress]++;
+
+          const modeRecords = stats.records[mode as keyof typeof stats.records] as Record<string, number | null>;
+          const currentRecord = modeRecords[difficulty] ?? null;
+          if (currentRecord === null || time < currentRecord) {
+            modeRecords[difficulty] = time;
+          }
+
+          await setPlayerStats(username, JSON.stringify(stats));
+        } catch (statsError) {
+          console.warn("[STATS] Failed to update player stats (non-fatal):", statsError);
+        }
+
+        res.json({
+          type: "submit-score",
+          status: "success",
+          message: "Score submitted, but your personal best is still faster.",
+        });
+        return;
+      }
+
+      // ── 7. Store the score in the sorted set (single source of truth) ─
+      // If this throws, the outer catch returns a 500 and stats are NOT updated.
+      await redis.zAdd(scoresKey, { member: username, score: time });
+
+      console.log(
+        `[SCORE] ${username} submitted ${time}s for ${mode}`,
+      );
+
+      // ── 8. Update player statistics after successful leaderboard write ─
       try {
         // TODO: Implement idempotency token (e.g. game ID) to prevent duplicate requests incrementing stats
         await redis.incrBy("suhdokuh:stats:totalSolved", 1);
@@ -412,31 +470,6 @@ router.post<{ postId: string }, SubmitScoreResponse, SubmitScoreRequest>(
       } catch (statsError) {
         console.warn("[STATS] Failed to update player stats (non-fatal):", statsError);
       }
-
-      // ── 6. Ensure the sorted set exists (one-time legacy migration) ───
-      await migrateLegacyIfNeeded(mode, difficulty);
-
-      // ── 7. Check for existing personal best via the sorted set ────────
-      const scoresKey = `leaderboard:${mode}:${difficulty}:scores`;
-      const existingScore = await redis.zScore(scoresKey, username);
-
-      // If they already have a faster (or equal) time, reject this submission.
-      if (existingScore !== undefined && existingScore <= time) {
-        console.log(`[SCORE] ${username} submitted ${time}s for ${mode}, but their personal best (${existingScore}s) is faster.`);
-        res.json({
-          type: "submit-score",
-          status: "success",
-          message: "Score submitted, but your personal best is still faster.",
-        });
-        return;
-      }
-
-      // ── 8. Store the score in the sorted set (single source of truth) ─
-      await redis.zAdd(scoresKey, { member: username, score: time });
-
-      console.log(
-        `[SCORE] ${username} submitted ${time}s for ${mode}`,
-      );
 
       res.json({
         type: "submit-score",
