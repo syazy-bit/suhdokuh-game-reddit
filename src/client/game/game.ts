@@ -1802,8 +1802,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
 
-    // Restore mistake state
-    mistakeCount = move.mistakeCountAfter;
+    // Restore mistaken cells (current board state — not historical mistakes)
     mistakenCells = new Set(move.mistakenCellsAfter);
 
     state.selected = move.selectionAfterMove;
@@ -1892,8 +1891,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
 
-    // Restore mistake state
-    mistakeCount = move.mistakeCountBefore;
+    // Restore mistaken cells (current board state — not historical mistakes)
     mistakenCells = new Set(move.mistakenCellsBefore);
 
     state.selected = move.selectionBeforeMove;
